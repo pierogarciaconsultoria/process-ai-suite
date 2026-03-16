@@ -244,6 +244,7 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
 
   return (
     <div className="flex flex-col h-full">
+      <style>{`.djs-palette{z-index:1000 !important}.djs-context-pad{z-index:1000 !important}.djs-overlay-container{z-index:1000 !important}.djs-container{overflow:visible !important}`}</style>
       <div className="flex items-center justify-between p-2 md:p-3 border rounded-md bg-card mb-2">
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => { const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined; canvas?.zoom("fit-viewport"); }}>Ajustar</Button>
@@ -258,7 +259,7 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
           <Button variant="outline" size="sm" onClick={clear}>Limpar</Button>
         </div>
       </div>
-      <div className="flex-1 bg-muted/30 rounded-md w-full min-h-[500px] md:min-h-[700px] h-[80vh] md:h-[85vh]" ref={containerRef} />
+      <div className="flex-1 bg-muted/30 rounded-md w-full min-h-[500px] md:min-h-[700px] h-[80vh] md:h-[85vh] relative overflow-visible" ref={containerRef} />
       {!hideGenerateButton && (
         <div className="mt-2">
           <Button className="w-full" onClick={generate}>Gerar Diagrama BPMN Automaticamente</Button>
