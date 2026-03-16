@@ -2,8 +2,6 @@ import {
   LayoutDashboard,
   Network,
   ClipboardList,
-  Building2,
-  Users,
   FileText,
   Settings,
   LogOut,
@@ -28,8 +26,6 @@ const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Arquitetura", url: "/arquitetura", icon: Network },
   { title: "Processos", url: "/processos", icon: ClipboardList },
-  { title: "Empresas", url: "/empresas", icon: Building2 },
-  { title: "Usuários", url: "/usuarios", icon: Users },
   { title: "Relatórios", url: "/relatorios", icon: FileText },
 ];
 

@@ -5,24 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye } from "lucide-react";
-
-interface Processo {
-  id: string;
-  nome: string;
-  area: string;
-  responsavel: string;
-  status: string;
-  criticidade: string;
-  data_criacao: string;
-}
-
-const mockProcessos: Processo[] = [
-  { id: "1", nome: "Gestão de Vendas", area: "Comercial", responsavel: "Ana Silva", status: "Mapeado", criticidade: "Alta", data_criacao: "2024-03-01" },
-  { id: "2", nome: "Onboarding de Clientes", area: "Operações", responsavel: "Carlos Souza", status: "Em Análise", criticidade: "Média", data_criacao: "2024-03-05" },
-  { id: "3", nome: "Fechamento Contábil", area: "Financeiro", responsavel: "Maria Oliveira", status: "Documentado", criticidade: "Crítica", data_criacao: "2024-03-10" },
-  { id: "4", nome: "Recrutamento e Seleção", area: "RH", responsavel: "Pedro Santos", status: "Novo", criticidade: "Baixa", data_criacao: "2024-03-12" },
-];
+import { Plus, Search, Eye, Pencil } from "lucide-react";
+import { processos, type Processo } from "@/data/mock-processos";
 
 const statusColors: Record<string, string> = {
   Novo: "bg-muted text-muted-foreground",
@@ -42,7 +26,7 @@ const Processos = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
-  const filtered = mockProcessos.filter(
+  const filtered = processos.filter(
     (p) =>
       p.nome.toLowerCase().includes(search.toLowerCase()) ||
       p.area.toLowerCase().includes(search.toLowerCase())
@@ -104,6 +88,13 @@ const Processos = () => {
                   <TableCell>
                     <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}`)}>
                       <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate(`/processos/${processo.id}/editar`, { state: processo })}
+                    >
+                      <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Sparkles } from "lucide-react";
+import { processos, processosFormMock } from "@/data/mock-processos";
+import { aiFillFromObjective } from "@/lib/ai";
+import { toast } from "@/hooks/use-toast";
 
 const steps = [
   "Identificação",
@@ -37,22 +40,103 @@ interface Risco {
 const ProcessoFormulario = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams();
+  const fromMock = id ? processos.find((p) => p.id === id) ?? {} : {};
+  const formMock = id ? processosFormMock[id] ?? undefined : undefined;
+  const initial = { ...(fromMock as { nome?: string; area?: string; responsavel?: string }), ...((location.state as { nome?: string; area?: string; responsavel?: string } | undefined) ?? {}) };
 
-  const [nome, setNome] = useState("");
-  const [area, setArea] = useState("");
-  const [responsavel, setResponsavel] = useState("");
-  const [objetivo, setObjetivo] = useState("");
-  const [clienteProcesso, setClienteProcesso] = useState("");
-  const [areasEnvolvidas, setAreasEnvolvidas] = useState("");
-  const [entradas, setEntradas] = useState("");
-  const [etapas, setEtapas] = useState<Etapa[]>([{ ordem: 1, atividade: "", responsavel: "", sistema: "" }]);
-  const [decisoes, setDecisoes] = useState("");
-  const [saidas, setSaidas] = useState("");
-  const [problemas, setProblemas] = useState({ retrabalho: false, atrasos: false, erros: false, dependencia: false });
-  const [problemasTexto, setProblemasTexto] = useState("");
-  const [riscos, setRiscos] = useState<Risco[]>([{ risco: "", impacto: "" }]);
-  const [indicadores, setIndicadores] = useState("");
-  const [sugestoes, setSugestoes] = useState("");
+  const [nome, setNome] = useState(initial.nome ?? "");
+  const [area, setArea] = useState(initial.area ?? "");
+  const [responsavel, setResponsavel] = useState(initial.responsavel ?? "");
+  const [objetivo, setObjetivo] = useState(formMock?.objetivo ?? "");
+  const [clienteProcesso, setClienteProcesso] = useState(formMock?.clienteProcesso ?? "");
+  const [areasEnvolvidas, setAreasEnvolvidas] = useState(formMock?.areasEnvolvidas ?? "");
+  const [entradas, setEntradas] = useState(formMock?.entradas ?? "");
+  const [etapas, setEtapas] = useState<Etapa[]>(formMock?.etapas ?? [{ ordem: 1, atividade: "", responsavel: "", sistema: "" }]);
+  const [decisoes, setDecisoes] = useState(formMock?.decisoes ?? "");
+  const [saidas, setSaidas] = useState(formMock?.saidas ?? "");
+  const [problemas, setProblemas] = useState(formMock?.problemas ?? { retrabalho: false, atrasos: false, erros: false, dependencia: false });
+  const [problemasTexto, setProblemasTexto] = useState(formMock?.problemasTexto ?? "");
+  const [riscos, setRiscos] = useState<Risco[]>(formMock?.riscos ?? [{ risco: "", impacto: "" }]);
+  const [indicadores, setIndicadores] = useState(formMock?.indicadores ?? "");
+  const [sugestoes, setSugestoes] = useState(formMock?.sugestoes ?? "");
+  const [loadingAI, setLoadingAI] = useState(false);
+  const gerarMapaASIS = () => {
+    if (!id) {
+      toast({ title: "Abra um processo", description: "Abra um processo específico para gerar o BPMN." });
+      return;
+    }
+    const etapasText =
+      (etapas ?? [])
+        .filter((e) => e.atividade?.trim())
+        .map((e) => {
+          const resp = e.responsavel ? ` pelo(a) ${e.responsavel}` : "";
+          const sis = e.sistema ? ` usando ${e.sistema}` : "";
+          return `${e.atividade}${resp}${sis}.`;
+        })
+        .join("\n") || "";
+    const header = objetivo ? `Objetivo: ${objetivo}.\n` : "";
+    const cliente = clienteProcesso ? `Cliente: ${clienteProcesso}.\n` : "";
+    const areas = areasEnvolvidas ? `Áreas: ${areasEnvolvidas}.\n` : "";
+    const descricao = `${header}${cliente}${areas}${etapasText}`.trim();
+    const executoresStr =
+      [...new Set((etapas ?? []).map((e) => e.responsavel).filter(Boolean))].join(", ") ||
+      areasEnvolvidas ||
+      "";
+    try {
+      localStorage.setItem(`bpmn_as_is_description_${id}`, descricao);
+      if (executoresStr) localStorage.setItem(`bpmn_executors_${id}`, executoresStr);
+      navigate(`/processos/${id}`);
+      toast({ title: "Mapa AS IS", description: "Descrição enviada para a aba BPMN." });
+    } catch {
+      toast({ title: "Falha ao enviar descrição", description: "Tente novamente." });
+    }
+  };
+
+  const preencherComIA = async () => {
+    if (!objetivo.trim()) {
+      toast({ title: "Informe o objetivo", description: "Preencha o campo Objetivo do Processo para usar a IA." });
+      return;
+    }
+    setLoadingAI(true);
+    try {
+      const data = await aiFillFromObjective(objetivo);
+      setEntradas(data.entradas ?? "");
+      setEtapas((data.etapas ?? []).map((e, i) => ({ ...e, ordem: i + 1 })));
+      setDecisoes(data.decisoes ?? "");
+      setSaidas(data.saidas ?? "");
+      setProblemas(data.problemas ?? { retrabalho: false, atrasos: false, erros: false, dependencia: false });
+      setProblemasTexto(data.problemasTexto ?? "");
+      setRiscos((data.riscos ?? []).length ? data.riscos : [{ risco: "", impacto: "" }]);
+      setIndicadores(data.indicadores ?? "");
+      setSugestoes(data.sugestoes ?? "");
+      toast({ title: "Campos preenchidos", description: "As abas foram atualizadas com sugestões da IA." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("OPENAI_API_KEY_NOT_CONFIGURED")) {
+        const fallback = formMock ?? processosFormMock[id ?? ""] ?? undefined;
+        if (fallback) {
+          setEntradas(fallback.entradas);
+          setEtapas(fallback.etapas.map((e, i) => ({ ...e, ordem: i + 1 })));
+          setDecisoes(fallback.decisoes);
+          setSaidas(fallback.saidas);
+          setProblemas(fallback.problemas);
+          setProblemasTexto(fallback.problemasTexto);
+          setRiscos(fallback.riscos);
+          setIndicadores(fallback.indicadores);
+          setSugestoes(fallback.sugestoes);
+          toast({ title: "Usando mock local", description: "Configure VITE_OPENAI_API_KEY para usar a IA por API." });
+        } else {
+          toast({ title: "Chave da OpenAI ausente", description: "Defina VITE_OPENAI_API_KEY no ambiente para habilitar a IA." });
+        }
+      } else {
+        toast({ title: "Falha ao gerar com IA", description: "Tente novamente mais tarde." });
+      }
+    } finally {
+      setLoadingAI(false);
+    }
+  };
 
   const addEtapa = () => setEtapas([...etapas, { ordem: etapas.length + 1, atividade: "", responsavel: "", sistema: "" }]);
   const removeEtapa = (i: number) => setEtapas(etapas.filter((_, idx) => idx !== i).map((e, idx) => ({ ...e, ordem: idx + 1 })));
@@ -103,6 +187,18 @@ const ProcessoFormulario = () => {
             <div className="space-y-2">
               <Label>Áreas Envolvidas</Label>
               <Input value={areasEnvolvidas} onChange={(e) => setAreasEnvolvidas(e.target.value)} placeholder="Separe por vírgula" />
+            </div>
+            <div className="flex justify-end">
+              <div className="flex gap-2">
+              <Button onClick={preencherComIA} disabled={loadingAI} className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                {loadingAI ? "Gerando..." : "Preencher com IA"}
+              </Button>
+              <Button variant="outline" onClick={gerarMapaASIS} className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Enviar para Mapa AS IS
+              </Button>
+              </div>
             </div>
           </div>
         );
@@ -260,8 +356,8 @@ const ProcessoFormulario = () => {
           <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Formulário Master de Processo</h1>
-          <p className="text-muted-foreground">Preencha todas as informações do processo</p>
+          <h1 className="text-2xl font-bold text-foreground">{id ? "Editar Processo" : "Formulário Master de Processo"}</h1>
+          <p className="text-muted-foreground">{id ? `Editando processo #${id}` : "Preencha todas as informações do processo"}</p>
         </div>
       </div>
 
