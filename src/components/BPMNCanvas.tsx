@@ -11,6 +11,7 @@ type BPMNCanvasProps = {
   executors?: string;
   description?: string;
   generateKey?: number;
+  fitKey?: number;
   onSave?: (xml: string) => void;
   onGenerated?: () => void;
   hideGenerateButton?: boolean;
@@ -147,7 +148,7 @@ function generateBPMNFromDescription(description: string, processName?: string, 
   return xml;
 }
 
-export default function BPMNCanvas({ processName, processCode, executors, description, generateKey, onSave, onGenerated, hideGenerateButton }: BPMNCanvasProps) {
+export default function BPMNCanvas({ processName, processCode, executors, description, generateKey, fitKey, onSave, onGenerated, hideGenerateButton }: BPMNCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnModeler | null>(null);
   type CanvasService = { zoom: (value?: number | string) => number; resized: () => void };
@@ -178,6 +179,14 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generateKey]);
 
+  useEffect(() => {
+    if (fitKey !== undefined) {
+      const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined;
+      canvas?.resized();
+      canvas?.zoom("fit-viewport");
+    }
+  }, [fitKey]);
+
   const generate = async () => {
     if (!description || !description.trim()) return;
     const xml = generateBPMNFromDescription(description, processName, processCode, executors);
@@ -191,6 +200,9 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
   const save = async () => {
     const { xml } = await modelerRef.current!.saveXML({ format: true });
     onSave?.(xml);
+    const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined;
+    canvas?.resized();
+    canvas?.zoom("fit-viewport");
   };
 
   const exportSVG = async () => {

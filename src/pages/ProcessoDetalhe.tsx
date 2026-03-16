@@ -33,10 +33,13 @@ const ProcessoDetalhe = () => {
   const [xmlToBe, setXmlToBe] = useState<string | null>(null);
   const [genKeyAsIs, setGenKeyAsIs] = useState(0);
   const [genKeyToBe, setGenKeyToBe] = useState(0);
+  const [fitKeyAsIs, setFitKeyAsIs] = useState(0);
+  const [fitKeyToBe, setFitKeyToBe] = useState(0);
   const [saving, setSaving] = useState(false);
   const [generatingAsIs, setGeneratingAsIs] = useState(false);
   const [generatingToBe, setGeneratingToBe] = useState(false);
   const [executoresOverride, setExecutoresOverride] = useState("");
+  const [tabValue, setTabValue] = useState("bpmn");
 
   const handlePersist = async () => {
     if (!id) return;
@@ -81,6 +84,11 @@ const ProcessoDetalhe = () => {
       localStorage.removeItem(`bpmn_executors_${id}`);
     }
   }, [id]);
+
+  React.useEffect(() => {
+    if (tabValue === "bpmn") setFitKeyAsIs((k) => k + 1);
+    if (tabValue === "redesenho") setFitKeyToBe((k) => k + 1);
+  }, [tabValue]);
 
   const statusColor =
     processo?.status === "Mapeado"
@@ -140,7 +148,7 @@ const ProcessoDetalhe = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="bpmn">
+      <Tabs value={tabValue} onValueChange={setTabValue}>
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="bpmn">BPMN</TabsTrigger>
           <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
@@ -160,6 +168,7 @@ const ProcessoDetalhe = () => {
                 executors={executoresOverride || executores}
                 description={asIsDesc}
                 generateKey={genKeyAsIs}
+                fitKey={fitKeyAsIs}
                 onSave={(xml) => setXmlAsIs(xml)}
                 onGenerated={() => setGeneratingAsIs(false)}
                 hideGenerateButton
@@ -223,6 +232,7 @@ const ProcessoDetalhe = () => {
                       executors={executores}
                       description={toBeDesc}
                       generateKey={genKeyToBe}
+                      fitKey={fitKeyToBe}
                       onSave={(xml) => setXmlToBe(xml)}
                       onGenerated={() => setGeneratingToBe(false)}
                     />
