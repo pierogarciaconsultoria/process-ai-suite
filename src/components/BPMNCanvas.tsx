@@ -264,7 +264,7 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
 
   return (
     <div className="flex flex-col h-full">
-      <style>{`.djs-palette{z-index:1000 !important}.djs-context-pad{z-index:1000 !important}.djs-overlay-container{z-index:1000 !important}.djs-container{overflow:visible !important}.djs-container,.djs-parent,.djs-scrollable{width:100%;height:100%}.djs-svg{width:100%;height:100%}`}</style>
+      <style>{`.djs-palette{z-index:1000 !important}.djs-context-pad{z-index:1000 !important}.djs-overlay-container{z-index:1000 !important}.djs-container{overflow:visible !important}.bjs-container,.djs-container,.djs-parent,.djs-scrollable{width:100%;height:100%}.djs-svg{width:100%;height:100%;display:block}`}</style>
       <div className="flex items-center justify-between p-2 md:p-3 border rounded-md bg-card mb-2">
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => { const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined; canvas?.zoom("fit-viewport"); }}>Ajustar</Button>
