@@ -150,7 +150,7 @@ function generateBPMNFromDescription(description: string, processName?: string, 
 export default function BPMNCanvas({ processName, processCode, executors, description, generateKey, onSave, onGenerated, hideGenerateButton }: BPMNCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnModeler | null>(null);
-  type CanvasService = { zoom: (value?: number | string) => number };
+  type CanvasService = { zoom: (value?: number | string) => number; resized: () => void };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -159,7 +159,14 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
       keyboard: { bindTo: window },
     });
     modelerRef.current = modeler;
+    const ro = new ResizeObserver(() => {
+      const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined;
+      canvas?.resized();
+      canvas?.zoom("fit-viewport");
+    });
+    ro.observe(containerRef.current);
     return () => {
+      ro.disconnect();
       modeler.destroy();
     };
   }, []);
@@ -176,6 +183,7 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
     const xml = generateBPMNFromDescription(description, processName, processCode, executors);
     await modelerRef.current?.importXML(xml);
     const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined;
+    canvas?.resized();
     canvas?.zoom("fit-viewport");
     onGenerated?.();
   };
@@ -244,7 +252,7 @@ export default function BPMNCanvas({ processName, processCode, executors, descri
 
   return (
     <div className="flex flex-col h-full">
-      <style>{`.djs-palette{z-index:1000 !important}.djs-context-pad{z-index:1000 !important}.djs-overlay-container{z-index:1000 !important}.djs-container{overflow:visible !important}`}</style>
+      <style>{`.djs-palette{z-index:1000 !important}.djs-context-pad{z-index:1000 !important}.djs-overlay-container{z-index:1000 !important}.djs-container{overflow:visible !important}.djs-container,.djs-parent,.djs-scrollable{width:100%;height:100%}.djs-svg{width:100%;height:100%}`}</style>
       <div className="flex items-center justify-between p-2 md:p-3 border rounded-md bg-card mb-2">
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => { const canvas = modelerRef.current?.get("canvas") as CanvasService | undefined; canvas?.zoom("fit-viewport"); }}>Ajustar</Button>
