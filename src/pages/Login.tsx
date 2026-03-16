@@ -24,8 +24,9 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       navigate("/dashboard");
-    } catch (error: any) {
-      toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "Erro ao entrar", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -41,8 +42,9 @@ const Login = () => {
       if (error) throw error;
       toast({ title: "Email enviado", description: "Verifique sua caixa de entrada para redefinir sua senha." });
       setIsResetMode(false);
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "Erro", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
