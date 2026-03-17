@@ -90,7 +90,7 @@ const ProcessoFormulario = () => {
     updateField("etapas", updated);
   };
 
-  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "" }]);
+  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "", probabilidade: 1 as NivelRisco, impacto: 1 as NivelRisco }]);
   const removeRisco = (i: number) => updateField("riscos", form.riscos.filter((_, idx) => idx !== i));
   const updateRisco = (i: number, field: keyof RiscoForm, value: string) => {
     const updated = [...form.riscos];
