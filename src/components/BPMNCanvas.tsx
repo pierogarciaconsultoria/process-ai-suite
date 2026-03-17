@@ -227,7 +227,7 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
       <div
         ref={containerRef}
         className="border rounded-lg bg-background"
-        style={{ width: "100%", height: "500px" }}
+        style={{ width: "100%", height: "600px" }}
       />
     </div>
   );
