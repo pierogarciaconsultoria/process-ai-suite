@@ -76,8 +76,8 @@ export interface ProcessoFormData {
   // 6. Decisões
   decisoes: string;
 
-  // 7. Saídas
-  saidas: string;
+  // 7. Saídas (SIPOC: Output + Customer)
+  saidas: SaidaForm[];
 
   // 8. Recursos
   recursos: string;
