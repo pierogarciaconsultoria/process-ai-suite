@@ -337,8 +337,36 @@ const ProcessoFormulario = () => {
                   <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={4} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Saídas do Processo</Label>
-                  <Textarea value={form.saidas} onChange={(e) => updateField("saidas", e.target.value)} placeholder="Resultado final do processo" rows={4} />
+                  <Label>Saídas do Processo (Output → Customer)</Label>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Saída (Output)</TableHead>
+                        <TableHead>Cliente (Customer)</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {form.saidas.map((s, i) => (
+                        <TableRow key={i}>
+                          <TableCell>
+                            <Input value={s.saida} onChange={(e) => { const arr = [...form.saidas]; arr[i] = { ...arr[i], saida: e.target.value }; updateField("saidas", arr); }} placeholder="Resultado / entrega" />
+                          </TableCell>
+                          <TableCell>
+                            <Input value={s.cliente} onChange={(e) => { const arr = [...form.saidas]; arr[i] = { ...arr[i], cliente: e.target.value }; updateField("saidas", arr); }} placeholder="Quem recebe a saída" />
+                          </TableCell>
+                          <TableCell>
+                            {form.saidas.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" onClick={() => { const arr = form.saidas.filter((_, idx) => idx !== i); updateField("saidas", arr); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <Button type="button" variant="outline" size="sm" onClick={() => updateField("saidas", [...form.saidas, { saida: "", cliente: "" }])}>
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar Saída
+                  </Button>
                 </div>
               </div>
             </TabsContent>

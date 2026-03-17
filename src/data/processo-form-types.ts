@@ -15,6 +15,11 @@ export interface EntradaForm {
   entrada: string;
 }
 
+export interface SaidaForm {
+  saida: string;
+  cliente: string;
+}
+
 export interface RiscoForm {
   risco: string;
   consequencia: string;
@@ -71,8 +76,8 @@ export interface ProcessoFormData {
   // 6. Decisões
   decisoes: string;
 
-  // 7. Saídas
-  saidas: string;
+  // 7. Saídas (SIPOC: Output + Customer)
+  saidas: SaidaForm[];
 
   // 8. Recursos
   recursos: string;
@@ -140,7 +145,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   entradas: [{ fornecedor: "", entrada: "" }],
   etapas: [{ ordem: 1, atividade: "", responsavel: "", ferramentaDocumento: "" }],
   decisoes: "",
-  saidas: "",
+  saidas: [{ saida: "", cliente: "" }],
   recursos: "",
   frequencia: "Sob demanda",
   tempoExecucao: "",
