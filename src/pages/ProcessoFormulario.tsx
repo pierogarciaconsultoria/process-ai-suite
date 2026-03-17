@@ -99,9 +99,25 @@ const ProcessoFormulario = () => {
     updateField("etapas", updated);
   };
 
-  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "" }]);
+  const addEntrada = () => updateField("entradas", [...form.entradas, { fornecedor: "", entrada: "" }]);
+  const removeEntrada = (i: number) => updateField("entradas", form.entradas.filter((_, idx) => idx !== i));
+  const updateEntrada = (i: number, field: keyof EntradaForm, value: string) => {
+    const updated = [...form.entradas];
+    updated[i] = { ...updated[i], [field]: value };
+    updateField("entradas", updated);
+  };
+
+  const addSaida = () => updateField("saidas", [...form.saidas, { saida: "", cliente: "" }]);
+  const removeSaida = (i: number) => updateField("saidas", form.saidas.filter((_, idx) => idx !== i));
+  const updateSaida = (i: number, field: keyof SaidaForm, value: string) => {
+    const updated = [...form.saidas];
+    updated[i] = { ...updated[i], [field]: value };
+    updateField("saidas", updated);
+  };
+
+  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "", probabilidade: 1 as NivelRisco, impacto: 1 as NivelRisco }]);
   const removeRisco = (i: number) => updateField("riscos", form.riscos.filter((_, idx) => idx !== i));
-  const updateRisco = (i: number, field: keyof RiscoForm, value: string) => {
+  const updateRisco = (i: number, field: keyof RiscoForm, value: string | number) => {
     const updated = [...form.riscos];
     updated[i] = { ...updated[i], [field]: value };
     updateField("riscos", updated);
