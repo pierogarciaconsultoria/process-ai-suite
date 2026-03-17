@@ -10,6 +10,11 @@ export interface EtapaForm {
   ferramentaDocumento: string;
 }
 
+export interface EntradaForm {
+  fornecedor: string;
+  entrada: string;
+}
+
 export interface RiscoForm {
   risco: string;
   consequencia: string;
