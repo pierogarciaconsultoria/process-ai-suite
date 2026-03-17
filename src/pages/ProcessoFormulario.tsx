@@ -203,6 +203,28 @@ const ProcessoFormulario = () => {
     navigate("/processos");
   };
 
+  const handleDiagnose = async () => {
+    setIsDiagnosing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-diagnose-process", {
+        body: { processoData: form },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      navigate("/processos/novo/diagnostico", { state: { diagnostico: data } });
+    } catch (err: any) {
+      console.error("Diagnose error:", err);
+      toast({
+        title: "Erro ao gerar diagnóstico",
+        description: err?.message || "Tente novamente em alguns segundos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
