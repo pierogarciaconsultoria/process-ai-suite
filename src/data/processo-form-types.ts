@@ -129,6 +129,10 @@ export interface ProcessoFormData {
 
   // 19. Conclusão
   conclusao: string;
+
+  // 20. BPMN Maps
+  bpmnAsIs: string;
+  bpmnToBe: string;
 }
 
 // ── Diagnóstico Result Types ──
@@ -264,4 +268,6 @@ export const emptyProcessoForm: ProcessoFormData = {
   criticidadeDetalhada: { impactoNegocio: 1, impactoCliente: 1, riscoOperacional: 1 },
   planoAcao: [{ oque: "", porque: "", quem: "", quando: "", onde: "", como: "", custo: "" }],
   conclusao: "",
+  bpmnAsIs: "",
+  bpmnToBe: "",
 };
