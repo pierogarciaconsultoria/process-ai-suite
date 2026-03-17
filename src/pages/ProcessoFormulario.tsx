@@ -53,7 +53,7 @@ const TAB_LABELS: Record<string, string> = {
   recursos: "7. Recursos",
   dores: "8. Dores & Gargalos",
   riscos: "9. Riscos",
-  controles: "10. Controles",
+  controles: "10. Indicadores",
   melhorias: "11. Melhorias",
   plano: "12. Plano de Ação"
 };
@@ -570,17 +570,12 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 8: Controles & Indicadores */}
+            {/* Tab 8: Indicadores */}
             <TabsContent value="controles">
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <CardTitle className="text-lg">Controles Existentes</CardTitle>
-                  <Textarea value={form.controles} onChange={(e) => updateField("controles", e.target.value)} placeholder="Conferências, aprovações, checklists, validações..." rows={4} />
-                </div>
-
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Indicadores Existentes</CardTitle>
+                    <CardTitle className="text-lg">Indicadores</CardTitle>
                     <Button size="sm" variant="outline" onClick={addIndicador}><Plus className="h-4 w-4 mr-1" /> Indicador</Button>
                   </div>
                   <Table>
