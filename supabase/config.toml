@@ -1,1 +1,4 @@
 project_id = "owenetohbgzhzwncwzbn"
+
+[functions.ai-fill-process]
+verify_jwt = false
