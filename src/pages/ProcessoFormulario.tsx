@@ -10,8 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, ArrowRight, Save, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Plus, Trash2, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   type ProcessoFormData,
   type EtapaForm,
@@ -72,6 +73,63 @@ const ProcessoFormulario = () => {
 
   const [activeTab, setActiveTab] = useState<string>("identificacao");
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
+  const [descricaoIA, setDescricaoIA] = useState("");
+  const [isFillingAI, setIsFillingAI] = useState(false);
+
+  const handleAIFill = async () => {
+    if (descricaoIA.trim().length < 10) {
+      toast({ title: "Descrição muito curta", description: "Descreva o processo com mais detalhes (mínimo 10 caracteres).", variant: "destructive" });
+      return;
+    }
+    setIsFillingAI(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-fill-process", {
+        body: { descricao: descricaoIA },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Merge AI data into form, preserving identification fields
+      setForm((prev) => ({
+        ...prev,
+        objetivo: data.objetivo || prev.objetivo,
+        porqueExiste: data.porqueExiste || prev.porqueExiste,
+        clienteProcesso: data.clienteProcesso || prev.clienteProcesso,
+        areasEnvolvidas: data.areasEnvolvidas || prev.areasEnvolvidas,
+        gatilho: data.gatilho || prev.gatilho,
+        entradas: data.entradas?.length ? data.entradas : prev.entradas,
+        etapas: data.etapas?.length ? data.etapas : prev.etapas,
+        decisoes: data.decisoes || prev.decisoes,
+        saidas: data.saidas?.length ? data.saidas : prev.saidas,
+        recursos: data.recursos || prev.recursos,
+        frequencia: data.frequencia || prev.frequencia,
+        tempoExecucao: data.tempoExecucao || prev.tempoExecucao,
+        problemas: data.problemas || prev.problemas,
+        problemasTexto: data.problemasTexto || prev.problemasTexto,
+        gargalos: data.gargalos || prev.gargalos,
+        riscos: data.riscos?.length ? data.riscos : prev.riscos,
+        controles: data.controles || prev.controles,
+        indicadores: data.indicadores?.length ? data.indicadores : prev.indicadores,
+        sugestoes: data.sugestoes || prev.sugestoes,
+        automacao: data.automacao || prev.automacao,
+        documentacao: data.documentacao || prev.documentacao,
+        criticidadeDetalhada: data.criticidadeDetalhada || prev.criticidadeDetalhada,
+        planoAcao: data.planoAcao?.length ? data.planoAcao : prev.planoAcao,
+        conclusao: data.conclusao || prev.conclusao,
+      }));
+
+      toast({ title: "Preenchimento concluído!", description: "A IA preencheu todas as abas. Revise os dados gerados." });
+    } catch (err: any) {
+      console.error("AI fill error:", err);
+      toast({
+        title: "Erro ao preencher com IA",
+        description: err?.message || "Tente novamente em alguns segundos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFillingAI(false);
+    }
+  };
 
   const tabIndex = TABS.indexOf(activeTab as typeof TABS[number]);
 
@@ -220,7 +278,39 @@ const ProcessoFormulario = () => {
 
             {/* Tab 2: Contexto */}
             <TabsContent value="contexto">
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* AI Auto-fill Section */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg">Preenchimento com IA</CardTitle>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Descreva o processo em detalhes e a IA preencherá automaticamente todas as demais abas do mapeamento.
+                    </p>
+                    <Textarea
+                      value={descricaoIA}
+                      onChange={(e) => setDescricaoIA(e.target.value)}
+                      placeholder="Ex: Processo de contratação de novos colaboradores, desde a abertura da vaga até a integração do novo funcionário. Envolve RH, gestor da área e diretoria para aprovação..."
+                      rows={5}
+                      disabled={isFillingAI}
+                    />
+                    <Button onClick={handleAIFill} disabled={isFillingAI || descricaoIA.trim().length < 10}>
+                      {isFillingAI ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Preenchendo...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" /> Preencher com IA
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Manual context fields */}
                 <CardHeader className="p-0 pb-4"><CardTitle className="text-lg">Contexto do Processo</CardTitle></CardHeader>
                 <div className="space-y-2">
                   <Label>Objetivo do Processo</Label>
