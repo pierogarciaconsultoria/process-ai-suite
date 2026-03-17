@@ -240,11 +240,6 @@ const ProcessoFormulario = () => {
                     <Input value={form.areasEnvolvidas} onChange={(e) => updateField("areasEnvolvidas", e.target.value)} placeholder="Comercial, Financeiro..." />
                   </div>
                 </div>
-                <CardHeader className="p-0 pt-6 pb-4"><CardTitle className="text-lg">Gatilho do Processo</CardTitle></CardHeader>
-                <div className="space-y-2">
-                  <Label>O que inicia o processo?</Label>
-                  <Textarea value={form.gatilho} onChange={(e) => updateField("gatilho", e.target.value)} placeholder="Ex: Chamado, solicitação, pedido, documento recebido..." />
-                </div>
               </div>
             </TabsContent>
 
