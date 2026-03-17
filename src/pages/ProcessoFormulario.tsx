@@ -218,7 +218,7 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 2: Contexto & Gatilho */}
+            {/* Tab 2: Contexto */}
             <TabsContent value="contexto">
               <div className="space-y-4">
                 <CardHeader className="p-0 pb-4"><CardTitle className="text-lg">Contexto do Processo</CardTitle></CardHeader>
