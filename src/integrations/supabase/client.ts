@@ -2,16 +2,38 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
-});
+let client: ReturnType<typeof createClient<Database>>;
+if (SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) {
+  client = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    }
+  });
+} else {
+  const stub = {
+    from: () => ({
+      select: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") }),
+      update: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") }),
+      insert: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") }),
+      delete: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") }),
+      eq: () => ({
+        select: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") }),
+        update: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") })
+      })
+    }),
+    auth: {
+      signInWithPassword: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") }),
+      resetPasswordForEmail: async () => ({ data: null, error: new Error("SUPABASE_NOT_CONFIGURED") })
+    }
+  } as unknown as ReturnType<typeof createClient<Database>>;
+  client = stub;
+}
+export const supabase = client;

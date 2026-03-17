@@ -22,7 +22,7 @@ const steps = [
   "Problemas",
   "Riscos",
   "Indicadores",
-  "Sugestões",
+  "Melhoria",
 ];
 
 interface Etapa {
@@ -35,6 +35,13 @@ interface Etapa {
 interface Risco {
   risco: string;
   impacto: string;
+  probabilidade?: number;
+  severidade?: number;
+  categoria?: string;
+  responsavel?: string;
+  prazo?: string;
+  plano?: string;
+  status?: string;
 }
 
 const ProcessoFormulario = () => {
@@ -58,41 +65,22 @@ const ProcessoFormulario = () => {
   const [saidas, setSaidas] = useState(formMock?.saidas ?? "");
   const [problemas, setProblemas] = useState(formMock?.problemas ?? { retrabalho: false, atrasos: false, erros: false, dependencia: false });
   const [problemasTexto, setProblemasTexto] = useState(formMock?.problemasTexto ?? "");
-  const [riscos, setRiscos] = useState<Risco[]>(formMock?.riscos ?? [{ risco: "", impacto: "" }]);
+  const [riscos, setRiscos] = useState<Risco[]>(
+    (formMock?.riscos ?? [{ risco: "", impacto: "" }]).map((r) => ({
+      risco: r.risco ?? "",
+      impacto: r.impacto ?? "",
+      probabilidade: 3,
+      severidade: 3,
+      categoria: "",
+      responsavel: "",
+      prazo: "",
+      plano: "",
+      status: "Aberto",
+    }))
+  );
   const [indicadores, setIndicadores] = useState(formMock?.indicadores ?? "");
   const [sugestoes, setSugestoes] = useState(formMock?.sugestoes ?? "");
   const [loadingAI, setLoadingAI] = useState(false);
-  const gerarMapaASIS = () => {
-    if (!id) {
-      toast({ title: "Abra um processo", description: "Abra um processo específico para gerar o BPMN." });
-      return;
-    }
-    const etapasText =
-      (etapas ?? [])
-        .filter((e) => e.atividade?.trim())
-        .map((e) => {
-          const resp = e.responsavel ? ` pelo(a) ${e.responsavel}` : "";
-          const sis = e.sistema ? ` usando ${e.sistema}` : "";
-          return `${e.atividade}${resp}${sis}.`;
-        })
-        .join("\n") || "";
-    const header = objetivo ? `Objetivo: ${objetivo}.\n` : "";
-    const cliente = clienteProcesso ? `Cliente: ${clienteProcesso}.\n` : "";
-    const areas = areasEnvolvidas ? `Áreas: ${areasEnvolvidas}.\n` : "";
-    const descricao = `${header}${cliente}${areas}${etapasText}`.trim();
-    const executoresStr =
-      [...new Set((etapas ?? []).map((e) => e.responsavel).filter(Boolean))].join(", ") ||
-      areasEnvolvidas ||
-      "";
-    try {
-      localStorage.setItem(`bpmn_as_is_description_${id}`, descricao);
-      if (executoresStr) localStorage.setItem(`bpmn_executors_${id}`, executoresStr);
-      navigate(`/processos/${id}`);
-      toast({ title: "Mapa AS IS", description: "Descrição enviada para a aba BPMN." });
-    } catch {
-      toast({ title: "Falha ao enviar descrição", description: "Tente novamente." });
-    }
-  };
 
   const preencherComIA = async () => {
     if (!objetivo.trim()) {
@@ -108,7 +96,21 @@ const ProcessoFormulario = () => {
       setSaidas(data.saidas ?? "");
       setProblemas(data.problemas ?? { retrabalho: false, atrasos: false, erros: false, dependencia: false });
       setProblemasTexto(data.problemasTexto ?? "");
-      setRiscos((data.riscos ?? []).length ? data.riscos : [{ risco: "", impacto: "" }]);
+      setRiscos(
+        (data.riscos ?? []).length
+          ? (data.riscos ?? []).map((r) => ({
+              risco: r.risco ?? "",
+              impacto: r.impacto ?? "",
+              probabilidade: 3,
+              severidade: 3,
+              categoria: "",
+              responsavel: "",
+              prazo: "",
+              plano: "",
+              status: "Aberto",
+            }))
+          : [{ risco: "", impacto: "", probabilidade: 3, severidade: 3, categoria: "", responsavel: "", prazo: "", plano: "", status: "Aberto" }]
+      );
       setIndicadores(data.indicadores ?? "");
       setSugestoes(data.sugestoes ?? "");
       toast({ title: "Campos preenchidos", description: "As abas foram atualizadas com sugestões da IA." });
@@ -146,9 +148,23 @@ const ProcessoFormulario = () => {
     setEtapas(updated);
   };
 
-  const addRisco = () => setRiscos([...riscos, { risco: "", impacto: "" }]);
+  const addRisco = () =>
+    setRiscos([
+      ...riscos,
+      {
+        risco: "",
+        impacto: "",
+        probabilidade: 3,
+        severidade: 3,
+        categoria: "",
+        responsavel: "",
+        prazo: "",
+        plano: "",
+        status: "Aberto",
+      },
+    ]);
   const removeRisco = (i: number) => setRiscos(riscos.filter((_, idx) => idx !== i));
-  const updateRisco = (i: number, field: keyof Risco, value: string) => {
+  const updateRisco = (i: number, field: keyof Risco, value: string | number) => {
     const updated = [...riscos];
     updated[i] = { ...updated[i], [field]: value };
     setRiscos(updated);
@@ -194,10 +210,7 @@ const ProcessoFormulario = () => {
                 <Sparkles className="h-4 w-4" />
                 {loadingAI ? "Gerando..." : "Preencher com IA"}
               </Button>
-              <Button variant="outline" onClick={gerarMapaASIS} className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Enviar para Mapa AS IS
-              </Button>
+              
               </div>
             </div>
           </div>
@@ -309,29 +322,81 @@ const ProcessoFormulario = () => {
                 <Plus className="h-3 w-3 mr-1" /> Adicionar
               </Button>
             </div>
-            {riscos.map((risco, i) => (
-              <div key={i} className="flex gap-3 items-start">
-                <div className="flex-1 space-y-2">
-                  <Input value={risco.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descrição do risco" />
-                </div>
-                <div className="w-32 space-y-2">
-                  <Input value={risco.impacto} onChange={(e) => updateRisco(i, "impacto", e.target.value)} placeholder="Impacto" />
-                </div>
-                {riscos.length > 1 && (
-                  <Button variant="ghost" size="icon" onClick={() => removeRisco(i)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
-              </div>
-            ))}
+            <div className="space-y-3">
+              {riscos.map((risco, i) => {
+                const prob = Number(risco.probabilidade ?? 0);
+                const sev = Number(risco.severidade ?? 0);
+                const nivel = prob * sev;
+                const nivelLabel =
+                  nivel >= 15 ? "Crítico" : nivel >= 10 ? "Alto" : nivel >= 6 ? "Médio" : nivel > 0 ? "Baixo" : "-";
+                const nivelClass =
+                  nivel >= 15
+                    ? "bg-destructive text-destructive-foreground"
+                    : nivel >= 10
+                    ? "bg-destructive/20 text-destructive border-destructive/30"
+                    : nivel >= 6
+                    ? "bg-warning/20 text-warning border-warning/30"
+                    : "bg-success/20 text-success border-success/30";
+                return (
+                  <div key={i} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-start">
+                    <div className="md:col-span-2 space-y-2">
+                      <Label className="text-xs">Risco</Label>
+                      <Input value={risco.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descrição do risco" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Impacto (texto)</Label>
+                      <Input value={risco.impacto} onChange={(e) => updateRisco(i, "impacto", e.target.value)} placeholder="Impacto resumido" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Probabilidade (1-5)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={risco.probabilidade ?? 3}
+                        onChange={(e) => updateRisco(i, "probabilidade", Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Severidade (1-5)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={risco.severidade ?? 3}
+                        onChange={(e) => updateRisco(i, "severidade", Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Nível</Label>
+                      <div className={`inline-flex items-center px-2 py-1 rounded border text-xs ${nivelClass}`}>
+                        {nivelLabel} ({nivel || 0})
+                      </div>
+                    </div>
+                    <div className="flex items-end">
+                      {riscos.length > 1 && (
+                        <Button variant="ghost" size="icon" onClick={() => removeRisco(i)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       case 8:
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Indicadores Existentes</Label>
-              <Textarea value={indicadores} onChange={(e) => setIndicadores(e.target.value)} placeholder="Quais indicadores já são utilizados neste processo?" rows={6} />
+              <Label>Indicadores do Processo</Label>
+              <Textarea
+                value={indicadores}
+                onChange={(e) => setIndicadores(e.target.value)}
+                placeholder="Quais indicadores já são utilizados? Ex.: Tempo de ciclo, Taxa de retrabalho, SLA atendido."
+                rows={6}
+              />
             </div>
           </div>
         );
@@ -339,8 +404,13 @@ const ProcessoFormulario = () => {
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Sugestões de Melhoria</Label>
-              <Textarea value={sugestoes} onChange={(e) => setSugestoes(e.target.value)} placeholder="Alguma sugestão para melhorar este processo?" rows={6} />
+              <Label>Melhoria</Label>
+              <Textarea
+                value={sugestoes}
+                onChange={(e) => setSugestoes(e.target.value)}
+                placeholder="Descreva melhorias propostas para orientar o redesenho do processo (ações, responsáveis, prazos)."
+                rows={6}
+              />
             </div>
           </div>
         );
