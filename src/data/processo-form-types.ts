@@ -129,6 +129,10 @@ export interface ProcessoFormData {
 
   // 19. Conclusão
   conclusao: string;
+
+  // 20. BPMN Maps
+  bpmnAsIs: string;
+  bpmnToBe: string;
 }
 
 // ── Diagnóstico Result Types ──
