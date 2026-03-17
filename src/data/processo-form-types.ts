@@ -145,7 +145,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   entradas: [{ fornecedor: "", entrada: "" }],
   etapas: [{ ordem: 1, atividade: "", responsavel: "", ferramentaDocumento: "" }],
   decisoes: "",
-  saidas: "",
+  saidas: [{ saida: "", cliente: "" }],
   recursos: "",
   frequencia: "Sob demanda",
   tempoExecucao: "",
