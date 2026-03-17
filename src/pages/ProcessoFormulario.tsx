@@ -15,13 +15,17 @@ import { useToast } from "@/hooks/use-toast";
 import {
   type ProcessoFormData,
   type EtapaForm,
+  type EntradaForm,
+  type SaidaForm,
   type RiscoForm,
+  type NivelRisco,
   type IndicadorForm,
   type PlanoAcao5W2H,
   type Classificacao,
   type Frequencia,
   emptyProcessoForm } from
 "@/data/processo-form-types";
+import { Badge } from "@/components/ui/badge";
 
 const TABS = [
 "identificacao",
@@ -29,6 +33,7 @@ const TABS = [
 "entradas",
 "atividades",
 "decisoes",
+"saidas",
 "recursos",
 "dores",
 "riscos",
@@ -43,12 +48,20 @@ const TAB_LABELS: Record<string, string> = {
   entradas: "3. Entradas",
   atividades: "4. Atividades",
   decisoes: "5. Decisões",
-  recursos: "6. Recursos",
-  dores: "7. Dores & Gargalos",
-  riscos: "8. Riscos",
-  controles: "9. Controles",
-  melhorias: "10. Melhorias",
-  plano: "11. Plano de Ação"
+  saidas: "6. Saídas",
+  recursos: "7. Recursos",
+  dores: "8. Dores & Gargalos",
+  riscos: "9. Riscos",
+  controles: "10. Controles",
+  melhorias: "11. Melhorias",
+  plano: "12. Plano de Ação"
+};
+
+const getRiscoNivel = (score: number) => {
+  if (score <= 4) return { label: "Baixo", color: "bg-green-100 text-green-800" };
+  if (score <= 9) return { label: "Médio", color: "bg-yellow-100 text-yellow-800" };
+  if (score <= 15) return { label: "Alto", color: "bg-orange-100 text-orange-800" };
+  return { label: "Crítico", color: "bg-red-100 text-red-800" };
 };
 
 const ProcessoFormulario = () => {
@@ -86,9 +99,25 @@ const ProcessoFormulario = () => {
     updateField("etapas", updated);
   };
 
-  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "" }]);
+  const addEntrada = () => updateField("entradas", [...form.entradas, { fornecedor: "", entrada: "" }]);
+  const removeEntrada = (i: number) => updateField("entradas", form.entradas.filter((_, idx) => idx !== i));
+  const updateEntrada = (i: number, field: keyof EntradaForm, value: string) => {
+    const updated = [...form.entradas];
+    updated[i] = { ...updated[i], [field]: value };
+    updateField("entradas", updated);
+  };
+
+  const addSaida = () => updateField("saidas", [...form.saidas, { saida: "", cliente: "" }]);
+  const removeSaida = (i: number) => updateField("saidas", form.saidas.filter((_, idx) => idx !== i));
+  const updateSaida = (i: number, field: keyof SaidaForm, value: string) => {
+    const updated = [...form.saidas];
+    updated[i] = { ...updated[i], [field]: value };
+    updateField("saidas", updated);
+  };
+
+  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "", probabilidade: 1 as NivelRisco, impacto: 1 as NivelRisco }]);
   const removeRisco = (i: number) => updateField("riscos", form.riscos.filter((_, idx) => idx !== i));
-  const updateRisco = (i: number, field: keyof RiscoForm, value: string) => {
+  const updateRisco = (i: number, field: keyof RiscoForm, value: string | number) => {
     const updated = [...form.riscos];
     updated[i] = { ...updated[i], [field]: value };
     updateField("riscos", updated);
@@ -219,13 +248,35 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 3: Entradas */}
+            {/* Tab 3: Entradas (SIPOC) */}
             <TabsContent value="entradas">
               <div className="space-y-4">
-                <div className="space-y-2">
-                  
-                  <Textarea value={form.entradas} onChange={(e) => updateField("entradas", e.target.value)} placeholder="Informações, documentos ou dados necessários para iniciar o processo" rows={6} />
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Entradas do Processo (SIPOC)</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addEntrada}><Plus className="h-4 w-4 mr-1" /> Entrada</Button>
                 </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fornecedor (Supplier)</TableHead>
+                      <TableHead>Entrada (Input)</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.entradas.map((ent, i) =>
+                    <TableRow key={i}>
+                        <TableCell><Input value={ent.fornecedor} onChange={(e) => updateEntrada(i, "fornecedor", e.target.value)} placeholder="Quem fornece" /></TableCell>
+                        <TableCell><Input value={ent.entrada} onChange={(e) => updateEntrada(i, "entrada", e.target.value)} placeholder="O que entra" /></TableCell>
+                        <TableCell>
+                          {form.entradas.length > 1 &&
+                        <Button size="icon" variant="ghost" onClick={() => removeEntrada(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
 
@@ -265,17 +316,45 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 5: Decisões & Saídas */}
+            {/* Tab 5: Decisões */}
             <TabsContent value="decisoes">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Decisões do Processo</Label>
-                  <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={4} />
+                  <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={6} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Saídas do Processo</Label>
-                  <Textarea value={form.saidas} onChange={(e) => updateField("saidas", e.target.value)} placeholder="Resultado final do processo" rows={4} />
+              </div>
+            </TabsContent>
+
+            {/* Tab 6: Saídas (SIPOC) */}
+            <TabsContent value="saidas">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Saídas do Processo (SIPOC)</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addSaida}><Plus className="h-4 w-4 mr-1" /> Saída</Button>
                 </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Saída (Output)</TableHead>
+                      <TableHead>Cliente (Customer)</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.saidas.map((s, i) =>
+                    <TableRow key={i}>
+                        <TableCell><Input value={s.saida} onChange={(e) => updateSaida(i, "saida", e.target.value)} placeholder="O que sai" /></TableCell>
+                        <TableCell><Input value={s.cliente} onChange={(e) => updateSaida(i, "cliente", e.target.value)} placeholder="Quem recebe" /></TableCell>
+                        <TableCell>
+                          {form.saidas.length > 1 &&
+                        <Button size="icon" variant="ghost" onClick={() => removeSaida(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
 
@@ -340,7 +419,7 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 8: Riscos */}
+            {/* Tab 9: Riscos */}
             <TabsContent value="riscos">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -352,21 +431,55 @@ const ProcessoFormulario = () => {
                     <TableRow>
                       <TableHead>Risco</TableHead>
                       <TableHead>Consequência</TableHead>
+                      <TableHead className="w-40">Probabilidade</TableHead>
+                      <TableHead className="w-40">Impacto</TableHead>
+                      <TableHead className="w-28">Grau de Risco</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {form.riscos.map((r, i) =>
-                    <TableRow key={i}>
+                    {form.riscos.map((r, i) => {
+                      const score = r.probabilidade * r.impacto;
+                      const nivel = getRiscoNivel(score);
+                      return (
+                      <TableRow key={i}>
                         <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
                         <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
+                        <TableCell>
+                          <Select value={String(r.probabilidade)} onValueChange={(v) => updateRisco(i, "probabilidade", Number(v) as NivelRisco)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 - Raro</SelectItem>
+                              <SelectItem value="2">2 - Improvável</SelectItem>
+                              <SelectItem value="3">3 - Possível</SelectItem>
+                              <SelectItem value="4">4 - Provável</SelectItem>
+                              <SelectItem value="5">5 - Quase certo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={String(r.impacto)} onValueChange={(v) => updateRisco(i, "impacto", Number(v) as NivelRisco)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 - Insignificante</SelectItem>
+                              <SelectItem value="2">2 - Pequeno</SelectItem>
+                              <SelectItem value="3">3 - Moderado</SelectItem>
+                              <SelectItem value="4">4 - Grande</SelectItem>
+                              <SelectItem value="5">5 - Catastrófico</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={nivel.color}>{score} - {nivel.label}</Badge>
+                        </TableCell>
                         <TableCell>
                           {form.riscos.length > 1 &&
                         <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         }
                         </TableCell>
                       </TableRow>
-                    )}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
