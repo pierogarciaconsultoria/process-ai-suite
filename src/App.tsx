@@ -12,6 +12,7 @@ const Empresas = React.lazy(() => import("./pages/Empresas"));
 const Processos = React.lazy(() => import("./pages/Processos"));
 const ProcessoFormulario = React.lazy(() => import("./pages/ProcessoFormulario"));
 const ProcessoDetalhe = React.lazy(() => import("./pages/ProcessoDetalhe"));
+const ProcessoDiagnostico = React.lazy(() => import("./pages/ProcessoDiagnostico"));
 const Arquitetura = React.lazy(() => import("./pages/Arquitetura"));
 const Usuarios = React.lazy(() => import("./pages/Usuarios"));
 const Relatorios = React.lazy(() => import("./pages/Relatorios"));
