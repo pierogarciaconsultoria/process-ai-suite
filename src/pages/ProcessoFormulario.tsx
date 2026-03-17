@@ -331,13 +331,19 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 5: Decisões & Saídas */}
+            {/* Tab 5: Decisões */}
             <TabsContent value="decisoes">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Decisões do Processo</Label>
                   <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={4} />
                 </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab 6: Saídas (SIPOC: Output → Customer) */}
+            <TabsContent value="saidas">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Saídas do Processo (Output → Customer)</Label>
                   <Table>
