@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.ai-diagnose-process]
 verify_jwt = false
+
+[functions.ai-generate-bpmn]
+verify_jwt = false

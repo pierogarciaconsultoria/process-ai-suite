@@ -268,4 +268,6 @@ export const emptyProcessoForm: ProcessoFormData = {
   criticidadeDetalhada: { impactoNegocio: 1, impactoCliente: 1, riscoOperacional: 1 },
   planoAcao: [{ oque: "", porque: "", quem: "", quando: "", onde: "", como: "", custo: "" }],
   conclusao: "",
+  bpmnAsIs: "",
+  bpmnToBe: "",
 };
