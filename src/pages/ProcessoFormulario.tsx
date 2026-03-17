@@ -92,10 +92,17 @@ const ProcessoFormulario = () => {
 
   const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "", probabilidade: 1 as NivelRisco, impacto: 1 as NivelRisco }]);
   const removeRisco = (i: number) => updateField("riscos", form.riscos.filter((_, idx) => idx !== i));
-  const updateRisco = (i: number, field: keyof RiscoForm, value: string) => {
+  const updateRisco = (i: number, field: keyof RiscoForm, value: string | NivelRisco) => {
     const updated = [...form.riscos];
     updated[i] = { ...updated[i], [field]: value };
     updateField("riscos", updated);
+  };
+
+  const getRiscoNivel = (score: number): { label: string; className: string } => {
+    if (score <= 4) return { label: "Baixo", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" };
+    if (score <= 9) return { label: "Médio", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" };
+    if (score <= 15) return { label: "Alto", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" };
+    return { label: "Crítico", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" };
   };
 
   const addIndicador = () => updateField("indicadores", [...form.indicadores, { indicador: "", meta: "" }]);
