@@ -15,6 +15,11 @@ export interface EntradaForm {
   entrada: string;
 }
 
+export interface SaidaForm {
+  saida: string;
+  cliente: string;
+}
+
 export interface RiscoForm {
   risco: string;
   consequencia: string;
