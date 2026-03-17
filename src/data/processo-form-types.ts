@@ -20,9 +20,13 @@ export interface SaidaForm {
   cliente: string;
 }
 
+export type NivelRisco = 1 | 2 | 3 | 4 | 5;
+
 export interface RiscoForm {
   risco: string;
   consequencia: string;
+  probabilidade: NivelRisco;
+  impacto: NivelRisco;
 }
 
 export interface IndicadorForm {
@@ -152,7 +156,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   problemas: { retrabalho: false, atrasos: false, erros: false, dependencia: false, faltaPadrao: false },
   problemasTexto: "",
   gargalos: "",
-  riscos: [{ risco: "", consequencia: "" }],
+  riscos: [{ risco: "", consequencia: "", probabilidade: 1, impacto: 1 }],
   controles: "",
   indicadores: [{ indicador: "", meta: "" }],
   sugestoes: "",
