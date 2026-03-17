@@ -15,13 +15,17 @@ import { useToast } from "@/hooks/use-toast";
 import {
   type ProcessoFormData,
   type EtapaForm,
+  type EntradaForm,
+  type SaidaForm,
   type RiscoForm,
+  type NivelRisco,
   type IndicadorForm,
   type PlanoAcao5W2H,
   type Classificacao,
   type Frequencia,
   emptyProcessoForm } from
 "@/data/processo-form-types";
+import { Badge } from "@/components/ui/badge";
 
 const TABS = [
 "identificacao",
