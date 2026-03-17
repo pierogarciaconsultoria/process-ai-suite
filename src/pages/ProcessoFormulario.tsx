@@ -53,7 +53,7 @@ const TAB_LABELS: Record<string, string> = {
   recursos: "7. Recursos",
   dores: "8. Dores & Gargalos",
   riscos: "9. Riscos",
-  controles: "10. Controles",
+  controles: "10. Indicadores",
   melhorias: "11. Melhorias",
   plano: "12. Plano de Ação"
 };
