@@ -278,7 +278,39 @@ const ProcessoFormulario = () => {
 
             {/* Tab 2: Contexto */}
             <TabsContent value="contexto">
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* AI Auto-fill Section */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg">Preenchimento com IA</CardTitle>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Descreva o processo em detalhes e a IA preencherá automaticamente todas as demais abas do mapeamento.
+                    </p>
+                    <Textarea
+                      value={descricaoIA}
+                      onChange={(e) => setDescricaoIA(e.target.value)}
+                      placeholder="Ex: Processo de contratação de novos colaboradores, desde a abertura da vaga até a integração do novo funcionário. Envolve RH, gestor da área e diretoria para aprovação..."
+                      rows={5}
+                      disabled={isFillingAI}
+                    />
+                    <Button onClick={handleAIFill} disabled={isFillingAI || descricaoIA.trim().length < 10}>
+                      {isFillingAI ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Preenchendo...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" /> Preencher com IA
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Manual context fields */}
                 <CardHeader className="p-0 pb-4"><CardTitle className="text-lg">Contexto do Processo</CardTitle></CardHeader>
                 <div className="space-y-2">
                   <Label>Objetivo do Processo</Label>
