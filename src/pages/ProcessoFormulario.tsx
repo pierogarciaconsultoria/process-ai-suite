@@ -248,13 +248,35 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 3: Entradas */}
+            {/* Tab 3: Entradas (SIPOC) */}
             <TabsContent value="entradas">
               <div className="space-y-4">
-                <div className="space-y-2">
-                  
-                  <Textarea value={form.entradas} onChange={(e) => updateField("entradas", e.target.value)} placeholder="Informações, documentos ou dados necessários para iniciar o processo" rows={6} />
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Entradas do Processo (SIPOC)</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addEntrada}><Plus className="h-4 w-4 mr-1" /> Entrada</Button>
                 </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fornecedor (Supplier)</TableHead>
+                      <TableHead>Entrada (Input)</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.entradas.map((ent, i) =>
+                    <TableRow key={i}>
+                        <TableCell><Input value={ent.fornecedor} onChange={(e) => updateEntrada(i, "fornecedor", e.target.value)} placeholder="Quem fornece" /></TableCell>
+                        <TableCell><Input value={ent.entrada} onChange={(e) => updateEntrada(i, "entrada", e.target.value)} placeholder="O que entra" /></TableCell>
+                        <TableCell>
+                          {form.entradas.length > 1 &&
+                        <Button size="icon" variant="ghost" onClick={() => removeEntrada(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
 
@@ -294,17 +316,45 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 5: Decisões & Saídas */}
+            {/* Tab 5: Decisões */}
             <TabsContent value="decisoes">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Decisões do Processo</Label>
-                  <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={4} />
+                  <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={6} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Saídas do Processo</Label>
-                  <Textarea value={form.saidas} onChange={(e) => updateField("saidas", e.target.value)} placeholder="Resultado final do processo" rows={4} />
+              </div>
+            </TabsContent>
+
+            {/* Tab 6: Saídas (SIPOC) */}
+            <TabsContent value="saidas">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Saídas do Processo (SIPOC)</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addSaida}><Plus className="h-4 w-4 mr-1" /> Saída</Button>
                 </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Saída (Output)</TableHead>
+                      <TableHead>Cliente (Customer)</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.saidas.map((s, i) =>
+                    <TableRow key={i}>
+                        <TableCell><Input value={s.saida} onChange={(e) => updateSaida(i, "saida", e.target.value)} placeholder="O que sai" /></TableCell>
+                        <TableCell><Input value={s.cliente} onChange={(e) => updateSaida(i, "cliente", e.target.value)} placeholder="Quem recebe" /></TableCell>
+                        <TableCell>
+                          {form.saidas.length > 1 &&
+                        <Button size="icon" variant="ghost" onClick={() => removeSaida(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
 
