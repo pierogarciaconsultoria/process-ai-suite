@@ -62,8 +62,8 @@ export interface ProcessoFormData {
   // 3. Gatilho
   gatilho: string;
 
-  // 4. Entradas
-  entradas: string;
+  // 4. Entradas (SIPOC: Supplier + Input)
+  entradas: EntradaForm[];
 
   // 5. Atividades
   etapas: EtapaForm[];
