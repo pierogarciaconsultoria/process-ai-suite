@@ -14,6 +14,7 @@ import { ArrowLeft, ArrowRight, Save, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   type ProcessoFormData,
+  type EntradaForm,
   type EtapaForm,
   type RiscoForm,
   type IndicadorForm,
