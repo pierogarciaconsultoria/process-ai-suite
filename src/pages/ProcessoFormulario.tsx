@@ -73,6 +73,63 @@ const ProcessoFormulario = () => {
 
   const [activeTab, setActiveTab] = useState<string>("identificacao");
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
+  const [descricaoIA, setDescricaoIA] = useState("");
+  const [isFillingAI, setIsFillingAI] = useState(false);
+
+  const handleAIFill = async () => {
+    if (descricaoIA.trim().length < 10) {
+      toast({ title: "Descrição muito curta", description: "Descreva o processo com mais detalhes (mínimo 10 caracteres).", variant: "destructive" });
+      return;
+    }
+    setIsFillingAI(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-fill-process", {
+        body: { descricao: descricaoIA },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Merge AI data into form, preserving identification fields
+      setForm((prev) => ({
+        ...prev,
+        objetivo: data.objetivo || prev.objetivo,
+        porqueExiste: data.porqueExiste || prev.porqueExiste,
+        clienteProcesso: data.clienteProcesso || prev.clienteProcesso,
+        areasEnvolvidas: data.areasEnvolvidas || prev.areasEnvolvidas,
+        gatilho: data.gatilho || prev.gatilho,
+        entradas: data.entradas?.length ? data.entradas : prev.entradas,
+        etapas: data.etapas?.length ? data.etapas : prev.etapas,
+        decisoes: data.decisoes || prev.decisoes,
+        saidas: data.saidas?.length ? data.saidas : prev.saidas,
+        recursos: data.recursos || prev.recursos,
+        frequencia: data.frequencia || prev.frequencia,
+        tempoExecucao: data.tempoExecucao || prev.tempoExecucao,
+        problemas: data.problemas || prev.problemas,
+        problemasTexto: data.problemasTexto || prev.problemasTexto,
+        gargalos: data.gargalos || prev.gargalos,
+        riscos: data.riscos?.length ? data.riscos : prev.riscos,
+        controles: data.controles || prev.controles,
+        indicadores: data.indicadores?.length ? data.indicadores : prev.indicadores,
+        sugestoes: data.sugestoes || prev.sugestoes,
+        automacao: data.automacao || prev.automacao,
+        documentacao: data.documentacao || prev.documentacao,
+        criticidadeDetalhada: data.criticidadeDetalhada || prev.criticidadeDetalhada,
+        planoAcao: data.planoAcao?.length ? data.planoAcao : prev.planoAcao,
+        conclusao: data.conclusao || prev.conclusao,
+      }));
+
+      toast({ title: "Preenchimento concluído!", description: "A IA preencheu todas as abas. Revise os dados gerados." });
+    } catch (err: any) {
+      console.error("AI fill error:", err);
+      toast({
+        title: "Erro ao preencher com IA",
+        description: err?.message || "Tente novamente em alguns segundos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFillingAI(false);
+    }
+  };
 
   const tabIndex = TABS.indexOf(activeTab as typeof TABS[number]);
 
