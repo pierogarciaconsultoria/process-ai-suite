@@ -506,10 +506,13 @@ const ProcessoFormulario = () => {
         return (
           <div className="space-y-4">
             <CardTitle className="text-lg">Mapa AS IS (BPMN)</CardTitle>
-            <p className="text-sm text-muted-foreground">Visualize o fluxo atual do processo.</p>
-            <div className="border rounded-lg min-h-[400px] flex items-center justify-center bg-muted/30">
-              <BPMNCanvas />
-            </div>
+            <p className="text-sm text-muted-foreground">Visualize o fluxo atual do processo. Clique em "Gerar Mapa com IA" para criar o diagrama automaticamente.</p>
+            <BPMNCanvas
+              xml={form.bpmnAsIs}
+              onChange={(xml) => updateField("bpmnAsIs", xml)}
+              formData={form}
+              mode="as-is"
+            />
           </div>
         );
 
