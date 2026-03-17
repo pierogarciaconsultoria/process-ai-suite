@@ -306,7 +306,7 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 7: Dores, Gargalos & Riscos */}
+            {/* Tab 7: Dores & Gargalos */}
             <TabsContent value="dores">
               <div className="space-y-6">
                 <div className="space-y-3">
@@ -337,35 +337,38 @@ const ProcessoFormulario = () => {
                   <CardTitle className="text-lg">Gargalos do Processo</CardTitle>
                   <Textarea value={form.gargalos} onChange={(e) => updateField("gargalos", e.target.value)} placeholder="Onde o processo trava ou atrasa?" rows={3} />
                 </div>
+              </div>
+            </TabsContent>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Riscos do Processo</CardTitle>
-                    <Button size="sm" variant="outline" onClick={addRisco}><Plus className="h-4 w-4 mr-1" /> Risco</Button>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Risco</TableHead>
-                        <TableHead>Consequência</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {form.riscos.map((r, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
-                          <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
-                          <TableCell>
-                            {form.riscos.length > 1 && (
-                              <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+            {/* Tab 8: Riscos */}
+            <TabsContent value="riscos">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Riscos do Processo</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addRisco}><Plus className="h-4 w-4 mr-1" /> Risco</Button>
                 </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Risco</TableHead>
+                      <TableHead>Consequência</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.riscos.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
+                        <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
+                        <TableCell>
+                          {form.riscos.length > 1 && (
+                            <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
 
