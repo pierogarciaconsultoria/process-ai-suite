@@ -30,6 +30,7 @@ const TABS = [
   "entradas",
   "atividades",
   "decisoes",
+  "saidas",
   "recursos",
   "dores",
   "riscos",
@@ -44,12 +45,13 @@ const TAB_LABELS: Record<string, string> = {
   entradas: "3. Entradas",
   atividades: "4. Atividades",
   decisoes: "5. Decisões",
-  recursos: "6. Recursos",
-  dores: "7. Dores & Gargalos",
-  riscos: "8. Riscos",
-  controles: "9. Controles",
-  melhorias: "10. Melhorias",
-  plano: "11. Plano de Ação",
+  saidas: "6. Saídas",
+  recursos: "7. Recursos",
+  dores: "8. Dores & Gargalos",
+  riscos: "9. Riscos",
+  controles: "10. Controles",
+  melhorias: "11. Melhorias",
+  plano: "12. Plano de Ação",
 };
 
 const ProcessoFormulario = () => {
