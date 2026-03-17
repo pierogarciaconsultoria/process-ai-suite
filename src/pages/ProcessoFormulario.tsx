@@ -17,6 +17,7 @@ import {
   type EntradaForm,
   type EtapaForm,
   type RiscoForm,
+  type NivelRisco,
   type IndicadorForm,
   type PlanoAcao5W2H,
   type Classificacao,
