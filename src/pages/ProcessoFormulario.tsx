@@ -75,6 +75,7 @@ const ProcessoFormulario = () => {
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
   const [descricaoIA, setDescricaoIA] = useState("");
   const [isFillingAI, setIsFillingAI] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
 
   const handleAIFill = async () => {
     if (descricaoIA.trim().length < 10) {
