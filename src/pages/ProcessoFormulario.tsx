@@ -14,31 +14,28 @@ import { ArrowLeft, ArrowRight, Save, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   type ProcessoFormData,
-  type EntradaForm,
   type EtapaForm,
   type RiscoForm,
-  type NivelRisco,
   type IndicadorForm,
   type PlanoAcao5W2H,
   type Classificacao,
   type Frequencia,
-  emptyProcessoForm,
-} from "@/data/processo-form-types";
+  emptyProcessoForm } from
+"@/data/processo-form-types";
 
 const TABS = [
-  "identificacao",
-  "contexto",
-  "entradas",
-  "atividades",
-  "decisoes",
-  "saidas",
-  "recursos",
-  "dores",
-  "riscos",
-  "controles",
-  "melhorias",
-  "plano",
-] as const;
+"identificacao",
+"contexto",
+"entradas",
+"atividades",
+"decisoes",
+"recursos",
+"dores",
+"riscos",
+"controles",
+"melhorias",
+"plano"] as
+const;
 
 const TAB_LABELS: Record<string, string> = {
   identificacao: "1. Identificação",
@@ -46,13 +43,12 @@ const TAB_LABELS: Record<string, string> = {
   entradas: "3. Entradas",
   atividades: "4. Atividades",
   decisoes: "5. Decisões",
-  saidas: "6. Saídas",
-  recursos: "7. Recursos",
-  dores: "8. Dores & Gargalos",
-  riscos: "9. Riscos",
-  controles: "10. Controles",
-  melhorias: "11. Melhorias",
-  plano: "12. Plano de Ação",
+  recursos: "6. Recursos",
+  dores: "7. Dores & Gargalos",
+  riscos: "8. Riscos",
+  controles: "9. Controles",
+  melhorias: "10. Melhorias",
+  plano: "11. Plano de Ação"
 };
 
 const ProcessoFormulario = () => {
@@ -66,7 +62,7 @@ const ProcessoFormulario = () => {
 
   const tabIndex = TABS.indexOf(activeTab as typeof TABS[number]);
 
-  const updateField = <K extends keyof ProcessoFormData>(key: K, value: ProcessoFormData[K]) => {
+  const updateField = <K extends keyof ProcessoFormData,>(key: K, value: ProcessoFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -90,19 +86,12 @@ const ProcessoFormulario = () => {
     updateField("etapas", updated);
   };
 
-  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "", probabilidade: 1 as NivelRisco, impacto: 1 as NivelRisco }]);
+  const addRisco = () => updateField("riscos", [...form.riscos, { risco: "", consequencia: "" }]);
   const removeRisco = (i: number) => updateField("riscos", form.riscos.filter((_, idx) => idx !== i));
-  const updateRisco = (i: number, field: keyof RiscoForm, value: string | NivelRisco) => {
+  const updateRisco = (i: number, field: keyof RiscoForm, value: string) => {
     const updated = [...form.riscos];
     updated[i] = { ...updated[i], [field]: value };
     updateField("riscos", updated);
-  };
-
-  const getRiscoNivel = (score: number): { label: string; className: string } => {
-    if (score <= 4) return { label: "Baixo", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" };
-    if (score <= 9) return { label: "Médio", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" };
-    if (score <= 15) return { label: "Alto", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" };
-    return { label: "Crítico", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" };
   };
 
   const addIndicador = () => updateField("indicadores", [...form.indicadores, { indicador: "", meta: "" }]);
@@ -144,11 +133,11 @@ const ProcessoFormulario = () => {
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex flex-wrap h-auto gap-1 mb-6">
-              {TABS.map((tab) => (
-                <TabsTrigger key={tab} value={tab} className="text-xs">
+              {TABS.map((tab) =>
+              <TabsTrigger key={tab} value={tab} className="text-xs">
                   {TAB_LABELS[tab]}
                 </TabsTrigger>
-              ))}
+              )}
             </TabsList>
 
             {/* Tab 1: Identificação */}
@@ -230,76 +219,13 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 3: Entradas (SIPOC: Supplier + Input) */}
+            {/* Tab 3: Entradas */}
             <TabsContent value="entradas">
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Defina as entradas do processo e seus fornecedores, seguindo a metodologia SIPOC (Supplier → Input).
-                </p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Fornecedor (Supplier)</TableHead>
-                      <TableHead>Entrada (Input)</TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {form.entradas.map((entrada, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">{idx + 1}</TableCell>
-                        <TableCell>
-                          <Input
-                            value={entrada.fornecedor}
-                            onChange={(e) => {
-                              const updated = [...form.entradas];
-                              updated[idx] = { ...updated[idx], fornecedor: e.target.value };
-                              updateField("entradas", updated);
-                            }}
-                            placeholder="Quem fornece esta entrada"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={entrada.entrada}
-                            onChange={(e) => {
-                              const updated = [...form.entradas];
-                              updated[idx] = { ...updated[idx], entrada: e.target.value };
-                              updateField("entradas", updated);
-                            }}
-                            placeholder="Informação, documento ou dado"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {form.entradas.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                const updated = form.entradas.filter((_, i) => i !== idx);
-                                updateField("entradas", updated);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    updateField("entradas", [...form.entradas, { fornecedor: "", entrada: "" }])
-                  }
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Adicionar Entrada
-                </Button>
+                <div className="space-y-2">
+                  
+                  <Textarea value={form.entradas} onChange={(e) => updateField("entradas", e.target.value)} placeholder="Informações, documentos ou dados necessários para iniciar o processo" rows={6} />
+                </div>
               </div>
             </TabsContent>
 
@@ -321,68 +247,34 @@ const ProcessoFormulario = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {form.etapas.map((etapa, i) => (
-                      <TableRow key={i}>
+                    {form.etapas.map((etapa, i) =>
+                    <TableRow key={i}>
                         <TableCell>{etapa.ordem}</TableCell>
                         <TableCell><Input value={etapa.atividade} onChange={(e) => updateEtapa(i, "atividade", e.target.value)} placeholder="Descreva a atividade" /></TableCell>
                         <TableCell><Input value={etapa.responsavel} onChange={(e) => updateEtapa(i, "responsavel", e.target.value)} placeholder="Responsável" /></TableCell>
                         <TableCell><Input value={etapa.ferramentaDocumento} onChange={(e) => updateEtapa(i, "ferramentaDocumento", e.target.value)} placeholder="Sistema/Doc" /></TableCell>
                         <TableCell>
-                          {form.etapas.length > 1 && (
-                            <Button size="icon" variant="ghost" onClick={() => removeEtapa(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                          )}
+                          {form.etapas.length > 1 &&
+                        <Button size="icon" variant="ghost" onClick={() => removeEtapa(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
 
-            {/* Tab 5: Decisões */}
+            {/* Tab 5: Decisões & Saídas */}
             <TabsContent value="decisoes">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Decisões do Processo</Label>
                   <Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={4} />
                 </div>
-              </div>
-            </TabsContent>
-
-            {/* Tab 6: Saídas (SIPOC: Output → Customer) */}
-            <TabsContent value="saidas">
-              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Saídas do Processo (Output → Customer)</Label>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Saída (Output)</TableHead>
-                        <TableHead>Cliente (Customer)</TableHead>
-                        <TableHead className="w-10"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {form.saidas.map((s, i) => (
-                        <TableRow key={i}>
-                          <TableCell>
-                            <Input value={s.saida} onChange={(e) => { const arr = [...form.saidas]; arr[i] = { ...arr[i], saida: e.target.value }; updateField("saidas", arr); }} placeholder="Resultado / entrega" />
-                          </TableCell>
-                          <TableCell>
-                            <Input value={s.cliente} onChange={(e) => { const arr = [...form.saidas]; arr[i] = { ...arr[i], cliente: e.target.value }; updateField("saidas", arr); }} placeholder="Quem recebe a saída" />
-                          </TableCell>
-                          <TableCell>
-                            {form.saidas.length > 1 && (
-                              <Button type="button" variant="ghost" size="icon" onClick={() => { const arr = form.saidas.filter((_, idx) => idx !== i); updateField("saidas", arr); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <Button type="button" variant="outline" size="sm" onClick={() => updateField("saidas", [...form.saidas, { saida: "", cliente: "" }])}>
-                    <Plus className="h-4 w-4 mr-1" /> Adicionar Saída
-                  </Button>
+                  <Label>Saídas do Processo</Label>
+                  <Textarea value={form.saidas} onChange={(e) => updateField("saidas", e.target.value)} placeholder="Resultado final do processo" rows={4} />
                 </div>
               </div>
             </TabsContent>
@@ -400,9 +292,9 @@ const ProcessoFormulario = () => {
                     <Select value={form.frequencia} onValueChange={(v) => updateField("frequencia", v as Frequencia)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {["Diária", "Semanal", "Quinzenal", "Mensal", "Trimestral", "Semestral", "Anual", "Sob demanda"].map((f) => (
-                          <SelectItem key={f} value={f}>{f}</SelectItem>
-                        ))}
+                        {["Diária", "Semanal", "Quinzenal", "Mensal", "Trimestral", "Semestral", "Anual", "Sob demanda"].map((f) =>
+                        <SelectItem key={f} value={f}>{f}</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -421,22 +313,22 @@ const ProcessoFormulario = () => {
                   <CardTitle className="text-lg">Dores e Problemas</CardTitle>
                   <div className="flex flex-wrap gap-4">
                     {([
-                      ["retrabalho", "Retrabalho"],
-                      ["atrasos", "Atrasos"],
-                      ["erros", "Erros manuais"],
-                      ["dependencia", "Dependência de pessoas"],
-                      ["faltaPadrao", "Falta de padrão"],
-                    ] as const).map(([key, label]) => (
-                      <div key={key} className="flex items-center gap-2">
+                    ["retrabalho", "Retrabalho"],
+                    ["atrasos", "Atrasos"],
+                    ["erros", "Erros manuais"],
+                    ["dependencia", "Dependência de pessoas"],
+                    ["faltaPadrao", "Falta de padrão"]] as
+                    const).map(([key, label]) =>
+                    <div key={key} className="flex items-center gap-2">
                         <Checkbox
-                          checked={form.problemas[key]}
-                          onCheckedChange={(checked) =>
-                            updateField("problemas", { ...form.problemas, [key]: !!checked })
-                          }
-                        />
+                        checked={form.problemas[key]}
+                        onCheckedChange={(checked) =>
+                        updateField("problemas", { ...form.problemas, [key]: !!checked })
+                        } />
+                      
                         <Label className="font-normal">{label}</Label>
                       </div>
-                    ))}
+                    )}
                   </div>
                   <Textarea value={form.problemasTexto} onChange={(e) => updateField("problemasTexto", e.target.value)} placeholder="Descreva os problemas em detalhes" rows={3} />
                 </div>
@@ -450,70 +342,31 @@ const ProcessoFormulario = () => {
 
             {/* Tab 8: Riscos */}
             <TabsContent value="riscos">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">Riscos do Processo</CardTitle>
                   <Button size="sm" variant="outline" onClick={addRisco}><Plus className="h-4 w-4 mr-1" /> Risco</Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Avalie cada risco com a probabilidade de ocorrência (1-5) e o impacto no processo/negócio (1-5). O grau de risco é calculado automaticamente (P × I).
-                </p>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Risco</TableHead>
                       <TableHead>Consequência</TableHead>
-                      <TableHead className="w-[130px]">Probabilidade</TableHead>
-                      <TableHead className="w-[130px]">Impacto</TableHead>
-                      <TableHead className="w-[120px]">Grau de Risco</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {form.riscos.map((r, i) => {
-                      const grau = r.probabilidade * r.impacto;
-                      const nivel = getRiscoNivel(grau);
-                      return (
-                        <TableRow key={i}>
-                          <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
-                          <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
-                          <TableCell>
-                            <Select value={String(r.probabilidade)} onValueChange={(v) => updateRisco(i, "probabilidade", Number(v) as NivelRisco)}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">1 - Raro</SelectItem>
-                                <SelectItem value="2">2 - Improvável</SelectItem>
-                                <SelectItem value="3">3 - Possível</SelectItem>
-                                <SelectItem value="4">4 - Provável</SelectItem>
-                                <SelectItem value="5">5 - Quase certo</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select value={String(r.impacto)} onValueChange={(v) => updateRisco(i, "impacto", Number(v) as NivelRisco)}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">1 - Insignificante</SelectItem>
-                                <SelectItem value="2">2 - Menor</SelectItem>
-                                <SelectItem value="3">3 - Moderado</SelectItem>
-                                <SelectItem value="4">4 - Maior</SelectItem>
-                                <SelectItem value="5">5 - Catastrófico</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${nivel.className}`}>
-                              {grau} — {nivel.label}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {form.riscos.length > 1 && (
-                              <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {form.riscos.map((r, i) =>
+                    <TableRow key={i}>
+                        <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
+                        <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
+                        <TableCell>
+                          {form.riscos.length > 1 &&
+                        <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        }
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -541,17 +394,17 @@ const ProcessoFormulario = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {form.indicadores.map((ind, i) => (
-                        <TableRow key={i}>
+                      {form.indicadores.map((ind, i) =>
+                      <TableRow key={i}>
                           <TableCell><Input value={ind.indicador} onChange={(e) => updateIndicador(i, "indicador", e.target.value)} placeholder="Nome do indicador" /></TableCell>
                           <TableCell><Input value={ind.meta} onChange={(e) => updateIndicador(i, "meta", e.target.value)} placeholder="Meta" /></TableCell>
                           <TableCell>
-                            {form.indicadores.length > 1 && (
-                              <Button size="icon" variant="ghost" onClick={() => removeIndicador(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            )}
+                            {form.indicadores.length > 1 &&
+                          <Button size="icon" variant="ghost" onClick={() => removeIndicador(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          }
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -579,28 +432,28 @@ const ProcessoFormulario = () => {
                   <p className="text-sm text-muted-foreground">Avalie de 1 (baixo) a 5 (alto)</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {([
-                      ["impactoNegocio", "Impacto no Negócio"],
-                      ["impactoCliente", "Impacto no Cliente"],
-                      ["riscoOperacional", "Risco Operacional"],
-                    ] as const).map(([key, label]) => (
-                      <div key={key} className="space-y-2">
+                    ["impactoNegocio", "Impacto no Negócio"],
+                    ["impactoCliente", "Impacto no Cliente"],
+                    ["riscoOperacional", "Risco Operacional"]] as
+                    const).map(([key, label]) =>
+                    <div key={key} className="space-y-2">
                         <Label>{label}</Label>
                         <RadioGroup
-                          value={String(form.criticidadeDetalhada[key])}
-                          onValueChange={(v) =>
-                            updateField("criticidadeDetalhada", { ...form.criticidadeDetalhada, [key]: Number(v) as 1 | 3 | 5 })
-                          }
-                          className="flex gap-4"
-                        >
-                          {[1, 3, 5].map((val) => (
-                            <div key={val} className="flex items-center gap-1">
+                        value={String(form.criticidadeDetalhada[key])}
+                        onValueChange={(v) =>
+                        updateField("criticidadeDetalhada", { ...form.criticidadeDetalhada, [key]: Number(v) as 1 | 3 | 5 })
+                        }
+                        className="flex gap-4">
+                        
+                          {[1, 3, 5].map((val) =>
+                        <div key={val} className="flex items-center gap-1">
                               <RadioGroupItem value={String(val)} />
                               <Label className="font-normal">{val}</Label>
                             </div>
-                          ))}
+                        )}
                         </RadioGroup>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               </div>
@@ -629,8 +482,8 @@ const ProcessoFormulario = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {form.planoAcao.map((p, i) => (
-                          <TableRow key={i}>
+                        {form.planoAcao.map((p, i) =>
+                        <TableRow key={i}>
                             <TableCell><Input value={p.oque} onChange={(e) => updatePlano(i, "oque", e.target.value)} placeholder="O quê" /></TableCell>
                             <TableCell><Input value={p.porque} onChange={(e) => updatePlano(i, "porque", e.target.value)} placeholder="Por quê" /></TableCell>
                             <TableCell><Input value={p.quem} onChange={(e) => updatePlano(i, "quem", e.target.value)} placeholder="Quem" /></TableCell>
@@ -639,12 +492,12 @@ const ProcessoFormulario = () => {
                             <TableCell><Input value={p.como} onChange={(e) => updatePlano(i, "como", e.target.value)} placeholder="Como" /></TableCell>
                             <TableCell><Input value={p.custo} onChange={(e) => updatePlano(i, "custo", e.target.value)} placeholder="R$" /></TableCell>
                             <TableCell>
-                              {form.planoAcao.length > 1 && (
-                                <Button size="icon" variant="ghost" onClick={() => removePlano(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                              )}
+                              {form.planoAcao.length > 1 &&
+                            <Button size="icon" variant="ghost" onClick={() => removePlano(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            }
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )}
                       </TableBody>
                     </Table>
                   </div>
@@ -666,20 +519,20 @@ const ProcessoFormulario = () => {
             <span className="text-sm text-muted-foreground">
               {tabIndex + 1} de {TABS.length}
             </span>
-            {tabIndex === TABS.length - 1 ? (
-              <Button onClick={handleSave}>
+            {tabIndex === TABS.length - 1 ?
+            <Button onClick={handleSave}>
                 <Save className="h-4 w-4 mr-2" /> Salvar
-              </Button>
-            ) : (
-              <Button onClick={goNext}>
+              </Button> :
+
+            <Button onClick={goNext}>
                 Próximo <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
-            )}
+            }
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>);
+
 };
 
 export default ProcessoFormulario;
