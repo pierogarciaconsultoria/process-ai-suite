@@ -20,9 +20,13 @@ export interface SaidaForm {
   cliente: string;
 }
 
+export type NivelRisco = 1 | 2 | 3 | 4 | 5;
+
 export interface RiscoForm {
   risco: string;
   consequencia: string;
+  probabilidade: NivelRisco;
+  impacto: NivelRisco;
 }
 
 export interface IndicadorForm {
