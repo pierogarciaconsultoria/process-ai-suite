@@ -156,7 +156,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   problemas: { retrabalho: false, atrasos: false, erros: false, dependencia: false, faltaPadrao: false },
   problemasTexto: "",
   gargalos: "",
-  riscos: [{ risco: "", consequencia: "" }],
+  riscos: [{ risco: "", consequencia: "", probabilidade: 1, impacto: 1 }],
   controles: "",
   indicadores: [{ indicador: "", meta: "" }],
   sugestoes: "",

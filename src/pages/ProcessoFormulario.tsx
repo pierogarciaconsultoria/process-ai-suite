@@ -450,31 +450,70 @@ const ProcessoFormulario = () => {
 
             {/* Tab 8: Riscos */}
             <TabsContent value="riscos">
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">Riscos do Processo</CardTitle>
                   <Button size="sm" variant="outline" onClick={addRisco}><Plus className="h-4 w-4 mr-1" /> Risco</Button>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  Avalie cada risco com a probabilidade de ocorrência (1-5) e o impacto no processo/negócio (1-5). O grau de risco é calculado automaticamente (P × I).
+                </p>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Risco</TableHead>
                       <TableHead>Consequência</TableHead>
+                      <TableHead className="w-[130px]">Probabilidade</TableHead>
+                      <TableHead className="w-[130px]">Impacto</TableHead>
+                      <TableHead className="w-[120px]">Grau de Risco</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {form.riscos.map((r, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
-                        <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
-                        <TableCell>
-                          {form.riscos.length > 1 && (
-                            <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {form.riscos.map((r, i) => {
+                      const grau = r.probabilidade * r.impacto;
+                      const nivel = getRiscoNivel(grau);
+                      return (
+                        <TableRow key={i}>
+                          <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
+                          <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
+                          <TableCell>
+                            <Select value={String(r.probabilidade)} onValueChange={(v) => updateRisco(i, "probabilidade", Number(v) as NivelRisco)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1 - Raro</SelectItem>
+                                <SelectItem value="2">2 - Improvável</SelectItem>
+                                <SelectItem value="3">3 - Possível</SelectItem>
+                                <SelectItem value="4">4 - Provável</SelectItem>
+                                <SelectItem value="5">5 - Quase certo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select value={String(r.impacto)} onValueChange={(v) => updateRisco(i, "impacto", Number(v) as NivelRisco)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1 - Insignificante</SelectItem>
+                                <SelectItem value="2">2 - Menor</SelectItem>
+                                <SelectItem value="3">3 - Moderado</SelectItem>
+                                <SelectItem value="4">4 - Maior</SelectItem>
+                                <SelectItem value="5">5 - Catastrófico</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${nivel.className}`}>
+                              {grau} — {nivel.label}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {form.riscos.length > 1 && (
+                              <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
