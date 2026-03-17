@@ -10,6 +10,11 @@ export interface EtapaForm {
   ferramentaDocumento: string;
 }
 
+export interface EntradaForm {
+  fornecedor: string;
+  entrada: string;
+}
+
 export interface RiscoForm {
   risco: string;
   consequencia: string;
@@ -57,8 +62,8 @@ export interface ProcessoFormData {
   // 3. Gatilho
   gatilho: string;
 
-  // 4. Entradas
-  entradas: string;
+  // 4. Entradas (SIPOC: Supplier + Input)
+  entradas: EntradaForm[];
 
   // 5. Atividades
   etapas: EtapaForm[];
@@ -132,7 +137,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   clienteProcesso: "",
   areasEnvolvidas: "",
   gatilho: "",
-  entradas: "",
+  entradas: [{ fornecedor: "", entrada: "" }],
   etapas: [{ ordem: 1, atividade: "", responsavel: "", ferramentaDocumento: "" }],
   decisoes: "",
   saidas: "",

@@ -14,6 +14,7 @@ import { ArrowLeft, ArrowRight, Save, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   type ProcessoFormData,
+  type EntradaForm,
   type EtapaForm,
   type RiscoForm,
   type IndicadorForm,
@@ -219,13 +220,76 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 3: Entradas */}
+            {/* Tab 3: Entradas (SIPOC: Supplier + Input) */}
             <TabsContent value="entradas">
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Entradas do Processo</Label>
-                  <Textarea value={form.entradas} onChange={(e) => updateField("entradas", e.target.value)} placeholder="Informações, documentos ou dados necessários para iniciar o processo" rows={6} />
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Defina as entradas do processo e seus fornecedores, seguindo a metodologia SIPOC (Supplier → Input).
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Fornecedor (Supplier)</TableHead>
+                      <TableHead>Entrada (Input)</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {form.entradas.map((entrada, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{idx + 1}</TableCell>
+                        <TableCell>
+                          <Input
+                            value={entrada.fornecedor}
+                            onChange={(e) => {
+                              const updated = [...form.entradas];
+                              updated[idx] = { ...updated[idx], fornecedor: e.target.value };
+                              updateField("entradas", updated);
+                            }}
+                            placeholder="Quem fornece esta entrada"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={entrada.entrada}
+                            onChange={(e) => {
+                              const updated = [...form.entradas];
+                              updated[idx] = { ...updated[idx], entrada: e.target.value };
+                              updateField("entradas", updated);
+                            }}
+                            placeholder="Informação, documento ou dado"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {form.entradas.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const updated = form.entradas.filter((_, i) => i !== idx);
+                                updateField("entradas", updated);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateField("entradas", [...form.entradas, { fornecedor: "", entrada: "" }])
+                  }
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Adicionar Entrada
+                </Button>
               </div>
             </TabsContent>
 
