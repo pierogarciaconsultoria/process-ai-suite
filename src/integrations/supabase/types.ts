@@ -14,45 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      processes: {
-        Row: {
-          id: string
-          nome: string | null
-          area: string | null
-          responsavel: string | null
-          bpmn_as_is: string | null
-          bpmn_to_be: string | null
-          description_as_is: string | null
-          description_to_be: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          nome?: string | null
-          area?: string | null
-          responsavel?: string | null
-          bpmn_as_is?: string | null
-          bpmn_to_be?: string | null
-          description_as_is?: string | null
-          description_to_be?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          nome?: string | null
-          area?: string | null
-          responsavel?: string | null
-          bpmn_as_is?: string | null
-          bpmn_to_be?: string | null
-          description_as_is?: string | null
-          description_to_be?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
