@@ -419,7 +419,7 @@ const ProcessoFormulario = () => {
               </div>
             </TabsContent>
 
-            {/* Tab 8: Riscos */}
+            {/* Tab 9: Riscos */}
             <TabsContent value="riscos">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -431,21 +431,55 @@ const ProcessoFormulario = () => {
                     <TableRow>
                       <TableHead>Risco</TableHead>
                       <TableHead>Consequência</TableHead>
+                      <TableHead className="w-40">Probabilidade</TableHead>
+                      <TableHead className="w-40">Impacto</TableHead>
+                      <TableHead className="w-28">Grau de Risco</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {form.riscos.map((r, i) =>
-                    <TableRow key={i}>
+                    {form.riscos.map((r, i) => {
+                      const score = r.probabilidade * r.impacto;
+                      const nivel = getRiscoNivel(score);
+                      return (
+                      <TableRow key={i}>
                         <TableCell><Input value={r.risco} onChange={(e) => updateRisco(i, "risco", e.target.value)} placeholder="Descreva o risco" /></TableCell>
                         <TableCell><Input value={r.consequencia} onChange={(e) => updateRisco(i, "consequencia", e.target.value)} placeholder="Consequência" /></TableCell>
+                        <TableCell>
+                          <Select value={String(r.probabilidade)} onValueChange={(v) => updateRisco(i, "probabilidade", Number(v) as NivelRisco)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 - Raro</SelectItem>
+                              <SelectItem value="2">2 - Improvável</SelectItem>
+                              <SelectItem value="3">3 - Possível</SelectItem>
+                              <SelectItem value="4">4 - Provável</SelectItem>
+                              <SelectItem value="5">5 - Quase certo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={String(r.impacto)} onValueChange={(v) => updateRisco(i, "impacto", Number(v) as NivelRisco)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 - Insignificante</SelectItem>
+                              <SelectItem value="2">2 - Pequeno</SelectItem>
+                              <SelectItem value="3">3 - Moderado</SelectItem>
+                              <SelectItem value="4">4 - Grande</SelectItem>
+                              <SelectItem value="5">5 - Catastrófico</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={nivel.color}>{score} - {nivel.label}</Badge>
+                        </TableCell>
                         <TableCell>
                           {form.riscos.length > 1 &&
                         <Button size="icon" variant="ghost" onClick={() => removeRisco(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         }
                         </TableCell>
                       </TableRow>
-                    )}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
