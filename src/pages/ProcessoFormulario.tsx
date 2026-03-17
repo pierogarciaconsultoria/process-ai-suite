@@ -736,9 +736,15 @@ const ProcessoFormulario = () => {
               {tabIndex + 1} de {TABS.length}
             </span>
             {tabIndex === TABS.length - 1 ?
-            <Button onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" /> Salvar
-              </Button> :
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleDiagnose} disabled={isDiagnosing}>
+                  {isDiagnosing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSearch className="h-4 w-4 mr-2" />}
+                  {isDiagnosing ? "Gerando..." : "Gerar Diagnóstico"}
+                </Button>
+                <Button onClick={handleSave}>
+                  <Save className="h-4 w-4 mr-2" /> Salvar
+                </Button>
+              </div> :
 
             <Button onClick={goNext}>
                 Próximo <ArrowRight className="h-4 w-4 ml-2" />

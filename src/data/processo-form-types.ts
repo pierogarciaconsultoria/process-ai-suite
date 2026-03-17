@@ -131,6 +131,105 @@ export interface ProcessoFormData {
   conclusao: string;
 }
 
+// ── Diagnóstico Result Types ──
+
+export interface Fase1Mapeamento {
+  resumoExecutivo: string;
+  descricaoPontaAPonta: string;
+  principaisAtores: string[];
+  fluxoLogico: string;
+}
+
+export interface ProblemaEstruturado {
+  problema: string;
+  tipo: "gargalo" | "retrabalho" | "risco" | "ineficiencia";
+  severidade: "alto" | "medio" | "baixo";
+  impactoNegocio: string;
+}
+
+export interface Fase2Diagnostico {
+  problemas: ProblemaEstruturado[];
+  principaisGargalos: string[];
+  pontosRetrabalho: string[];
+  analiseRiscos: Array<{ risco: string; nivel: "alto" | "medio" | "baixo"; impacto: string }>;
+}
+
+export interface ClassificacaoAtividade {
+  atividade: string;
+  classificacao: "valor_agregado" | "suporte" | "desperdicio";
+}
+
+export interface Fase3Maturidade {
+  classificacaoAtividades: ClassificacaoAtividade[];
+  scoreProcesso: number;
+  nivelMaturidade: 1 | 2 | 3 | 4 | 5;
+  descricaoMaturidade: string;
+  maturidadeDigital: "baixa" | "media" | "alta";
+  descricaoMaturidadeDigital: string;
+}
+
+export interface MelhoriaToBe {
+  problemaIdentificado: string;
+  solucaoProposta: string;
+  tipoTecnologia: "RPA" | "Workflow" | "API" | "IA" | "BI" | "Manual";
+  impactoEsperado: string;
+  complexidade: "Baixa" | "Media" | "Alta";
+  prioridade: "Alta" | "Media" | "Baixa";
+}
+
+export interface Fase4ToBe {
+  melhorias: MelhoriaToBe[];
+  reducaoTempoEstimada: string;
+  potencialAutomacao: string;
+}
+
+export interface PlanoAcaoDiag {
+  oque: string;
+  porque: string;
+  quem: string;
+  quando: string;
+  onde: string;
+  como: string;
+  custo: string;
+  prioridade: "Alta" | "Media" | "Baixa";
+}
+
+export interface Fase5PlanoAcao {
+  acoes: PlanoAcaoDiag[];
+}
+
+export interface IndicadorKPI {
+  nome: string;
+  objetivo: string;
+  formulaCalculo: string;
+  meta: string;
+  periodicidade: string;
+  responsavel: string;
+  classificacao: "Estrategico" | "Tatico" | "Operacional";
+  tipo: "Leading" | "Lagging";
+}
+
+export interface Fase6Indicadores {
+  indicadores: IndicadorKPI[];
+}
+
+export interface AnaliseFinal {
+  diagnosticoGeral: string;
+  top5Problemas: string[];
+  top5Oportunidades: string[];
+  recomendacaoEstrategica: string;
+}
+
+export interface DiagnosticoResult {
+  fase1: Fase1Mapeamento;
+  fase2: Fase2Diagnostico;
+  fase3: Fase3Maturidade;
+  fase4: Fase4ToBe;
+  fase5: Fase5PlanoAcao;
+  fase6: Fase6Indicadores;
+  analiseFinal: AnaliseFinal;
+}
+
 export const emptyProcessoForm: ProcessoFormData = {
   data: new Date().toISOString().split("T")[0],
   analista: "",
