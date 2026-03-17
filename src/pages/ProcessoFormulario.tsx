@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, ArrowRight, Save, Plus, Trash2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Plus, Trash2, Sparkles, Loader2, FileSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -75,6 +75,7 @@ const ProcessoFormulario = () => {
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
   const [descricaoIA, setDescricaoIA] = useState("");
   const [isFillingAI, setIsFillingAI] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
 
   const handleAIFill = async () => {
     if (descricaoIA.trim().length < 10) {
@@ -200,6 +201,28 @@ const ProcessoFormulario = () => {
   const handleSave = () => {
     toast({ title: "Processo salvo", description: "O mapeamento foi salvo com sucesso." });
     navigate("/processos");
+  };
+
+  const handleDiagnose = async () => {
+    setIsDiagnosing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-diagnose-process", {
+        body: { processoData: form },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      navigate("/processos/novo/diagnostico", { state: { diagnostico: data } });
+    } catch (err: any) {
+      console.error("Diagnose error:", err);
+      toast({
+        title: "Erro ao gerar diagnóstico",
+        description: err?.message || "Tente novamente em alguns segundos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDiagnosing(false);
+    }
   };
 
   return (
@@ -713,9 +736,15 @@ const ProcessoFormulario = () => {
               {tabIndex + 1} de {TABS.length}
             </span>
             {tabIndex === TABS.length - 1 ?
-            <Button onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" /> Salvar
-              </Button> :
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleDiagnose} disabled={isDiagnosing}>
+                  {isDiagnosing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSearch className="h-4 w-4 mr-2" />}
+                  {isDiagnosing ? "Gerando..." : "Gerar Diagnóstico"}
+                </Button>
+                <Button onClick={handleSave}>
+                  <Save className="h-4 w-4 mr-2" /> Salvar
+                </Button>
+              </div> :
 
             <Button onClick={goNext}>
                 Próximo <ArrowRight className="h-4 w-4 ml-2" />

@@ -2,3 +2,6 @@ project_id = "owenetohbgzhzwncwzbn"
 
 [functions.ai-fill-process]
 verify_jwt = false
+
+[functions.ai-diagnose-process]
+verify_jwt = false
