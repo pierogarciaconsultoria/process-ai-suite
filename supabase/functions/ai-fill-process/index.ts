@@ -144,9 +144,9 @@ Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas 
                   criticidadeDetalhada: {
                     type: "object",
                     properties: {
-                      impactoNegocio: { type: "number", enum: [1, 3, 5] },
-                      impactoCliente: { type: "number", enum: [1, 3, 5] },
-                      riscoOperacional: { type: "number", enum: [1, 3, 5] },
+                      impactoNegocio: { type: "number", description: "Valor: 1, 3 ou 5" },
+                      impactoCliente: { type: "number", description: "Valor: 1, 3 ou 5" },
+                      riscoOperacional: { type: "number", description: "Valor: 1, 3 ou 5" },
                     },
                     required: ["impactoNegocio", "impactoCliente", "riscoOperacional"],
                   },
