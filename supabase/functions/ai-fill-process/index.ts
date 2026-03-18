@@ -120,8 +120,8 @@ Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas 
                       properties: {
                         risco: { type: "string" },
                         consequencia: { type: "string" },
-                        probabilidade: { type: "number", enum: [1, 2, 3, 4, 5] },
-                        impacto: { type: "number", enum: [1, 2, 3, 4, 5] },
+                        probabilidade: { type: "number", description: "Valor de 1 a 5" },
+                        impacto: { type: "number", description: "Valor de 1 a 5" },
                       },
                       required: ["risco", "consequencia", "probabilidade", "impacto"],
                     },
