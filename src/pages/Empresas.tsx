@@ -17,16 +17,10 @@ interface Empresa {
   data_cadastro: string;
 }
 
-const mockEmpresas: Empresa[] = [
-  { id: "1", nome: "Tech Solutions Ltda", segmento: "Tecnologia", tamanho: "50-100", data_cadastro: "2024-01-15" },
-  { id: "2", nome: "Indústria Alpha S.A.", segmento: "Indústria", tamanho: "500+", data_cadastro: "2024-02-20" },
-  { id: "3", nome: "Consultoria Beta", segmento: "Serviços", tamanho: "10-50", data_cadastro: "2024-03-10" },
-];
-
 const Empresas = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [empresas, setEmpresas] = useState<Empresa[]>(mockEmpresas);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [novaNome, setNovaNome] = useState("");
   const [novaSegmento, setNovaSegmento] = useState("");
   const [novaTamanho, setNovaTamanho] = useState("");
@@ -49,14 +43,28 @@ const Empresas = () => {
       });
       if (error) return;
       if (created?.empresa) {
-        const e = created.empresa as Empresa;
+        const raw = created.empresa as Record<string, unknown>;
+        const e: Empresa = {
+          id: String(raw.id),
+          nome: String(raw.nome),
+          segmento: String(raw.segmento || ""),
+          tamanho: String(raw.tamanho || ""),
+          data_cadastro: String(raw.created_at || new Date().toISOString()),
+        };
         setEmpresas((prev) => [e, ...prev]);
       }
     };
     const loadFromServer = async () => {
       const { data, error } = await supabase.functions.invoke("org-list");
       if (!error && Array.isArray(data)) {
-        setEmpresas(data as Empresa[]);
+        const list = (data as Array<Record<string, unknown>>).map((e) => ({
+          id: String(e.id),
+          nome: String(e.nome),
+          segmento: String(e.segmento || ""),
+          tamanho: String(e.tamanho || ""),
+          data_cadastro: String(e.created_at || new Date().toISOString()),
+        })) as Empresa[];
+        setEmpresas(list);
       }
     };
     loadFromServer().then(loadUserCompany);

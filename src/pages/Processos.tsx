@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,17 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Pencil } from "lucide-react";
-import { processos, type Processo } from "@/data/mock-processos";
+type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado";
+type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
+type Processo = {
+  id: string;
+  nome: string;
+  area: string;
+  responsavel: string;
+  status: Status;
+  criticidade: Criticidade;
+  data_criacao: string;
+};
 
 const statusColors: Record<string, string> = {
   Novo: "bg-muted text-muted-foreground",
@@ -26,10 +36,15 @@ const Processos = () => {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
-  const filtered = processos.filter(
-    (p) =>
-      p.nome.toLowerCase().includes(search.toLowerCase()) ||
-      p.area.toLowerCase().includes(search.toLowerCase())
+  const [lista] = useState<Processo[]>([]);
+  const filtered = useMemo(
+    () =>
+      lista.filter(
+        (p) =>
+          p.nome.toLowerCase().includes(search.toLowerCase()) ||
+          p.area.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [lista, search],
   );
 
   return (
@@ -71,34 +86,42 @@ const Processos = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((processo) => (
-                <TableRow key={processo.id}>
-                  <TableCell className="font-medium">{processo.nome}</TableCell>
-                  <TableCell>{processo.area}</TableCell>
-                  <TableCell>{processo.responsavel}</TableCell>
-                  <TableCell>
-                    <Badge className={statusColors[processo.status]}>{processo.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={criticidadeColors[processo.criticidade]}>
-                      {processo.criticidade}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{new Date(processo.data_criacao).toLocaleDateString("pt-BR")}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}`)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(`/processos/${processo.id}/editar`, { state: processo })}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    Nenhum processo cadastrado. Clique em “Novo Processo” para começar.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filtered.map((processo) => (
+                  <TableRow key={processo.id}>
+                    <TableCell className="font-medium">{processo.nome}</TableCell>
+                    <TableCell>{processo.area}</TableCell>
+                    <TableCell>{processo.responsavel}</TableCell>
+                    <TableCell>
+                      <Badge className={statusColors[processo.status]}>{processo.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={criticidadeColors[processo.criticidade]}>
+                        {processo.criticidade}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(processo.data_criacao).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}`)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/processos/${processo.id}/editar`, { state: processo })}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
