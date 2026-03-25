@@ -84,3 +84,15 @@ create policy if not exists convites_select_by_membership
       select empresa_id from public.membros where user_id = auth.uid()
     )
   );
+
+create policy if not exists convites_insert_by_admin_or_owner
+  on public.convites
+  for insert
+  with check (
+    empresa_id in (
+      select empresa_id from public.membros where user_id = auth.uid() and perfil in ('admin','gestor')
+    )
+    or empresa_id in (
+      select id from public.empresas where owner_id = auth.uid()
+    )
+  );
