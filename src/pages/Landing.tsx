@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Network, Building2, ClipboardList, Sparkles, Users } from "lucide-react";
+import { Network, Building2, ClipboardList, Sparkles, Users, ShieldCheck, Gauge, FileText, Lock, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -114,6 +114,182 @@ export default function Landing() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </div>
+      </section>
+      <section className="mx-auto max-w-6xl px-6 pb-12 space-y-12">
+        <div className="space-y-4">
+          <Badge variant="secondary">Funcionalidades</Badge>
+          <h3 className="text-2xl font-bold tracking-tight">O que você consegue fazer com a plataforma</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Multi-empresa e times</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Estruture múltiplas empresas, convide usuários e organize perfis de acesso (admin, gestor, analista).
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <ClipboardList className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Formulário de processo</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Coleta estruturada em SIPOC, atividades, decisões, entradas/saídas, riscos, indicadores e plano de ação.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Diagnóstico com IA (0–4)</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Classificação automática de maturidade, detecção de gargalos e recomendações de evolução do processo.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Gauge className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Indicadores e métricas</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Definição de KPIs, metas e acompanhamento da criticidade detalhada por impacto, risco e cliente.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Relatórios e mapas</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Geração de PDF e mapa BPMN 2.0 com diagrama visual, prontos para compartilhar com a diretoria.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Segurança com RLS</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Isolamento por usuário/empresa usando políticas de segurança no banco (Supabase RLS).
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Badge variant="secondary">Módulos do Sistema</Badge>
+          <h3 className="text-2xl font-bold tracking-tight">Arquitetura de módulos</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <ClipboardList className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Processos</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Cadastro, formulário, diagnóstico com IA e modelagem BPMN 2.0.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Users className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Usuários e Perfis</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Convites por empresa, perfis de acesso e gestão de membros.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Empresas</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Onboarding de organização, estrutura por segmento e tamanho.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Relatórios</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Geração automática de relatórios executivos e exportações.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Settings className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Configurações</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Preferências, segurança e integrações opcionais de IA.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Network className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Arquitetura</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Visualização de processos, fluxos e relação entre módulos.
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Badge variant="secondary">Requisitos e Segurança</Badge>
+          <h3 className="text-2xl font-bold tracking-tight">Antes de começar</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <Lock className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Isolamento de dados</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Políticas RLS garantem que cada usuário acesse apenas dados da sua empresa e dos seus vínculos.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex-row items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5 text-secondary-foreground" />
+                </div>
+                <CardTitle className="text-base">Pré-requisitos</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Conta Supabase configurada, envio de e-mails habilitado e, opcionalmente, chave de IA para BPMN e relatórios.
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
