@@ -56,6 +56,14 @@ create policy if not exists membros_select_self
   for select
   using (user_id = auth.uid());
 
+create policy if not exists membros_select_by_company
+  on public.membros
+  for select
+  using (
+    empresa_id in (
+      select empresa_id from public.membros where user_id = auth.uid()
+    )
+  );
 create policy if not exists membros_insert_by_owner
   on public.membros
   for insert

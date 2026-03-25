@@ -17,17 +17,19 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(
-        JSON.stringify({ error: "Supabase service role não configurado" }),
+        JSON.stringify({ error: "Supabase keys não configurados" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: userRes } = await supabase.auth.getUser();
     const user = userRes?.user;
@@ -66,7 +68,7 @@ serve(async (req) => {
 
     const users: Record<string, { id: string; email: string; nome?: string }> = {};
     for (const m of membros || []) {
-      const { data: u } = await supabase.auth.admin.getUserById(m.user_id);
+      const { data: u } = await admin.auth.admin.getUserById(m.user_id);
       if (u?.user) {
         users[m.user_id] = {
           id: u.user.id,

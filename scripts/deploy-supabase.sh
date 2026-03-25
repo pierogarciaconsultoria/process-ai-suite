@@ -12,8 +12,8 @@ if ! command -v supabase >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -n "${LOVABLE_API_KEY:-}" ] && [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
-  supabase secrets set LOVABLE_API_KEY="$LOVABLE_API_KEY" SUPABASE_URL="$SUPABASE_URL" SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" --project-ref "$REF"
+if [ -n "${LOVABLE_API_KEY:-}" ] && [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+  supabase secrets set LOVABLE_API_KEY="$LOVABLE_API_KEY" SUPABASE_URL="$SUPABASE_URL" SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" --project-ref "$REF"
 fi
 
 supabase db push --project-ref "$REF"
