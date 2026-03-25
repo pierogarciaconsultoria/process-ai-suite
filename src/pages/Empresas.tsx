@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Building2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Empresa {
   id: string;
@@ -24,10 +26,71 @@ const mockEmpresas: Empresa[] = [
 const Empresas = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [empresas, setEmpresas] = useState<Empresa[]>(mockEmpresas);
+  const [novaNome, setNovaNome] = useState("");
+  const [novaSegmento, setNovaSegmento] = useState("");
+  const [novaTamanho, setNovaTamanho] = useState("");
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const { toast } = useToast();
 
-  const filtered = mockEmpresas.filter((e) =>
+  useEffect(() => {
+    const loadUserCompany = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      if (!user) return;
+      const meta = user.user_metadata as Record<string, unknown>;
+      const empresaValue = meta?.empresa;
+      const empresaNome = typeof empresaValue === "string" ? empresaValue : undefined;
+      if (!empresaNome) return;
+      const exists = empresas.some((e) => e.nome.toLowerCase() === String(empresaNome).toLowerCase());
+      if (exists) return;
+      const { data: created, error } = await supabase.functions.invoke("org-onboarding", {
+        body: { empresaNome },
+      });
+      if (error) return;
+      if (created?.empresa) {
+        const e = created.empresa as Empresa;
+        setEmpresas((prev) => [e, ...prev]);
+      }
+    };
+    const loadFromServer = async () => {
+      const { data, error } = await supabase.functions.invoke("org-list");
+      if (!error && Array.isArray(data)) {
+        setEmpresas(data as Empresa[]);
+      }
+    };
+    loadFromServer().then(loadUserCompany);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filtered = empresas.filter((e) =>
     e.nome.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleCreate = async () => {
+    if (!novaNome.trim()) {
+      toast({ title: "Informe o nome da empresa", description: "Preencha o campo Nome da Empresa.", variant: "destructive" });
+      return;
+    }
+    setLoadingCreate(true);
+    const { data, error } = await supabase.functions.invoke("org-onboarding", {
+      body: { nome: novaNome.trim(), segmento: novaSegmento.trim() || null, tamanho: novaTamanho.trim() || null },
+    });
+    setLoadingCreate(false);
+    if (error) {
+      toast({ title: "Erro ao cadastrar", description: error.message, variant: "destructive" });
+      return;
+    }
+    if (data?.empresa) {
+      const e = data.empresa as Empresa;
+      setEmpresas((prev) => [e, ...prev]);
+      setOpen(false);
+      setNovaNome("");
+      setNovaSegmento("");
+      setNovaTamanho("");
+      toast({ title: "Empresa cadastrada", description: "A empresa foi criada e vinculada à sua conta." });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -50,18 +113,18 @@ const Empresas = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome da Empresa</Label>
-                <Input placeholder="Nome da empresa" />
+                <Input placeholder="Nome da empresa" value={novaNome} onChange={(e) => setNovaNome(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Segmento</Label>
-                <Input placeholder="Segmento de atuação" />
+                <Input placeholder="Segmento de atuação" value={novaSegmento} onChange={(e) => setNovaSegmento(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Número de Colaboradores</Label>
-                <Input placeholder="Ex: 50-100" />
+                <Input placeholder="Ex: 50-100" value={novaTamanho} onChange={(e) => setNovaTamanho(e.target.value)} />
               </div>
-              <Button className="w-full" onClick={() => setOpen(false)}>
-                Cadastrar
+              <Button className="w-full" onClick={handleCreate} disabled={loadingCreate}>
+                {loadingCreate ? "Cadastrando..." : "Cadastrar"}
               </Button>
             </div>
           </DialogContent>

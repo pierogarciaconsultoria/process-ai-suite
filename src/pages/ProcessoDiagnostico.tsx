@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, TrendingUp, Target, BarChart3, Lightbulb, ClipboardList, Activity } from "lucide-react";
+import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, TrendingUp, Target, BarChart3, Lightbulb, ClipboardList, Activity, Printer } from "lucide-react";
 import type { DiagnosticoResult } from "@/data/processo-form-types";
 
 const severidadeBadge = (s: string) => {
@@ -23,20 +23,12 @@ const prioridadeBadge = (p: string) => {
   }
 };
 
-const maturidadeLabel: Record<number, string> = {
-  1: "Caótico",
-  2: "Manual",
-  3: "Padronizado",
-  4: "Medido",
-  5: "Otimizado",
-};
-
-const maturidadeDigitalBadge = (m: string) => {
-  switch (m) {
-    case "alta": return <Badge className="bg-success text-success-foreground">🟢 Alta</Badge>;
-    case "media": return <Badge className="bg-warning text-warning-foreground">🟡 Média</Badge>;
-    default: return <Badge variant="destructive">🔴 Baixa</Badge>;
-  }
+const maturidadeLabel0a4: Record<number, string> = {
+  0: "Manual (analógico)",
+  1: "Planilha/E-mail",
+  2: "Sistema isolado",
+  3: "Sistema integrado/Workflow",
+  4: "Automação/IA aplicada",
 };
 
 const classAtividadeBadge = (c: string) => {
@@ -70,6 +62,13 @@ const ProcessoDiagnostico = () => {
   }
 
   const { fase1, fase2, fase3, fase4, fase5, fase6, analiseFinal } = diagnostico;
+  const nivelRaw = fase3.nivelMaturidade;
+  const nivel0a4 = (nivelRaw >= 1 && nivelRaw <= 5) ? nivelRaw - 1 : Math.max(0, Math.min(4, nivelRaw));
+  const classificacaoFaixa =
+    nivel0a4 <= 1.5 ? "Baixa maturidade (analógico)"
+    : nivel0a4 <= 2.5 ? "Média maturidade (digital básico)"
+    : nivel0a4 <= 3.5 ? "Alta maturidade (digital estruturado)"
+    : "Avançado (inteligente)";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -78,9 +77,14 @@ const ProcessoDiagnostico = () => {
           <h1 className="text-2xl font-bold text-foreground">Diagnóstico do Processo</h1>
           <p className="text-muted-foreground">Análise completa em 6 fases</p>
         </div>
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
-        </Button>
+        <div className="flex gap-2 no-print">
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+          </Button>
+          <Button onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" /> Exportar PDF
+          </Button>
+        </div>
       </div>
 
       {/* Score e Maturidade - Cards resumo */}
@@ -95,18 +99,18 @@ const ProcessoDiagnostico = () => {
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-primary" />
-            <div className="text-3xl font-bold text-foreground">{fase3.nivelMaturidade}/5</div>
-            <p className="text-sm text-muted-foreground mt-1">{maturidadeLabel[fase3.nivelMaturidade]}</p>
-            <Progress value={fase3.nivelMaturidade * 20} className="mt-3" />
+            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <div className="text-3xl font-bold text-foreground">{typeof fase3.mediaMaturidade === "number" ? fase3.mediaMaturidade : nivel0a4}/4</div>
+            <p className="text-sm text-muted-foreground mt-1">{typeof fase3.classificacaoMaturidade === "string" ? fase3.classificacaoMaturidade : classificacaoFaixa}</p>
+            <Progress value={(typeof fase3.mediaMaturidade === "number" ? fase3.mediaMaturidade : nivel0a4) * 25} className="mt-3" />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary" />
-            <div className="mt-1">{maturidadeDigitalBadge(fase3.maturidadeDigital)}</div>
-            <p className="text-sm text-muted-foreground mt-2">Maturidade Digital</p>
-            <p className="text-xs text-muted-foreground mt-1">{fase3.descricaoMaturidadeDigital}</p>
+            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <div className="text-3xl font-bold text-foreground">{nivel0a4}/4</div>
+            <p className="text-sm text-muted-foreground mt-1">{maturidadeLabel0a4[nivel0a4]}</p>
+            <Progress value={nivel0a4 * 25} className="mt-3" />
           </CardContent>
         </Card>
       </div>

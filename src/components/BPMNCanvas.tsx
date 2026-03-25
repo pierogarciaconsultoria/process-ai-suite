@@ -36,9 +36,21 @@ interface BPMNCanvasProps {
   mode?: "as-is" | "to-be";
 }
 
+interface BpmnCanvas {
+  zoom(value?: number | "fit-viewport"): number | void;
+}
+
+interface BpmnInstance {
+  importXML(xml: string): Promise<void>;
+  get(service: "canvas"): BpmnCanvas;
+  saveXML(options?: { format?: boolean }): Promise<{ xml: string }>;
+  on(event: string, handler: () => void): void;
+  destroy(): void;
+}
+
 export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, mode = "as-is" }: BPMNCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const bpmnInstanceRef = useRef<any>(null);
+  const bpmnInstanceRef = useRef<BpmnInstance | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const { toast } = useToast();
@@ -46,16 +58,16 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    let instance: any;
+    let instance: BpmnInstance;
 
     const initBpmn = async () => {
       try {
         if (readOnly) {
           const { default: BpmnViewer } = await import("bpmn-js/lib/NavigatedViewer");
-          instance = new BpmnViewer({ container: containerRef.current! });
+          instance = new BpmnViewer({ container: containerRef.current! }) as unknown as BpmnInstance;
         } else {
           const { default: BpmnModeler } = await import("bpmn-js/lib/Modeler");
-          instance = new BpmnModeler({ container: containerRef.current! });
+          instance = new BpmnModeler({ container: containerRef.current! }) as unknown as BpmnInstance;
         }
 
         bpmnInstanceRef.current = instance;
@@ -185,9 +197,10 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
       }
 
       toast({ title: "Mapa gerado!", description: "O diagrama BPMN foi gerado pela IA. Você pode editá-lo livremente." });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Tente novamente.";
       console.error("AI generate BPMN error:", err);
-      toast({ title: "Erro ao gerar mapa BPMN", description: err?.message || "Tente novamente.", variant: "destructive" });
+      toast({ title: "Erro ao gerar mapa BPMN", description: message, variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }

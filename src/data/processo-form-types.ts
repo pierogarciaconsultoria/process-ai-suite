@@ -8,6 +8,20 @@ export interface EtapaForm {
   atividade: string;
   responsavel: string;
   ferramentaDocumento: string;
+  comoHoje?: string;
+  nivelMaturidade?: 0 | 1 | 2 | 3 | 4;
+  nivelDesejado?: 0 | 1 | 2 | 3 | 4;
+  nivelIdeal?: 0 | 1 | 2 | 3 | 4;
+  gap?: number;
+  problemaIdentificado?: string;
+  oportunidadeMelhoria?: string;
+  tipoSolucao?: "RPA" | "Workflow" | "API" | "IA";
+  tecnologiaRecomendada?: string;
+  acaoRecomendada?: string;
+  gravidade?: number;
+  urgencia?: number;
+  tendencia?: number;
+  nota?: number;
 }
 
 export interface EntradaForm {
@@ -166,10 +180,12 @@ export interface ClassificacaoAtividade {
 export interface Fase3Maturidade {
   classificacaoAtividades: ClassificacaoAtividade[];
   scoreProcesso: number;
-  nivelMaturidade: 1 | 2 | 3 | 4 | 5;
+  nivelMaturidade: 0 | 1 | 2 | 3 | 4;
   descricaoMaturidade: string;
   maturidadeDigital: "baixa" | "media" | "alta";
   descricaoMaturidadeDigital: string;
+  mediaMaturidade?: number;
+  classificacaoMaturidade?: "Baixa maturidade (analógico)" | "Média maturidade (digital básico)" | "Alta maturidade (digital estruturado)" | "Avançado (inteligente)";
 }
 
 export interface MelhoriaToBe {

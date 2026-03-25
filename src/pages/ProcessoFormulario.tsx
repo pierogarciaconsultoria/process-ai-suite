@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import {
-  ArrowLeft, ArrowRight, Save, Plus, Trash2, Sparkles, Loader2, FileSearch,
+  ArrowLeft, ArrowRight, Save, Plus, Trash2, Sparkles, Loader2,
   ClipboardList, Search, Map, BarChart3, ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,6 @@ import {
   type IndicadorForm,
   type PlanoAcao5W2H,
   type Classificacao,
-  type Frequencia,
   emptyProcessoForm,
 } from "@/data/processo-form-types";
 import { Badge } from "@/components/ui/badge";
@@ -131,10 +130,12 @@ const ProcessoFormulario = () => {
   const goPrev = () => { if (tabIndex > 0) setActiveTab(ALL_TABS[tabIndex - 1]); };
 
   // Dynamic row helpers
-  const addEtapa = () => updateField("etapas", [...form.etapas, { ordem: form.etapas.length + 1, atividade: "", responsavel: "", ferramentaDocumento: "" }]);
+  const addEtapa = () => updateField("etapas", [...form.etapas, { ordem: form.etapas.length + 1, atividade: "", responsavel: "", ferramentaDocumento: "", comoHoje: "", nivelMaturidade: 0, nivelDesejado: 1, problemaIdentificado: "", oportunidadeMelhoria: "", tipoSolucao: "Workflow", tecnologiaRecomendada: "", acaoRecomendada: "", gravidade: 1, urgencia: 1, tendencia: 1, nota: 3 }]);
   const removeEtapa = (i: number) => updateField("etapas", form.etapas.filter((_, idx) => idx !== i).map((e, idx) => ({ ...e, ordem: idx + 1 })));
-  const updateEtapa = (i: number, field: keyof EtapaForm, value: string) => {
-    const updated = [...form.etapas]; (updated[i] as any)[field] = value; updateField("etapas", updated);
+  const updateEtapa = <K extends keyof EtapaForm>(i: number, field: K, value: EtapaForm[K]) => {
+    const updated = [...form.etapas];
+    updated[i] = { ...updated[i], [field]: value };
+    updateField("etapas", updated);
   };
 
   const addEntrada = () => updateField("entradas", [...form.entradas, { fornecedor: "", entrada: "" }]);
@@ -166,6 +167,8 @@ const ProcessoFormulario = () => {
   const updatePlano = (i: number, field: keyof PlanoAcao5W2H, value: string) => {
     const updated = [...form.planoAcao]; updated[i] = { ...updated[i], [field]: value }; updateField("planoAcao", updated);
   };
+
+  const recursosList = (form.recursos || "").split(/\n|,/).map((s) => s.trim()).filter(Boolean);
 
   // ── AI Fill ──
   const handleAIFill = async () => {
@@ -206,29 +209,37 @@ const ProcessoFormulario = () => {
         conclusao: data.conclusao || prev.conclusao,
       }));
       toast({ title: "Preenchimento concluído!", description: "Revise os dados gerados pela IA." });
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Tente novamente.";
       console.error("AI fill error:", err);
-      toast({ title: "Erro ao preencher com IA", description: err?.message || "Tente novamente.", variant: "destructive" });
+      toast({ title: "Erro ao preencher com IA", description: message, variant: "destructive" });
     } finally {
       setIsFillingAI(false);
     }
   };
 
   // ── Diagnose ──
-  const handleDiagnose = async () => {
+  const handleDiagnose = useCallback(async () => {
     setIsDiagnosing(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { body: { processoData: form } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       navigate("/processos/novo/diagnostico", { state: { diagnostico: data } });
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Tente novamente.";
       console.error("Diagnose error:", err);
-      toast({ title: "Erro ao gerar diagnóstico", description: err?.message || "Tente novamente.", variant: "destructive" });
+      toast({ title: "Erro ao gerar diagnóstico", description: message, variant: "destructive" });
     } finally {
       setIsDiagnosing(false);
     }
-  };
+  }, [form, navigate, toast]);
+
+  useEffect(() => {
+    if (activeTab === "relatorio") {
+      handleDiagnose();
+    }
+  }, [activeTab, handleDiagnose]);
 
   const handleSave = () => {
     toast({ title: "Processo salvo", description: "O mapeamento foi salvo com sucesso." });
@@ -355,17 +366,26 @@ const ProcessoFormulario = () => {
       case "recursos":
         return (
           <div className="space-y-4">
-            <div className="space-y-2"><Label>Recursos Utilizados</Label><Textarea value={form.recursos} onChange={(e) => updateField("recursos", e.target.value)} placeholder="Sistemas, ferramentas, máquinas..." rows={4} /></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Frequência</Label>
-                <Select value={form.frequencia} onValueChange={(v) => updateField("frequencia", v as Frequencia)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{["Diária","Semanal","Quinzenal","Mensal","Trimestral","Semestral","Anual","Sob demanda"].map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><Label>Tempo de Execução</Label><Input value={form.tempoExecucao} onChange={(e) => updateField("tempoExecucao", e.target.value)} placeholder="Ex: 2 horas" /></div>
+            <div className="space-y-2">
+              <Label>Recursos necessários</Label>
+              <Textarea
+                value={form.recursos}
+                onChange={(e) => updateField("recursos", e.target.value)}
+                placeholder="Digite um recurso por linha (ex.: ERP, CRM, Máquina X)"
+                rows={6}
+              />
+              <p className="text-xs text-muted-foreground">Um por linha. Ex.: ERP, CRM, Máquina X.</p>
             </div>
+            {recursosList.length > 0 && (
+              <div className="space-y-2">
+                <Label>Lista</Label>
+                <ul className="list-disc pl-6">
+                  {recursosList.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         );
 
@@ -431,19 +451,26 @@ const ProcessoFormulario = () => {
               <Button size="sm" variant="outline" onClick={addEtapa}><Plus className="h-4 w-4 mr-1" /> Etapa</Button>
             </div>
             <Table>
-              <TableHeader><TableRow><TableHead className="w-16">#</TableHead><TableHead>Atividade</TableHead><TableHead>Responsável</TableHead><TableHead>Ferramenta/Doc</TableHead><TableHead className="w-12"></TableHead></TableRow></TableHeader>
-              <TableBody>
-                {form.etapas.map((etapa, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{etapa.ordem}</TableCell>
-                    <TableCell><Input value={etapa.atividade} onChange={(e) => updateEtapa(i, "atividade", e.target.value)} placeholder="Descreva" /></TableCell>
-                    <TableCell><Input value={etapa.responsavel} onChange={(e) => updateEtapa(i, "responsavel", e.target.value)} placeholder="Responsável" /></TableCell>
-                    <TableCell><Input value={etapa.ferramentaDocumento} onChange={(e) => updateEtapa(i, "ferramentaDocumento", e.target.value)} placeholder="Sistema/Doc" /></TableCell>
-                    <TableCell>{form.etapas.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeEtapa(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                <TableHeader><TableRow><TableHead className="w-16">#</TableHead><TableHead>Atividade</TableHead><TableHead>Responsável</TableHead><TableHead>Como é executada hoje</TableHead><TableHead>Ferramenta/Doc</TableHead><TableHead>Nível (0–4)</TableHead><TableHead className="w-12"></TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {form.etapas.map((etapa, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{etapa.ordem}</TableCell>
+                      <TableCell><Input value={etapa.atividade} onChange={(e) => updateEtapa(i, "atividade", e.target.value)} placeholder="Descreva" /></TableCell>
+                      <TableCell><Input value={etapa.responsavel} onChange={(e) => updateEtapa(i, "responsavel", e.target.value)} placeholder="Responsável" /></TableCell>
+                      <TableCell><Textarea value={etapa.comoHoje ?? ""} onChange={(e) => updateEtapa(i, "comoHoje", e.target.value)} placeholder="Ex.: manual, planilha, verbal..." rows={2} /></TableCell>
+                      <TableCell><Input value={etapa.ferramentaDocumento} onChange={(e) => updateEtapa(i, "ferramentaDocumento", e.target.value)} placeholder="Sistema/Doc" /></TableCell>
+                      <TableCell>
+                        <Select value={String(etapa.nivelMaturidade ?? 0)} onValueChange={(v) => updateEtapa(i, "nivelMaturidade", Number(v) as 0 | 1 | 2 | 3 | 4)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{[0,1,2,3,4].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>{form.etapas.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeEtapa(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
           </div>
         );
 
@@ -589,18 +616,20 @@ const ProcessoFormulario = () => {
           </div>
         );
 
-      case "relatorio":
+      case "relatorio": {
         return (
           <div className="space-y-6">
             <CardTitle className="text-lg">Relatório de Diagnóstico por IA</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Gere um relatório completo com análise de maturidade, problemas, oportunidades de melhoria e plano de ação baseado em todos os dados preenchidos.
+              Compilando automaticamente todas as informações das fases anteriores para gerar o diagnóstico completo.
             </p>
-            <Button size="lg" onClick={handleDiagnose} disabled={isDiagnosing} className="w-full sm:w-auto">
-              {isDiagnosing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando Diagnóstico...</> : <><FileSearch className="h-4 w-4 mr-2" /> Gerar Diagnóstico Completo</>}
-            </Button>
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {isDiagnosing ? "Gerando diagnóstico..." : "Preparando diagnóstico..."}
+            </div>
           </div>
         );
+      }
 
       default:
         return null;

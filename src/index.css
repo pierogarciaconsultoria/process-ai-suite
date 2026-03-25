@@ -101,3 +101,20 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .animate-fade-in {
+    animation: none !important;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+}

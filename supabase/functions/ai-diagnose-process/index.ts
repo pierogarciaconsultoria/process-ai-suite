@@ -25,8 +25,17 @@ Você atua como o motor inteligente de um sistema de diagnóstico e transformaç
 🔴 FASE 3 – ANÁLISE E MATURIDADE
 - Classificar cada atividade como: valor_agregado, suporte ou desperdicio
 - Calcular SCORE DO PROCESSO (0 a 100) baseado em: % atividades manuais, gargalos, retrabalho, riscos, tempo
-- Nível de maturidade (1=Caótico, 2=Manual, 3=Padronizado, 4=Medido, 5=Otimizado)
-- Maturidade digital (baixa=manual/planilhas, media=sistemas isolados, alta=integrado/automatizado)
+- Nível de maturidade digital por tarefa e do processo utilizando a escala 0–4:
+  0 = Manual (papel, verbal, informal)
+  1 = Planilha, e-mail ou controle básico
+  2 = Sistema isolado (sem integração)
+  3 = Sistema integrado / workflow estruturado
+  4 = Automação avançada / IA aplicada
+- Classificar a média do processo nas faixas:
+  0–1,5 → Baixa maturidade (analógico)
+  1,6–2,5 → Média maturidade (digital básico)
+  2,6–3,5 → Alta maturidade (digital estruturado)
+  3,6–4 → Avançado (inteligente)
 
 🔵 FASE 4 – OPORTUNIDADES DE MELHORIA E AUTOMAÇÃO (TO BE)
 - Para cada melhoria: problema, solução, tipo de tecnologia (RPA/Workflow/API/IA/BI/Manual), impacto, complexidade, prioridade
@@ -121,12 +130,15 @@ const toolSchema = {
               },
             },
             scoreProcesso: { type: "number", description: "Score de 0 a 100" },
-            nivelMaturidade: { type: "number", enum: [1, 2, 3, 4, 5] },
+            nivelMaturidade: { type: "number", enum: [0, 1, 2, 3, 4] },
             descricaoMaturidade: { type: "string" },
-            maturidadeDigital: { type: "string", enum: ["baixa", "media", "alta"] },
-            descricaoMaturidadeDigital: { type: "string" },
+            mediaMaturidade: { type: "number", description: "Média 0–4 calculada a partir das tarefas" },
+            classificacaoMaturidade: {
+              type: "string",
+              enum: ["Baixa maturidade (analógico)", "Média maturidade (digital básico)", "Alta maturidade (digital estruturado)", "Avançado (inteligente)"]
+            },
           },
-          required: ["classificacaoAtividades", "scoreProcesso", "nivelMaturidade", "descricaoMaturidade", "maturidadeDigital", "descricaoMaturidadeDigital"],
+          required: ["classificacaoAtividades", "scoreProcesso", "nivelMaturidade", "descricaoMaturidade", "mediaMaturidade", "classificacaoMaturidade"],
         },
         fase4: {
           type: "object",

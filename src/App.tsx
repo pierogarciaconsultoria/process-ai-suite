@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 const Login = React.lazy(() => import("./pages/Login"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+const Landing = React.lazy(() => import("./pages/Landing"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Empresas = React.lazy(() => import("./pages/Empresas"));
 const Processos = React.lazy(() => import("./pages/Processos"));
@@ -62,7 +63,7 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Landing />} />
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empresas" element={<Empresas />} />
