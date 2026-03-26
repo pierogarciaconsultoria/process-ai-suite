@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Send, ArrowRight } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import {
@@ -340,6 +341,87 @@ export default function EntrevistaProcesso() {
     navigate("/processos/novo", { state: { formPrefill: form } });
   };
 
+  const extractFromPdf = async (file: File): Promise<string> => {
+    const mod = await import("pdfjs-dist");
+    mod.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
+    const buf = await file.arrayBuffer();
+    const loadingTask = mod.getDocument({ data: buf });
+    const pdf = await loadingTask.promise;
+    let full = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((it: unknown) => {
+          const rec = it as { str?: unknown };
+          return typeof rec.str === "string" ? rec.str : "";
+        })
+        .filter((s) => s && s.trim().length > 0)
+        .join(" ");
+      full += "\n" + pageText;
+    }
+    return full.trim();
+  };
+
+  const extractFromDocx = async (file: File): Promise<string> => {
+    const mammoth = await import("mammoth/mammoth.browser");
+    const buf = await file.arrayBuffer();
+    const res = await mammoth.extractRawText({ arrayBuffer: buf });
+    return String(res.value || "").trim();
+  };
+
+  const extractFromImage = async (file: File): Promise<string> => {
+    const Tesseract = await import("tesseract.js");
+    const result = await Tesseract.recognize(file, "por+eng");
+    return String(result.data?.text || "").trim();
+  };
+
+  const analyzeFile = async (file: File) => {
+    setLoading(true);
+    try {
+      let text = "";
+      const name = file.name.toLowerCase();
+      if (file.type === "application/pdf" || name.endsWith(".pdf")) {
+        text = await extractFromPdf(file);
+      } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
+        text = await extractFromDocx(file);
+      } else if ((file.type.startsWith("image/")) || /\.(png|jpe?g|webp|gif)$/i.test(name)) {
+        text = await extractFromImage(file);
+      } else {
+        return;
+      }
+      const snippet = text.length > 16000 ? text.slice(0, 16000) : text;
+      const userMsg: ChatMessage = {
+        role: "user",
+        content: `Extraí o seguinte conteúdo do arquivo anexado. Analise e use para preencher o formulário do processo, propondo objetivo, entradas, etapas, decisões e saídas quando possível:\n\n${snippet}`,
+      };
+      setMessages((m) => [...m, userMsg]);
+      const { data, error } = await supabase.functions.invoke("ai-interview", {
+        body: { history: [...messages, userMsg], current: form },
+      });
+      const hasErrorField = (d: unknown): d is { error: string } =>
+        typeof d === "object" && d !== null && "error" in d;
+      if (error || hasErrorField(data)) {
+        const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
+        handleFallback(userMsg.content, detail);
+        return;
+      }
+      const resp = data as InterviewResponse;
+      if (resp.partialUpdate) setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
+      if (resp.done) {
+        setRequestApply(true);
+        setMessages((m) => [...m, { role: "assistant", content: "Análise concluída. Deseja aplicar os dados no formulário?" }]);
+      } else if (resp.nextQuestion) {
+        setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
+      }
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : "Erro desconhecido";
+      handleFallback("Arquivo anexado", detail);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -367,6 +449,20 @@ export default function EntrevistaProcesso() {
                 <div className="text-sm whitespace-pre-wrap">{m.content}</div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <Label>Anexo para análise (PDF, DOCX, JPG/PNG)</Label>
+            <Input
+              type="file"
+              accept=".pdf,.docx,image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                if (f) void analyzeFile(f);
+                e.currentTarget.value = "";
+              }}
+              disabled={loading}
+            />
           </div>
 
           <div className="mt-4 flex gap-2">
