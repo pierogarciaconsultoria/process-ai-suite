@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
+import SupportWidget from "@/components/SupportWidget";
 const Login = React.lazy(() => import("./pages/Login"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
 const Landing = React.lazy(() => import("./pages/Landing"));
@@ -88,6 +89,7 @@ const App = () => (
             </Routes>
           </React.Suspense>
         </BrowserRouter>
+        <SupportWidget />
       </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
