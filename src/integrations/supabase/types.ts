@@ -45,6 +45,7 @@ export type Database = {
           id: string
           user_id: string
           empresa_id: string
+          tipo: "duvida" | "incidente" | "requisicao" | "melhoria"
           titulo: string
           descricao: string
           anexo_url: string | null
@@ -56,6 +57,7 @@ export type Database = {
           id?: string
           user_id: string
           empresa_id: string
+          tipo?: "duvida" | "incidente" | "requisicao" | "melhoria"
           titulo: string
           descricao: string
           anexo_url?: string | null
@@ -67,6 +69,7 @@ export type Database = {
           id?: string
           user_id?: string
           empresa_id?: string
+          tipo?: "duvida" | "incidente" | "requisicao" | "melhoria"
           titulo?: string
           descricao?: string
           anexo_url?: string | null

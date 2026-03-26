@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -17,6 +18,13 @@ const statusLabel: Record<Chamado["status"], string> = {
   fechado: "Fechado",
 };
 
+const tipoLabel: Record<NonNullable<Chamado["tipo"]>, string> = {
+  duvida: "Dúvida",
+  incidente: "Incidente",
+  requisicao: "Requisição",
+  melhoria: "Melhoria",
+};
+
 const ConfigChamados = () => {
   const navigate = useNavigate();
   const [empresaId, setEmpresaId] = useState<string>("");
@@ -25,6 +33,7 @@ const ConfigChamados = () => {
   const [criando, setCriando] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [tipo, setTipo] = useState<"duvida" | "incidente" | "requisicao" | "melhoria">("duvida");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const canCreate = useMemo(() => titulo.trim().length > 3 && descricao.trim().length > 5, [titulo, descricao]);
 
@@ -39,7 +48,7 @@ const ConfigChamados = () => {
         if (mRows[0]?.empresa_id) setEmpresaId(mRows[0].empresa_id);
         const { data: rows } = await supabase
           .from("chamados")
-          .select("id, titulo, descricao, anexo_url, status, created_at, updated_at, user_id, empresa_id")
+          .select("id, titulo, descricao, anexo_url, status, created_at, updated_at, user_id, empresa_id, tipo")
           .order("created_at", { ascending: false });
         setChamados(((rows as Chamado[]) || []).slice(0, 100));
       } finally {
@@ -66,6 +75,7 @@ const ConfigChamados = () => {
         .insert({
           user_id: user.id,
           empresa_id: empresaId,
+          tipo,
           titulo: titulo.trim(),
           descricao: descricao.trim(),
           status: "aberto",
@@ -85,6 +95,7 @@ const ConfigChamados = () => {
       setChamados((prev) => [{ ...novo, anexo_url: anexo_url ?? novo.anexo_url }, ...prev]);
       setTitulo("");
       setDescricao("");
+      setTipo("duvida");
       setArquivo(null);
     } finally {
       setCriando(false);
@@ -122,6 +133,19 @@ const ConfigChamados = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
+            <Label>Tipo</Label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as typeof tipo)}
+            >
+              <option value="duvida">Dúvida</option>
+              <option value="incidente">Incidente</option>
+              <option value="requisicao">Requisição</option>
+              <option value="melhoria">Melhoria</option>
+            </select>
+          </div>
+          <div className="space-y-2">
             <Label>Título</Label>
             <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Assunto do chamado" />
           </div>
@@ -156,7 +180,10 @@ const ConfigChamados = () => {
           chamados.map((c) => (
             <Card key={c.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle className="text-base">{c.titulo}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">{c.titulo}</CardTitle>
+              <Badge variant="secondary">{tipoLabel[c.tipo as NonNullable<Chamado["tipo"]>]}</Badge>
+            </div>
                 <select
                   className="text-sm border rounded-md px-2 py-1"
                   value={c.status}

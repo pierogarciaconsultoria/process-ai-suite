@@ -5,11 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Chamado = Tables<"chamados">;
 type Mensagem = Tables<"chamado_mensagens">;
+
+const tipoLabel: Record<NonNullable<Chamado["tipo"]>, string> = {
+  duvida: "Dúvida",
+  incidente: "Incidente",
+  requisicao: "Requisição",
+  melhoria: "Melhoria",
+};
 
 const ChamadoDetalhe = () => {
   const { id } = useParams<{ id: string }>();
@@ -98,7 +106,10 @@ const ChamadoDetalhe = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{chamado.titulo}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-foreground">{chamado.titulo}</h1>
+            <Badge variant="secondary">{chamado.tipo ? tipoLabel[chamado.tipo] : "—"}</Badge>
+          </div>
           <p className="text-muted-foreground">Aberto em {new Date(chamado.created_at).toLocaleString()}</p>
         </div>
         <Button variant="ghost" onClick={() => navigate("/configuracoes/chamados")}>Voltar</Button>
@@ -141,4 +152,3 @@ const ChamadoDetalhe = () => {
 };
 
 export default ChamadoDetalhe;
-
