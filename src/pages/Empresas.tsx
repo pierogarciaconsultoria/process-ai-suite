@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown, Check } from "lucide-react";
 import { Plus, Search, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -170,16 +172,37 @@ const Empresas = () => {
               </div>
             <div className="space-y-2">
               <Label>Segmento</Label>
-              <Select value={novaSegmento} onValueChange={setNovaSegmento}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o segmento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {segmentosBR.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full inline-flex items-center justify-between border rounded-md px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <span className="truncate">{novaSegmento || "Selecione o segmento"}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar segmento..." />
+                    <CommandEmpty>Nenhum segmento encontrado.</CommandEmpty>
+                    <CommandList>
+                      <CommandGroup>
+                        {segmentosBR.map((s) => (
+                          <CommandItem
+                            key={s}
+                            value={s}
+                            onSelect={(val) => setNovaSegmento(val)}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${novaSegmento === s ? "opacity-100" : "opacity-0"}`} />
+                            <span className="truncate">{s}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
               <div className="space-y-2">
                 <Label>Número de Colaboradores</Label>

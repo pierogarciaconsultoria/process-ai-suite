@@ -8,7 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Network, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown, Check } from "lucide-react";
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -159,16 +161,38 @@ const Login = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="segmento">Segmento</Label>
-                      <Select value={segmento} onValueChange={setSegmento}>
-                        <SelectTrigger id="segmento">
-                          <SelectValue placeholder="Selecione o segmento" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {segmentosBR.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-full inline-flex items-center justify-between border rounded-md px-3 py-2 text-sm hover:bg-accent"
+                            aria-label="Selecionar segmento"
+                          >
+                            <span className="truncate">{segmento || "Selecione o segmento"}</span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                          <Command>
+                            <CommandInput placeholder="Buscar segmento..." />
+                            <CommandEmpty>Nenhum segmento encontrado.</CommandEmpty>
+                            <CommandList>
+                              <CommandGroup>
+                                {segmentosBR.map((s) => (
+                                  <CommandItem
+                                    key={s}
+                                    value={s}
+                                    onSelect={(val) => setSegmento(val)}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${segmento === s ? "opacity-100" : "opacity-0"}`} />
+                                    <span className="truncate">{s}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="area">Área de atuação</Label>
