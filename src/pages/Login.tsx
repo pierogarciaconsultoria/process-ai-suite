@@ -232,7 +232,7 @@ const Login = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contexto">Contexto</Label>
-                    <Textarea id="contexto" placeholder="Breve contexto sobre a empresa (mercado, produtos/serviços, sistemas principais, etc.)" value={contexto} onChange={(e) => setContexto(e.target.value)} />
+                    <Textarea id="contexto" rows={6} className="min-h-32" placeholder="Breve contexto sobre a empresa (mercado, produtos/serviços, sistemas principais, etc.)" value={contexto} onChange={(e) => setContexto(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>

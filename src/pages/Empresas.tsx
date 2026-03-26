@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -244,7 +245,7 @@ const Empresas = () => {
             </div>
             <div className="space-y-2">
               <Label>Contexto</Label>
-              <Input placeholder="Breve contexto (mercado, produtos/serviços...)" value={novaContexto} onChange={(e) => setNovaContexto(e.target.value)} />
+              <Textarea rows={6} className="min-h-32" placeholder="Breve contexto (mercado, produtos/serviços...)" value={novaContexto} onChange={(e) => setNovaContexto(e.target.value)} />
             </div>
               <Button className="w-full" onClick={handleCreate} disabled={loadingCreate}>
                 {loadingCreate ? "Cadastrando..." : "Cadastrar"}
