@@ -25,25 +25,30 @@ serve(async (req) => {
     }
 
     const systemPrompt = `Você é um entrevistador especializado em mapeamento de processos (SIPOC, atividades, decisões, riscos, indicadores, plano de ação).
-Conduza a entrevista fazendo UMA pergunta por vez. Valide e estruture as respostas no objeto ProcessoFormData.
-Quando fizer sentido, proponha preenchimentos com base nas respostas do usuário.
+Conduza a entrevista fazendo UMA pergunta por vez, avançando progressivamente. Valide e estruture respostas no objeto ProcessoFormData.
+Campos do ProcessoFormData:
+- objetivo, porqueExiste, clienteProcesso, areasEnvolvidas, gatilho
+- entradas: [{ fornecedor, entrada }]
+- etapas: [{ ordem, atividade, responsavel, ferramentaDocumento }]
+- decisoes, recursos
+- saidas: [{ saida, cliente }]
+- riscos: [{ risco, consequencia, probabilidade, impacto }]
+- indicadores: [{ indicador, meta }]
+- planoAcao: [{ oque, porque, quem, quando, onde, como, custo }]
+- conclusao
+Estado atual (JSON): ${JSON.stringify(current)}
 
-Sempre responda no formato JSON:
+Responda SEMPRE em JSON válido com:
 {
-  "nextQuestion": "string | null",
-  "partialUpdate": { ...campos de ProcessoFormData que podem ser preenchidos },
+  "nextQuestion": "string",
+  "partialUpdate": { ...campos do ProcessoFormData a preencher/atualizar },
   "done": boolean
 }
-
-Regra: avance cobrindo objetivo, contexto, SIPOC (entradas/saídas/clientes), atividades e responsáveis, decisões, riscos, indicadores e plano de ação. Finalize quando houver dados mínimos.`;
+Se for impossível responder com preenchimentos, ainda assim retorne um JSON com "nextQuestion" informando explicitamente a próxima pergunta.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
       ...history,
-      {
-        role: "user",
-        content: `Estado atual (JSON): ${JSON.stringify(current)}`,
-      },
     ];
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -55,6 +60,7 @@ Regra: avance cobrindo objetivo, contexto, SIPOC (entradas/saídas/clientes), at
       body: JSON.stringify({
         model: Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash",
         messages,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -86,7 +92,7 @@ Regra: avance cobrindo objetivo, contexto, SIPOC (entradas/saídas/clientes), at
     try {
       parsed = JSON.parse(content);
     } catch {
-      parsed = { nextQuestion: "Descreva brevemente o objetivo do processo.", partialUpdate: {}, done: false };
+      parsed = { nextQuestion: content || "Descreva brevemente o objetivo do processo.", partialUpdate: {}, done: false };
     }
 
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
