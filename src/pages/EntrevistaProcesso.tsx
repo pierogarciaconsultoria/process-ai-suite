@@ -58,7 +58,7 @@ export default function EntrevistaProcesso() {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id ?? null;
       let empresaId: string | null = null;
-      const { data: membros } = await supabase.from("membros").select("empresa_id").limit(1);
+      const { data: membros } = await (supabase as any).from("membros").select("empresa_id").limit(1);
       const memRows = membros as { empresa_id: string }[] | null;
       if (Array.isArray(memRows) && memRows.length > 0) {
         empresaId = memRows[0].empresa_id ?? null;

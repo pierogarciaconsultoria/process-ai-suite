@@ -8,9 +8,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Chamado = Tables<"chamados">;
+interface Chamado {
+  id: string;
+  user_id: string;
+  empresa_id: string;
+  created_at: string;
+  updated_at: string;
+  titulo: string;
+  descricao: string;
+  anexo_url: string | null;
+  tipo: string;
+  status: string;
+}
 
 const statusLabel: Record<Chamado["status"], string> = {
   aberto: "Aberto",

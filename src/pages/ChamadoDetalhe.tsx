@@ -7,10 +7,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+interface Chamado {
+  id: string;
+  user_id: string;
+  empresa_id: string;
+  created_at: string;
+  updated_at: string;
+  titulo: string;
+  descricao: string;
+  anexo_url: string | null;
+  tipo: string;
+  status: string;
+}
 
-type Chamado = Tables<"chamados">;
-type Mensagem = Tables<"chamado_mensagens">;
+interface Mensagem {
+  id: string;
+  chamado_id: string;
+  user_id: string;
+  empresa_id: string;
+  created_at: string;
+  conteudo: string;
+  anexo_url: string | null;
+}
 
 const tipoLabel: Record<NonNullable<Chamado["tipo"]>, string> = {
   duvida: "Dúvida",

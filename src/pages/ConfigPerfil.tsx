@@ -29,7 +29,7 @@ const ConfigPerfil = () => {
         const memRows = (mem as { empresa_id: string; perfil: string }[]) || [];
         const ids = Array.from(new Set(memRows.map((m) => m.empresa_id)));
         if (ids.length) {
-          const { data: emp } = await supabase.from("empresas").select("id, nome").in("id", ids);
+          const { data: emp } = await (supabase as any).from("empresas").select("id, nome").in("id", ids);
           const empRows = (emp as { id: string; nome: string }[]) || [];
           const map = new Map(empRows.map((e) => [e.id, e.nome]));
           const combined = memRows.map((m) => ({ id: m.empresa_id, nome: map.get(m.empresa_id) ?? m.empresa_id, perfil: m.perfil }));
