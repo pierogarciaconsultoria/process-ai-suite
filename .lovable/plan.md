@@ -1,34 +1,21 @@
 
 
-## Plano: Criar Edge Function `ai-interview`
+## Plano: Deploy da Edge Function `ai-interview`
+
+### Estado atual
+
+- `supabase/functions/ai-interview/index.ts` — existe e está completo
+- `supabase/config.toml` — já registra `[functions.ai-interview]` com `verify_jwt = false`
+- `LOVABLE_API_KEY` — já configurado nos secrets do projeto
+- `AI_MODEL` — não está nos secrets, mas o código já tem fallback para `google/gemini-2.5-flash`
 
 ### O que será feito
 
-Criar e deployar a edge function `ai-interview` que conduz uma entrevista guiada por IA, fazendo uma pergunta por vez e estruturando as respostas no formato `ProcessoFormData`.
+1. **Deploy** da edge function `ai-interview`
+2. **Teste** com payload de exemplo para confirmar funcionamento
+3. **AI_MODEL** (opcional) — se desejar usar um modelo diferente do `gemini-2.5-flash`, posso configurar o secret `AI_MODEL`; caso contrário, o fallback padrão já funciona
 
-### Como funciona
+### Nenhum arquivo precisa ser modificado
 
-O cliente envia o histórico de mensagens (`history`) e o estado atual do formulário (`current`). A IA analisa, faz a próxima pergunta e retorna campos preenchidos parcialmente.
-
-```text
-Cliente → { history: [...], current: {...} }
-   ↓
-ai-interview → Gemini 2.5 Flash (system prompt de entrevistador)
-   ↓
-Resposta → { nextQuestion: "...", partialUpdate: {...}, done: boolean }
-```
-
-### Arquivos
-
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/ai-interview/index.ts` | Criar — edge function completa |
-| `supabase/config.toml` | Adicionar bloco `[functions.ai-interview]` com `verify_jwt = false` |
-
-### Detalhes técnicos
-
-- **Edge function** (`ai-interview/index.ts`): Já existe o código no contexto do projeto — será criado com CORS, system prompt de entrevistador especializado em SIPOC/BPM, chamada ao Lovable AI Gateway com `google/gemini-2.5-flash`, parsing do JSON de resposta com fallback seguro
-- **Config**: Registrar `verify_jwt = false` no `config.toml`
-- **Deploy + teste**: Deployar e invocar com payload de teste para validar funcionamento
-- Usa `LOVABLE_API_KEY` já configurado como secret
+Tudo já está no lugar. Apenas deploy + verificação.
 
