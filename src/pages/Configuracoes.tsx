@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, User, KeyRound } from "lucide-react";
+import { Building2, Users, User, KeyRound, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Configuracoes = () => {
@@ -24,6 +24,17 @@ const Configuracoes = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">Gerencie empresas e dados organizacionais</p>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/chamados")}>
+          <CardHeader className="flex-row items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <MessageSquare className="h-5 w-5 text-secondary-foreground" />
+            </div>
+            <CardTitle>Chamados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Abra e acompanhe chamados de suporte</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/usuarios")}>

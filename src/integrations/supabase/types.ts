@@ -40,6 +40,70 @@ export type Database = {
           created_at?: string
         }
       }
+      chamados: {
+        Row: {
+          id: string
+          user_id: string
+          empresa_id: string
+          titulo: string
+          descricao: string
+          anexo_url: string | null
+          status: "aberto" | "em_andamento" | "resolvido" | "fechado"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          empresa_id: string
+          titulo: string
+          descricao: string
+          anexo_url?: string | null
+          status?: "aberto" | "em_andamento" | "resolvido" | "fechado"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          empresa_id?: string
+          titulo?: string
+          descricao?: string
+          anexo_url?: string | null
+          status?: "aberto" | "em_andamento" | "resolvido" | "fechado"
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      chamado_mensagens: {
+        Row: {
+          id: string
+          chamado_id: string
+          user_id: string
+          empresa_id: string
+          conteudo: string
+          anexo_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          chamado_id: string
+          user_id: string
+          empresa_id: string
+          conteudo: string
+          anexo_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          chamado_id?: string
+          user_id?: string
+          empresa_id?: string
+          conteudo?: string
+          anexo_url?: string | null
+          created_at?: string
+        }
+      }
       interview_sessions: {
         Row: {
           id: string
