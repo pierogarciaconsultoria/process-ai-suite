@@ -123,7 +123,18 @@ const ProcessoFormulario = () => {
     type PrefillState = { formPrefill?: ProcessoFormData } | null;
     const state = location.state as PrefillState;
     const pre = state?.formPrefill;
-    if (pre) setForm(pre);
+    if (pre) {
+      setForm(pre);
+    } else {
+      try {
+        const raw = localStorage.getItem("process:formPrefill");
+        if (raw) {
+          const parsed = JSON.parse(raw) as ProcessoFormData;
+          setForm(parsed);
+          localStorage.removeItem("process:formPrefill");
+        }
+      } catch (e) { void e; }
+    }
   }, [location.state]);
 
   const tabIndex = ALL_TABS.indexOf(activeTab);

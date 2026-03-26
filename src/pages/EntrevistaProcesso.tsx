@@ -40,6 +40,16 @@ export default function EntrevistaProcesso() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
+  const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
+  const saveSession = (reason: "auto" | "manual") => {
+    try {
+      const key = "process:interviewSessions";
+      const prev = JSON.parse(localStorage.getItem(key) || "[]");
+      const item = { id: sessionIdRef.current, reason, at: new Date().toISOString(), messages, form, progress };
+      const next = Array.isArray(prev) ? [...prev, item] : [item];
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch (e) { void e; }
+  };
 
   const progress = useMemo(() => {
     const keys: (keyof ProcessoFormData)[] = [
@@ -145,6 +155,7 @@ export default function EntrevistaProcesso() {
     }
     if (fallback.done) {
       setRequestApply(true);
+      saveSession("auto");
     }
     setMessages((m) => [
       ...m,
@@ -259,6 +270,10 @@ export default function EntrevistaProcesso() {
     return { done: true };
   };
   const applyToForm = () => {
+    try {
+      localStorage.setItem("process:formPrefill", JSON.stringify(form));
+      saveSession("manual");
+    } catch (e) { void e; }
     navigate("/processos/novo", { state: { formPrefill: form } });
   };
 
