@@ -90,7 +90,7 @@ const ChamadoDetalhe = () => {
       let anexo_url: string | null = null;
       if (arquivo) {
         const path = `${empresaId}/${id}/${encodeURIComponent(arquivo.name)}`;
-        const { error: upErr } = await supabase.storage.from("chamados").upload(path, arquivo, { upsert: true });
+        const { error: upErr } = await supabase.storage.from("chamados").upload(path, arquivo, { upsert: true, contentType: arquivo.type || "application/octet-stream" });
         if (!upErr) anexo_url = path;
       }
       const msg: Partial<Mensagem> = {
@@ -162,7 +162,7 @@ const ChamadoDetalhe = () => {
           </div>
           <div className="mt-3 space-y-2">
             <Label>Anexo (opcional)</Label>
-            <Input type="file" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
+            <Input type="file" accept=".pdf,application/pdf" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
           </div>
           <div className="mt-3 flex justify-end">
             <Button onClick={enviar} disabled={!podeEnviar || enviando}>{enviando ? "Enviando..." : "Enviar"}</Button>

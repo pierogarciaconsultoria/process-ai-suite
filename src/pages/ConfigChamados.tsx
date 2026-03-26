@@ -99,7 +99,7 @@ const ConfigChamados = () => {
       let anexo_url: string | null = null;
       if (arquivo) {
         const path = `${empresaId}/${novo.id}/${encodeURIComponent(arquivo.name)}`;
-        const { error: upErr } = await supabase.storage.from("chamados").upload(path, arquivo, { upsert: true });
+        const { error: upErr } = await supabase.storage.from("chamados").upload(path, arquivo, { upsert: true, contentType: arquivo.type || "application/octet-stream" });
         if (upErr) throw upErr;
         anexo_url = path;
         await sb.from("chamados").update({ anexo_url }).eq("id", novo.id);
@@ -184,7 +184,7 @@ const ConfigChamados = () => {
               </div>
               <div className="space-y-2">
                 <Label>Anexo (opcional)</Label>
-                <Input type="file" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
+                <Input type="file" accept=".pdf,application/pdf" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
               </div>
             </div>
             <DialogFooter>
