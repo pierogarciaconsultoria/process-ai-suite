@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -34,8 +35,10 @@ const ConfigChamados = () => {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [tipo, setTipo] = useState<"duvida" | "incidente" | "requisicao" | "melhoria">("duvida");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "duvida" | "incidente" | "requisicao" | "melhoria">("todos");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const canCreate = useMemo(() => titulo.trim().length > 3 && descricao.trim().length > 5, [titulo, descricao]);
+  const [openNovo, setOpenNovo] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -97,6 +100,7 @@ const ConfigChamados = () => {
       setDescricao("");
       setTipo("duvida");
       setArquivo(null);
+      setOpenNovo(false);
     } finally {
       setCriando(false);
     }
@@ -120,50 +124,68 @@ const ConfigChamados = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Chamados</h1>
           <p className="text-muted-foreground">Abertura, controle e acompanhamento</p>
         </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Novo chamado</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Tipo</Label>
+        <Dialog open={openNovo} onOpenChange={setOpenNovo}>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm">Filtrar por Tipo</Label>
             <select
               className="border rounded-md px-3 py-2 text-sm"
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value as typeof tipo)}
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value as typeof filtroTipo)}
             >
+              <option value="todos">Todos</option>
               <option value="duvida">Dúvida</option>
               <option value="incidente">Incidente</option>
               <option value="requisicao">Requisição</option>
               <option value="melhoria">Melhoria</option>
             </select>
+            <DialogTrigger asChild>
+              <Button>Novo chamado</Button>
+            </DialogTrigger>
           </div>
-          <div className="space-y-2">
-            <Label>Título</Label>
-            <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Assunto do chamado" />
-          </div>
-          <div className="space-y-2">
-            <Label>Descrição</Label>
-            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descreva o problema ou dúvida" />
-          </div>
-          <div className="space-y-2">
-            <Label>Anexo (opcional)</Label>
-            <Input type="file" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={criarChamado} disabled={!canCreate || criando || !empresaId}>
-              {criando ? "Enviando..." : "Abrir chamado"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Novo chamado</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <select
+                  className="border rounded-md px-3 py-2 text-sm"
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value as typeof tipo)}
+                >
+                  <option value="duvida">Dúvida</option>
+                  <option value="incidente">Incidente</option>
+                  <option value="requisicao">Requisição</option>
+                  <option value="melhoria">Melhoria</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Título</Label>
+                <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Assunto do chamado" />
+              </div>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descreva o problema ou dúvida" />
+              </div>
+              <div className="space-y-2">
+                <Label>Anexo (opcional)</Label>
+                <Input type="file" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={criarChamado} disabled={!canCreate || criando || !empresaId}>
+                {criando ? "Enviando..." : "Abrir chamado"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {carregando ? (
@@ -176,8 +198,9 @@ const ConfigChamados = () => {
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">Nenhum chamado encontrado.</CardContent>
           </Card>
-        ) : (
-          chamados.map((c) => (
+        ) : (() => {
+          const lista = chamados.filter((c) => (filtroTipo === "todos" ? true : c.tipo === filtroTipo));
+          return lista.map((c) => (
             <Card key={c.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -206,8 +229,8 @@ const ConfigChamados = () => {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
+          ));
+        })()}
       </div>
     </div>
   );

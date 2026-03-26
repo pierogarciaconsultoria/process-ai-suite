@@ -121,6 +121,10 @@ const ChamadoDetalhe = () => {
         </CardHeader>
         <CardContent>
           <div className="h-[380px] overflow-auto border rounded-md p-3 space-y-3">
+            <div className="sticky top-0 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-2 rounded-md border text-xs flex items-center gap-2">
+              <span className="text-muted-foreground">Tipo atual:</span>
+              <Badge variant="secondary">{chamado.tipo ? tipoLabel[chamado.tipo] : "—"}</Badge>
+            </div>
             {mensagens.map((m) => (
               <div key={m.id} className="p-3 rounded-md bg-muted">
                 <div className="text-xs text-muted-foreground mb-1">{new Date(m.created_at).toLocaleString()}</div>
