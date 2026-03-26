@@ -1,21 +1,31 @@
 
 
-## Plano: Deploy da Edge Function `ai-interview`
+## Plano: Corrigir chat de ajuda (ai-helpcenter)
 
-### Estado atual
+### Causa raiz
 
-- `supabase/functions/ai-interview/index.ts` — existe e está completo
-- `supabase/config.toml` — já registra `[functions.ai-interview]` com `verify_jwt = false`
-- `LOVABLE_API_KEY` — já configurado nos secrets do projeto
-- `AI_MODEL` — não está nos secrets, mas o código já tem fallback para `google/gemini-2.5-flash`
+A edge function `ai-helpcenter` não está registrada no `supabase/config.toml`, por isso nunca foi deployada. A chamada do widget falha e exibe o fallback de erro.
 
-### O que será feito
+### Correções
 
-1. **Deploy** da edge function `ai-interview`
-2. **Teste** com payload de exemplo para confirmar funcionamento
-3. **AI_MODEL** (opcional) — se desejar usar um modelo diferente do `gemini-2.5-flash`, posso configurar o secret `AI_MODEL`; caso contrário, o fallback padrão já funciona
+**1. Registrar no config.toml**
 
-### Nenhum arquivo precisa ser modificado
+Adicionar o bloco abaixo ao `supabase/config.toml`:
 
-Tudo já está no lugar. Apenas deploy + verificação.
+```toml
+[functions.ai-helpcenter]
+verify_jwt = false
+```
+
+**2. Deploy**
+
+Após o registro, a function será deployada automaticamente. O `LOVABLE_API_KEY` já está configurado, então a IA responderá normalmente.
+
+### Arquivos modificados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/config.toml` | Adicionar registro da function `ai-helpcenter` |
+
+Nenhuma alteração de código na function ou no widget e necessária.
 
