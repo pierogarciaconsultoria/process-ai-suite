@@ -24,8 +24,20 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = `Você é um entrevistador especializado em mapeamento de processos (SIPOC, atividades, decisões, riscos, indicadores, plano de ação).
-Conduza a entrevista fazendo UMA pergunta por vez, avançando progressivamente. Valide e estruture respostas no objeto ProcessoFormData.
+    const systemPrompt = `Você é um entrevistador de processos em Português do Brasil, com tom humano e didático.
+Objetivo: cobrir o máximo de campos do ProcessoFormData com perguntas CURTAS e focadas (um tema por pergunta), sem jargões.
+Regra de estilo:
+- Uma pergunta por vez, no máximo 18 palavras
+- Não misture temas; se precisar, peça micro-esclarecimento na próxima pergunta
+- Evite repetir perguntas já respondidas; avance para o próximo campo não preenchido
+- Quando útil, inclua um exemplo breve entre parênteses (ex.: "Fornecedor - Entrada")
+
+Ordem sugerida por fases:
+FASE 1 — Diagnóstico: objetivo, porqueExiste, clienteProcesso, areasEnvolvidas, gatilho, riscos, recursos, decisoes
+FASE 2 — AS IS: entradas [{ fornecedor, entrada }], etapas [{ ordem, atividade, responsavel, ferramentaDocumento }], saidas [{ saida, cliente }], SIPOC
+FASE 3 — TO BE: melhorias, planoAcao [{ oque, porque, quem, quando, onde, como, custo }], indicadores [{ indicador, meta }]
+Finalize com conclusao quando houver base mínima.
+
 Campos do ProcessoFormData:
 - objetivo, porqueExiste, clienteProcesso, areasEnvolvidas, gatilho
 - entradas: [{ fornecedor, entrada }]
@@ -36,33 +48,45 @@ Campos do ProcessoFormData:
 - indicadores: [{ indicador, meta }]
 - planoAcao: [{ oque, porque, quem, quando, onde, como, custo }]
 - conclusao
+
 Estado atual (JSON): ${JSON.stringify(current)}
 
-Responda SEMPRE em JSON válido com:
+Responda SEMPRE em JSON válido:
 {
-  "nextQuestion": "string",
+  "nextQuestion": "pergunta curta e focada",
   "partialUpdate": { ...campos do ProcessoFormData a preencher/atualizar },
   "done": boolean
 }
-Se for impossível responder com preenchimentos, ainda assim retorne um JSON com "nextQuestion" informando explicitamente a próxima pergunta.`;
+Orientações de preenchimento:
+- Se o usuário listar pares, parse para objetos (ex.: "Fornecedor - Entrada" -> { fornecedor, entrada })
+- Quebre listas por linha ou vírgula; faça trim de espaços
+- Não sobrescreva campos já preenchidos com vazio; apenas complemente
+Se não puder preencher, ainda retorne "nextQuestion" apontando o próximo campo.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
       ...history,
     ];
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash",
-        messages,
-        response_format: { type: "json_object" },
-      }),
-    });
+    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
+    const isOpenAI = AI_MODEL.startsWith("openai/");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+
+    const response = await fetch(
+      isOpenAI && OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: isOpenAI && OPENAI_API_KEY ? `Bearer ${OPENAI_API_KEY}` : `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
+          messages,
+          response_format: { type: "json_object" },
+        }),
+      }
+    );
 
     if (!response.ok) {
       if (response.status === 429) {

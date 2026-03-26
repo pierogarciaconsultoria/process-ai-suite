@@ -9,6 +9,7 @@ import { Sparkles, Send, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   type ProcessoFormData,
+  type Classificacao,
   type EntradaForm,
   type SaidaForm,
   type EtapaForm,
@@ -53,6 +54,12 @@ export default function EntrevistaProcesso() {
 
   const progress = useMemo(() => {
     const keys: (keyof ProcessoFormData)[] = [
+      "nomeProcesso",
+      "area",
+      "empresa",
+      "donoProcesso",
+      "classificacao",
+      "entrevistados",
       "objetivo",
       "porqueExiste",
       "clienteProcesso",
@@ -190,6 +197,12 @@ export default function EntrevistaProcesso() {
     };
     const nextText = (key: keyof ProcessoFormData) => {
       const map: Partial<Record<keyof ProcessoFormData, string>> = {
+        nomeProcesso: "Qual é o nome do processo?",
+        area: "Qual é a área responsável pelo processo?",
+        empresa: "Qual é a empresa ou unidade organizacional?",
+        donoProcesso: "Quem é o dono do processo?",
+        classificacao: "Classificação do processo (Negócio, Apoio ou Gestão)?",
+        entrevistados: "Quem foram os entrevistados? (nomes separados por vírgula)",
         objetivo: "Qual é o objetivo principal do processo?",
         porqueExiste: "Por que este processo existe?",
         clienteProcesso: "Quem é o cliente do processo (quem recebe o resultado)?",
@@ -211,7 +224,31 @@ export default function EntrevistaProcesso() {
       const [a, b] = line.split(/[-–—;:]/).map(s => s.trim());
       return [a ?? line, b ?? ""];
     });
+    const parseClassificacao = (txt: string): Classificacao => {
+      const t = txt.toLowerCase();
+      if (t.includes("apoio")) return "Apoio";
+      if (t.includes("gest")) return "Gestão";
+      return "Negócio";
+    };
 
+    if (!isFilled("nomeProcesso")) {
+      return { partialUpdate: { nomeProcesso: answer }, nextQuestion: nextText("area"), done: false };
+    }
+    if (!isFilled("area")) {
+      return { partialUpdate: { area: answer }, nextQuestion: nextText("empresa"), done: false };
+    }
+    if (!isFilled("empresa")) {
+      return { partialUpdate: { empresa: answer }, nextQuestion: nextText("donoProcesso"), done: false };
+    }
+    if (!isFilled("donoProcesso")) {
+      return { partialUpdate: { donoProcesso: answer }, nextQuestion: nextText("classificacao"), done: false };
+    }
+    if (!isFilled("classificacao")) {
+      return { partialUpdate: { classificacao: parseClassificacao(answer) }, nextQuestion: nextText("entrevistados"), done: false };
+    }
+    if (!isFilled("entrevistados")) {
+      return { partialUpdate: { entrevistados: parseList(answer).join(", ") }, nextQuestion: nextText("objetivo"), done: false };
+    }
     if (!isFilled("objetivo")) {
       return { partialUpdate: { objetivo: answer }, nextQuestion: nextText("porqueExiste"), done: false };
     }
