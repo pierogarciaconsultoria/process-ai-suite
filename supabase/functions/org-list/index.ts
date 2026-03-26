@@ -40,12 +40,20 @@ serve(async (req) => {
       .select("empresa_id")
       .eq("user_id", user.id);
     if (memErr) {
-      return new Response(JSON.stringify({ error: memErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data: empresasOwner } = await supabase
+        .from("empresas")
+        .select("id, nome, segmento, tamanho, owner_id, created_at")
+        .eq("owner_id", user.id);
+      return new Response(JSON.stringify(empresasOwner || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const ids = Array.from(new Set((membros || []).map((m: { empresa_id: string }) => m.empresa_id)));
     if (ids.length === 0) {
-      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data: empresasOwner } = await supabase
+        .from("empresas")
+        .select("id, nome, segmento, tamanho, owner_id, created_at")
+        .eq("owner_id", user.id);
+      return new Response(JSON.stringify(empresasOwner || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { data: empresas, error: empErr } = await supabase
