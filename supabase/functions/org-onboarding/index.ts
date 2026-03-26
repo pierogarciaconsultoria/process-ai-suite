@@ -43,6 +43,8 @@ serve(async (req) => {
     const nome = typeof nomeRaw === "string" ? nomeRaw.trim() : "";
     const segmento = body?.segmento ? String(body.segmento).trim() : null;
     const tamanho = body?.tamanho ? String(body.tamanho).trim() : null;
+    const area_atuacao = body?.area_atuacao ? String(body.area_atuacao).trim() : null;
+    const contexto = body?.contexto ? String(body.contexto).trim() : null;
     const perfil = body?.perfil && ["admin","gestor","analista"].includes(String(body.perfil)) ? String(body.perfil) : "admin";
 
     if (!nome) {
@@ -67,8 +69,8 @@ serve(async (req) => {
     if (!empresaId) {
       const { data: empresaCreated, error: createErr } = await supabase
         .from("empresas")
-        .insert({ nome, segmento, tamanho, owner_id: user.id })
-        .select("id, nome, segmento, tamanho, owner_id, created_at")
+        .insert({ nome, segmento, tamanho, area_atuacao, contexto, owner_id: user.id })
+        .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
         .single();
       if (createErr) {
         return new Response(JSON.stringify({ error: createErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -95,7 +97,7 @@ serve(async (req) => {
 
     const { data: empresa } = await supabase
       .from("empresas")
-      .select("id, nome, segmento, tamanho, owner_id, created_at")
+      .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
       .eq("id", empresaId)
       .single();
 

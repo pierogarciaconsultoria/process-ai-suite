@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Network, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,9 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [nome, setNome] = useState("");
   const [empresa, setEmpresa] = useState("");
+  const [segmento, setSegmento] = useState("");
+  const [areaAtuacao, setAreaAtuacao] = useState("");
+  const [contexto, setContexto] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
@@ -49,7 +53,7 @@ const Login = () => {
         email,
         password,
         options: {
-          data: { nome, empresa },
+          data: { nome, empresa, segmento, area_atuacao: areaAtuacao, contexto },
           emailRedirectTo: `${window.location.origin}/login`,
         },
       });
@@ -61,6 +65,9 @@ const Login = () => {
       setIsSignupMode(false);
       setNome("");
       setEmpresa("");
+      setSegmento("");
+      setAreaAtuacao("");
+      setContexto("");
       setEmail("");
       setPassword("");
     } catch (error: unknown) {
@@ -124,6 +131,20 @@ const Login = () => {
                       <Label htmlFor="nome">Seu nome</Label>
                       <Input id="nome" placeholder="Seu nome completo" value={nome} onChange={(e) => setNome(e.target.value)} required />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="segmento">Segmento</Label>
+                      <Input id="segmento" placeholder="Ex: Varejo, Manufatura, Saúde..." value={segmento} onChange={(e) => setSegmento(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="area">Área de atuação</Label>
+                      <Input id="area" placeholder="Ex: Financeiro, Operações, Marketing..." value={areaAtuacao} onChange={(e) => setAreaAtuacao(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contexto">Contexto</Label>
+                    <Textarea id="contexto" placeholder="Breve contexto sobre a empresa (mercado, produtos/serviços, sistemas principais, etc.)" value={contexto} onChange={(e) => setContexto(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>

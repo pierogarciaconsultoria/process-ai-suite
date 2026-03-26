@@ -14,6 +14,8 @@ interface Empresa {
   nome: string;
   segmento: string;
   tamanho: string;
+  area_atuacao?: string;
+  contexto?: string;
   data_cadastro: string;
 }
 
@@ -24,6 +26,8 @@ const Empresas = () => {
   const [novaNome, setNovaNome] = useState("");
   const [novaSegmento, setNovaSegmento] = useState("");
   const [novaTamanho, setNovaTamanho] = useState("");
+  const [novaAreaAtuacao, setNovaAreaAtuacao] = useState("");
+  const [novaContexto, setNovaContexto] = useState("");
   const [loadingCreate, setLoadingCreate] = useState(false);
   const { toast } = useToast();
 
@@ -39,7 +43,12 @@ const Empresas = () => {
       const exists = empresas.some((e) => e.nome.toLowerCase() === String(empresaNome).toLowerCase());
       if (exists) return;
       const { data: created, error } = await supabase.functions.invoke("org-onboarding", {
-        body: { empresaNome },
+        body: {
+          empresaNome,
+          segmento: typeof meta?.segmento === "string" ? meta.segmento : null,
+          area_atuacao: typeof meta?.area_atuacao === "string" ? meta.area_atuacao : null,
+          contexto: typeof meta?.contexto === "string" ? meta.contexto : null,
+        },
       });
       if (error) return;
       if (created?.empresa) {
@@ -49,6 +58,8 @@ const Empresas = () => {
           nome: String(raw.nome),
           segmento: String(raw.segmento || ""),
           tamanho: String(raw.tamanho || ""),
+          area_atuacao: String(raw.area_atuacao || ""),
+          contexto: String(raw.contexto || ""),
           data_cadastro: String(raw.created_at || new Date().toISOString()),
         };
         setEmpresas((prev) => [e, ...prev]);
@@ -62,6 +73,8 @@ const Empresas = () => {
           nome: String(e.nome),
           segmento: String(e.segmento || ""),
           tamanho: String(e.tamanho || ""),
+          area_atuacao: String(e.area_atuacao || ""),
+          contexto: String(e.contexto || ""),
           data_cadastro: String(e.created_at || new Date().toISOString()),
         })) as Empresa[];
         setEmpresas(list);
@@ -82,7 +95,13 @@ const Empresas = () => {
     }
     setLoadingCreate(true);
     const { data, error } = await supabase.functions.invoke("org-onboarding", {
-      body: { nome: novaNome.trim(), segmento: novaSegmento.trim() || null, tamanho: novaTamanho.trim() || null },
+      body: {
+        nome: novaNome.trim(),
+        segmento: novaSegmento.trim() || null,
+        tamanho: novaTamanho.trim() || null,
+        area_atuacao: novaAreaAtuacao.trim() || null,
+        contexto: novaContexto.trim() || null
+      },
     });
     setLoadingCreate(false);
     if (error) {
@@ -96,6 +115,8 @@ const Empresas = () => {
       setNovaNome("");
       setNovaSegmento("");
       setNovaTamanho("");
+      setNovaAreaAtuacao("");
+      setNovaContexto("");
       toast({ title: "Empresa cadastrada", description: "A empresa foi criada e vinculada à sua conta." });
     }
   };
@@ -131,6 +152,14 @@ const Empresas = () => {
                 <Label>Número de Colaboradores</Label>
                 <Input placeholder="Ex: 50-100" value={novaTamanho} onChange={(e) => setNovaTamanho(e.target.value)} />
               </div>
+            <div className="space-y-2">
+              <Label>Área de atuação</Label>
+              <Input placeholder="Ex: Financeiro, Operações, Marketing..." value={novaAreaAtuacao} onChange={(e) => setNovaAreaAtuacao(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Contexto</Label>
+              <Input placeholder="Breve contexto (mercado, produtos/serviços...)" value={novaContexto} onChange={(e) => setNovaContexto(e.target.value)} />
+            </div>
               <Button className="w-full" onClick={handleCreate} disabled={loadingCreate}>
                 {loadingCreate ? "Cadastrando..." : "Cadastrar"}
               </Button>

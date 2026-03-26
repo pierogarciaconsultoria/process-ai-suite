@@ -42,7 +42,7 @@ serve(async (req) => {
     if (memErr) {
       const { data: empresasOwner } = await supabase
         .from("empresas")
-        .select("id, nome, segmento, tamanho, owner_id, created_at")
+        .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
         .eq("owner_id", user.id);
       return new Response(JSON.stringify(empresasOwner || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -58,7 +58,7 @@ serve(async (req) => {
 
     const { data: empresas, error: empErr } = await supabase
       .from("empresas")
-      .select("id, nome, segmento, tamanho, owner_id, created_at")
+      .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
       .in("id", ids);
     if (empErr) {
       return new Response(JSON.stringify({ error: empErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
