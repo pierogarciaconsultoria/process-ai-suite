@@ -55,10 +55,10 @@ const ConfigChamados = () => {
         const { data: userRes } = await supabase.auth.getUser();
         const user = userRes?.user;
         if (!user) throw new Error("Não autenticado");
-        const { data: m } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
+        const { data: m } = await (supabase as any).from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
         const mRows = (m as { empresa_id: string }[]) || [];
         if (mRows[0]?.empresa_id) setEmpresaId(mRows[0].empresa_id);
-        const { data: rows } = await supabase
+        const { data: rows } = await (supabase as any)
           .from("chamados")
           .select("id, titulo, descricao, anexo_url, status, created_at, updated_at, user_id, empresa_id, tipo")
           .order("created_at", { ascending: false });
