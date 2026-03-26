@@ -14,13 +14,254 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chamado_mensagens: {
+        Row: {
+          anexo_url: string | null
+          chamado_id: string
+          conteudo: string
+          created_at: string
+          empresa_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          anexo_url?: string | null
+          chamado_id: string
+          conteudo: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          anexo_url?: string | null
+          chamado_id?: string
+          conteudo?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamado_mensagens_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamado_mensagens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chamados: {
+        Row: {
+          anexo_url: string | null
+          created_at: string
+          descricao: string
+          empresa_id: string
+          id: string
+          status: string
+          tipo: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anexo_url?: string | null
+          created_at?: string
+          descricao: string
+          empresa_id: string
+          id?: string
+          status?: string
+          tipo?: string
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anexo_url?: string | null
+          created_at?: string
+          descricao?: string
+          empresa_id?: string
+          id?: string
+          status?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      convites: {
+        Row: {
+          created_at: string
+          email: string
+          empresa_id: string
+          id: string
+          perfil: string
+          status: string
+          token: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          empresa_id: string
+          id?: string
+          perfil: string
+          status: string
+          token?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          empresa_id?: string
+          id?: string
+          perfil?: string
+          status?: string
+          token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "convites_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      empresas: {
+        Row: {
+          area_atuacao: string | null
+          contexto: string | null
+          created_at: string
+          id: string
+          nome: string
+          owner_id: string
+          segmento: string | null
+          tamanho: string | null
+        }
+        Insert: {
+          area_atuacao?: string | null
+          contexto?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          owner_id: string
+          segmento?: string | null
+          tamanho?: string | null
+        }
+        Update: {
+          area_atuacao?: string | null
+          contexto?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          owner_id?: string
+          segmento?: string | null
+          tamanho?: string | null
+        }
+        Relationships: []
+      }
+      interview_sessions: {
+        Row: {
+          applied: boolean
+          created_at: string
+          empresa_id: string | null
+          form_snapshot: Json
+          id: string
+          messages: Json
+          progress: number
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          applied?: boolean
+          created_at?: string
+          empresa_id?: string | null
+          form_snapshot?: Json
+          id?: string
+          messages: Json
+          progress?: number
+          reason: string
+          user_id: string
+        }
+        Update: {
+          applied?: boolean
+          created_at?: string
+          empresa_id?: string | null
+          form_snapshot?: Json
+          id?: string
+          messages?: Json
+          progress?: number
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_sessions_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membros: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          invited_by: string | null
+          perfil: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          invited_by?: string | null
+          perfil: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          invited_by?: string | null
+          perfil?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membros_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_empresa_ids: { Args: { _user_id: string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never

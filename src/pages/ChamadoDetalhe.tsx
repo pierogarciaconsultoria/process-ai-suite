@@ -7,10 +7,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+interface Chamado {
+  id: string;
+  user_id: string;
+  empresa_id: string;
+  created_at: string;
+  updated_at: string;
+  titulo: string;
+  descricao: string;
+  anexo_url: string | null;
+  tipo: string;
+  status: string;
+}
 
-type Chamado = Tables<"chamados">;
-type Mensagem = Tables<"chamado_mensagens">;
+interface Mensagem {
+  id: string;
+  chamado_id: string;
+  user_id: string;
+  empresa_id: string;
+  created_at: string;
+  conteudo: string;
+  anexo_url: string | null;
+}
 
 const tipoLabel: Record<NonNullable<Chamado["tipo"]>, string> = {
   duvida: "Dúvida",
@@ -42,12 +60,12 @@ const ChamadoDetalhe = () => {
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user;
       if (!user) return;
-      const { data: m } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
+      const { data: m } = await (supabase as any).from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
       const mRows = (m as { empresa_id: string }[]) || [];
       if (mRows[0]?.empresa_id) setEmpresaId(mRows[0].empresa_id);
-      const { data: c } = await supabase.from("chamados").select("*").eq("id", id).single();
+      const { data: c } = await (supabase as any).from("chamados").select("*").eq("id", id).single();
       setChamado((c as Chamado) || null);
-      const { data: msgs } = await supabase
+      const { data: msgs } = await (supabase as any)
         .from("chamado_mensagens")
         .select("*")
         .eq("chamado_id", id)
