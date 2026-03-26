@@ -19,6 +19,8 @@ const Login = () => {
   const [nome, setNome] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [segmento, setSegmento] = useState("");
+  const [outroSegmento, setOutroSegmento] = useState(false);
+  const [outroSegmentoTexto, setOutroSegmentoTexto] = useState("");
   const [areaAtuacao, setAreaAtuacao] = useState("");
   const [contexto, setContexto] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -178,11 +180,25 @@ const Login = () => {
                             <CommandEmpty>Nenhum segmento encontrado.</CommandEmpty>
                             <CommandList>
                               <CommandGroup>
+                                <CommandItem
+                                  value="__outro__"
+                                  onSelect={() => {
+                                    setOutroSegmento(true);
+                                    setSegmento("Outro");
+                                  }}
+                                >
+                                  <Check className={`mr-2 h-4 w-4 ${outroSegmento ? "opacity-100" : "opacity-0"}`} />
+                                  <span className="truncate">Outro...</span>
+                                </CommandItem>
                                 {segmentosBR.map((s) => (
                                   <CommandItem
                                     key={s}
                                     value={s}
-                                    onSelect={(val) => setSegmento(val)}
+                                    onSelect={(val) => {
+                                      setSegmento(val);
+                                      setOutroSegmento(false);
+                                      setOutroSegmentoTexto("");
+                                    }}
                                   >
                                     <Check className={`mr-2 h-4 w-4 ${segmento === s ? "opacity-100" : "opacity-0"}`} />
                                     <span className="truncate">{s}</span>
@@ -193,6 +209,21 @@ const Login = () => {
                           </Command>
                         </PopoverContent>
                       </Popover>
+                      {outroSegmento && (
+                        <div className="space-y-2">
+                          <Label htmlFor="segmento-outro">Outro segmento</Label>
+                          <Input
+                            id="segmento-outro"
+                            placeholder="Descreva o segmento"
+                            value={outroSegmentoTexto}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setOutroSegmentoTexto(v);
+                              setSegmento(v ? `Outro: ${v}` : "Outro");
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="area">Área de atuação</Label>

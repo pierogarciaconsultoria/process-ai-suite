@@ -28,6 +28,8 @@ const Empresas = () => {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [novaNome, setNovaNome] = useState("");
   const [novaSegmento, setNovaSegmento] = useState("");
+  const [novaOutroSegmento, setNovaOutroSegmento] = useState(false);
+  const [novaOutroSegmentoTexto, setNovaOutroSegmentoTexto] = useState("");
   const [novaTamanho, setNovaTamanho] = useState("");
   const [novaAreaAtuacao, setNovaAreaAtuacao] = useState("");
   const [novaContexto, setNovaContexto] = useState("");
@@ -188,11 +190,25 @@ const Empresas = () => {
                     <CommandEmpty>Nenhum segmento encontrado.</CommandEmpty>
                     <CommandList>
                       <CommandGroup>
+                        <CommandItem
+                          value="__outro__"
+                          onSelect={() => {
+                            setNovaOutroSegmento(true);
+                            setNovaSegmento("Outro");
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${novaOutroSegmento ? "opacity-100" : "opacity-0"}`} />
+                          <span className="truncate">Outro...</span>
+                        </CommandItem>
                         {segmentosBR.map((s) => (
                           <CommandItem
                             key={s}
                             value={s}
-                            onSelect={(val) => setNovaSegmento(val)}
+                            onSelect={(val) => {
+                              setNovaSegmento(val);
+                              setNovaOutroSegmento(false);
+                              setNovaOutroSegmentoTexto("");
+                            }}
                           >
                             <Check className={`mr-2 h-4 w-4 ${novaSegmento === s ? "opacity-100" : "opacity-0"}`} />
                             <span className="truncate">{s}</span>
@@ -204,6 +220,20 @@ const Empresas = () => {
                 </PopoverContent>
               </Popover>
             </div>
+            {novaOutroSegmento && (
+              <div className="space-y-2">
+                <Label>Outro segmento</Label>
+                <Input
+                  placeholder="Descreva o segmento"
+                  value={novaOutroSegmentoTexto}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNovaOutroSegmentoTexto(v);
+                    setNovaSegmento(v ? `Outro: ${v}` : "Outro");
+                  }}
+                />
+              </div>
+            )}
               <div className="space-y-2">
                 <Label>Número de Colaboradores</Label>
                 <Input placeholder="Ex: 50-100" value={novaTamanho} onChange={(e) => setNovaTamanho(e.target.value)} />
