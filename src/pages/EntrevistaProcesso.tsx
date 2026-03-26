@@ -38,6 +38,8 @@ export default function EntrevistaProcesso() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [requestApply, setRequestApply] = useState(false);
+  const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
 
   const progress = useMemo(() => {
     const keys: (keyof ProcessoFormData)[] = [
@@ -90,6 +92,11 @@ export default function EntrevistaProcesso() {
 
   const send = async () => {
     if (!input.trim()) return;
+    if (requestApply && isApplyCommand(input.trim())) {
+      setRequestApply(false);
+      applyToForm();
+      return;
+    }
     const userMsg: ChatMessage = { role: "user", content: input.trim() };
     setMessages((m) => [...m, userMsg]);
     setInput("");
@@ -113,6 +120,7 @@ export default function EntrevistaProcesso() {
         setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
       }
       if (resp.done) {
+        setRequestApply(true);
         setMessages((m) => [
           ...m,
           { role: "assistant", content: "Entrevista concluída. Deseja aplicar os dados no formulário para revisão e geração de diagnóstico?" },
@@ -134,6 +142,9 @@ export default function EntrevistaProcesso() {
     const fallback = computeFallback(form, lastAnswer);
     if (fallback.partialUpdate) {
       setForm((prev) => ({ ...prev, ...fallback.partialUpdate! }));
+    }
+    if (fallback.done) {
+      setRequestApply(true);
     }
     setMessages((m) => [
       ...m,
