@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,6 +109,7 @@ const getRiscoNivel = (score: number) => {
 const ProcessoFormulario = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const isEditing = !!id;
 
@@ -117,6 +118,13 @@ const ProcessoFormulario = () => {
   const [descricaoIA, setDescricaoIA] = useState("");
   const [isFillingAI, setIsFillingAI] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
+
+  useEffect(() => {
+    type PrefillState = { formPrefill?: ProcessoFormData } | null;
+    const state = location.state as PrefillState;
+    const pre = state?.formPrefill;
+    if (pre) setForm(pre);
+  }, [location.state]);
 
   const tabIndex = ALL_TABS.indexOf(activeTab);
   const activePhase = getPhaseForTab(activeTab);

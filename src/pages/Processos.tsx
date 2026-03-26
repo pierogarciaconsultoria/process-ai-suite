@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Sparkles } from "lucide-react";
 type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado";
 type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
 type Processo = {
@@ -54,10 +54,16 @@ const Processos = () => {
           <h1 className="text-2xl font-bold text-foreground">Processos</h1>
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
-        <Button onClick={() => navigate("/processos/novo")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Processo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => navigate("/processos/novo")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Processo
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/processos/entrevista")}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            Entrevista com IA
+          </Button>
+        </div>
       </div>
 
       <Card>

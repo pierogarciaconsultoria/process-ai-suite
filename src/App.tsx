@@ -21,6 +21,7 @@ const Configuracoes = React.lazy(() => import("./pages/Configuracoes"));
 const ConfigPerfil = React.lazy(() => import("./pages/ConfigPerfil"));
 const ConfigAlterarSenha = React.lazy(() => import("./pages/ConfigAlterarSenha"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
+const EntrevistaProcesso = React.lazy(() => import("./pages/EntrevistaProcesso"));
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empresas" element={<Empresas />} />
                 <Route path="/processos" element={<Processos />} />
+                <Route path="/processos/entrevista" element={<EntrevistaProcesso />} />
                 <Route path="/processos/novo" element={<ProcessoFormulario />} />
                 <Route path="/processos/:id" element={<ProcessoDetalhe />} />
               <Route path="/processos/:id/editar" element={<ProcessoFormulario />} />
