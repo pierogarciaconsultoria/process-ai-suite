@@ -25,7 +25,7 @@ const ConfigPerfil = () => {
         setEmail(user.email ?? "");
         setNome(((user.user_metadata as { full_name?: string } | undefined)?.full_name ?? "") as string);
         setCreatedAt(user.created_at ?? null);
-        const { data: mem } = await supabase.from("membros").select("empresa_id, perfil").eq("user_id", user.id);
+        const { data: mem } = await (supabase as any).from("membros").select("empresa_id, perfil").eq("user_id", user.id);
         const memRows = (mem as { empresa_id: string; perfil: string }[]) || [];
         const ids = Array.from(new Set(memRows.map((m) => m.empresa_id)));
         if (ids.length) {
