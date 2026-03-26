@@ -14,7 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      membros: {
+        Row: {
+          id: string
+          user_id: string
+          empresa_id: string
+          perfil: string
+          invited_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          empresa_id: string
+          perfil: string
+          invited_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          empresa_id?: string
+          perfil?: string
+          invited_by?: string | null
+          created_at?: string
+        }
+      }
+      interview_sessions: {
+        Row: {
+          id: string
+          empresa_id: string | null
+          user_id: string
+          reason: "auto" | "manual"
+          messages: Json
+          form_snapshot: Json
+          progress: number
+          applied: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string | null
+          user_id: string
+          reason: "auto" | "manual"
+          messages: Json
+          form_snapshot?: Json
+          progress?: number
+          applied?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string | null
+          user_id?: string
+          reason?: "auto" | "manual"
+          messages?: Json
+          form_snapshot?: Json
+          progress?: number
+          applied?: boolean
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

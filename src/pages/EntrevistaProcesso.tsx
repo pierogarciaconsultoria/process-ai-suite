@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Send, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import {
   type ProcessoFormData,
   type Classificacao,
@@ -49,6 +50,30 @@ export default function EntrevistaProcesso() {
       const item = { id: sessionIdRef.current, reason, at: new Date().toISOString(), messages, form, progress };
       const next = Array.isArray(prev) ? [...prev, item] : [item];
       localStorage.setItem(key, JSON.stringify(next));
+    } catch (e) { void e; }
+    persistSession(reason);
+  };
+  const persistSession = async (reason: "auto" | "manual") => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth?.user?.id ?? null;
+      let empresaId: string | null = null;
+      const { data: membros } = await supabase.from("membros").select("empresa_id").limit(1);
+      const memRows = membros as { empresa_id: string }[] | null;
+      if (Array.isArray(memRows) && memRows.length > 0) {
+        empresaId = memRows[0].empresa_id ?? null;
+      }
+      const row = {
+        user_id: userId,
+        empresa_id: empresaId,
+        reason,
+        messages: messages as unknown as Json,
+        form_snapshot: form as unknown as Json,
+        progress,
+        applied: reason === "manual",
+      } as unknown;
+      const sb = supabase as unknown as { from: (table: string) => { insert: (values: unknown) => Promise<unknown> } };
+      await sb.from("interview_sessions").insert(row);
     } catch (e) { void e; }
   };
 

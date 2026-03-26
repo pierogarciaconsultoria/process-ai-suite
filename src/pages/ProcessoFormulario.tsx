@@ -141,13 +141,26 @@ const ProcessoFormulario = () => {
   }, [location.state]);
 
   useEffect(() => {
-    try {
-      const sid = localStorage.getItem("process:lastInterviewSessionId") || "";
-      const sessionsRaw = localStorage.getItem("process:interviewSessions") || "[]";
-      const sessions = JSON.parse(sessionsRaw) as Array<{ id: string; messages: ChatMessage[]; at: string }>;
-      const found = sessions.find((s) => s.id === sid) || sessions[sessions.length - 1];
-      if (found?.messages?.length) setChatHistory(found.messages);
-    } catch (e) { void e; }
+    (async () => {
+      try {
+        const sb = supabase as unknown as { from: (table: string) => { select: (...a: unknown[]) => { order: (...a: unknown[]) => { limit: (n: number) => Promise<{ data?: unknown[] }> } } } };
+        const { data } = await sb.from("interview_sessions").select("messages").order("created_at", { ascending: false }).limit(1);
+        if (Array.isArray(data)) {
+          const rows = data as unknown as { messages: ChatMessage[] }[];
+          if (rows[0]?.messages?.length) {
+            setChatHistory(rows[0].messages);
+            return;
+          }
+        }
+      } catch (e) { void e; }
+      try {
+        const sid = localStorage.getItem("process:lastInterviewSessionId") || "";
+        const sessionsRaw = localStorage.getItem("process:interviewSessions") || "[]";
+        const sessions = JSON.parse(sessionsRaw) as Array<{ id: string; messages: ChatMessage[]; at: string }>;
+        const found = sessions.find((s) => s.id === sid) || sessions[sessions.length - 1];
+        if (found?.messages?.length) setChatHistory(found.messages);
+      } catch (e) { void e; }
+    })();
   }, []);
 
   const tabIndex = ALL_TABS.indexOf(activeTab);
