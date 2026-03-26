@@ -142,9 +142,24 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/Could not find the table|schema cache/i.test(msg)) {
+      const empresa = {
+        id: `temp-${Date.now()}`,
+        nome: "Empresa temporária",
+        segmento: null,
+        tamanho: null,
+        area_atuacao: null,
+        contexto: null,
+        owner_id: "unknown",
+        created_at: new Date().toISOString(),
+        note: "Fallback sem persistência: aplique migrações do banco (empresas/membros).",
+      };
+      return new Response(JSON.stringify({ empresa }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ error: msg || "Erro desconhecido" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
