@@ -128,13 +128,15 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
   const handleZoomIn = () => {
     if (!bpmnInstanceRef.current) return;
     const canvas = bpmnInstanceRef.current.get("canvas");
-    canvas.zoom(canvas.zoom() * 1.2);
+    const current = canvas.zoom() as number;
+    canvas.zoom(current * 1.2);
   };
 
   const handleZoomOut = () => {
     if (!bpmnInstanceRef.current) return;
     const canvas = bpmnInstanceRef.current.get("canvas");
-    canvas.zoom(canvas.zoom() / 1.2);
+    const current = canvas.zoom() as number;
+    canvas.zoom(current / 1.2);
   };
 
   const handleFitViewport = () => {
