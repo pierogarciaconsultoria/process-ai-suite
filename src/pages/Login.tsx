@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Network, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -19,6 +20,29 @@ const Login = () => {
   const [areaAtuacao, setAreaAtuacao] = useState("");
   const [contexto, setContexto] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const segmentosBR = [
+    "Agricultura, Pecuária, Produção Florestal, Pesca e Aquicultura",
+    "Indústrias Extrativas",
+    "Indústrias de Transformação",
+    "Eletricidade e Gás",
+    "Água, Esgoto, Atividades de Gestão de Resíduos e Descontaminação",
+    "Construção",
+    "Comércio; Reparação de Veículos Automotores e Motocicletas",
+    "Transporte, Armazenagem e Correio",
+    "Alojamento e Alimentação",
+    "Informação e Comunicação",
+    "Atividades Financeiras, de Seguros e Serviços Relacionados",
+    "Atividades Imobiliárias",
+    "Atividades Profissionais, Científicas e Técnicas",
+    "Atividades Administrativas e Serviços Complementares",
+    "Administração Pública, Defesa e Seguridade Social",
+    "Educação",
+    "Saúde Humana e Serviços Sociais",
+    "Artes, Cultura, Esporte e Recreação",
+    "Outras Atividades de Serviços",
+    "Serviços Domésticos",
+    "Organismos Internacionais e Outras Instituições Extraterritoriais",
+  ];
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isSignupMode, setIsSignupMode] = useState(false);
@@ -135,7 +159,16 @@ const Login = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="segmento">Segmento</Label>
-                      <Input id="segmento" placeholder="Ex: Varejo, Manufatura, Saúde..." value={segmento} onChange={(e) => setSegmento(e.target.value)} />
+                      <Select value={segmento} onValueChange={setSegmento}>
+                        <SelectTrigger id="segmento">
+                          <SelectValue placeholder="Selecione o segmento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {segmentosBR.map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="area">Área de atuação</Label>

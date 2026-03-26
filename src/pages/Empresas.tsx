@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,29 @@ const Empresas = () => {
   const [novaTamanho, setNovaTamanho] = useState("");
   const [novaAreaAtuacao, setNovaAreaAtuacao] = useState("");
   const [novaContexto, setNovaContexto] = useState("");
+  const segmentosBR = [
+    "Agricultura, Pecuária, Produção Florestal, Pesca e Aquicultura",
+    "Indústrias Extrativas",
+    "Indústrias de Transformação",
+    "Eletricidade e Gás",
+    "Água, Esgoto, Atividades de Gestão de Resíduos e Descontaminação",
+    "Construção",
+    "Comércio; Reparação de Veículos Automotores e Motocicletas",
+    "Transporte, Armazenagem e Correio",
+    "Alojamento e Alimentação",
+    "Informação e Comunicação",
+    "Atividades Financeiras, de Seguros e Serviços Relacionados",
+    "Atividades Imobiliárias",
+    "Atividades Profissionais, Científicas e Técnicas",
+    "Atividades Administrativas e Serviços Complementares",
+    "Administração Pública, Defesa e Seguridade Social",
+    "Educação",
+    "Saúde Humana e Serviços Sociais",
+    "Artes, Cultura, Esporte e Recreação",
+    "Outras Atividades de Serviços",
+    "Serviços Domésticos",
+    "Organismos Internacionais e Outras Instituições Extraterritoriais",
+  ];
   const [loadingCreate, setLoadingCreate] = useState(false);
   const { toast } = useToast();
 
@@ -144,10 +168,19 @@ const Empresas = () => {
                 <Label>Nome da Empresa</Label>
                 <Input placeholder="Nome da empresa" value={novaNome} onChange={(e) => setNovaNome(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Segmento</Label>
-                <Input placeholder="Segmento de atuação" value={novaSegmento} onChange={(e) => setNovaSegmento(e.target.value)} />
-              </div>
+            <div className="space-y-2">
+              <Label>Segmento</Label>
+              <Select value={novaSegmento} onValueChange={setNovaSegmento}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o segmento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {segmentosBR.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
               <div className="space-y-2">
                 <Label>Número de Colaboradores</Label>
                 <Input placeholder="Ex: 50-100" value={novaTamanho} onChange={(e) => setNovaTamanho(e.target.value)} />
