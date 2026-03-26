@@ -60,12 +60,12 @@ const ChamadoDetalhe = () => {
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user;
       if (!user) return;
-      const { data: m } = await (supabase as any).from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
+      const { data: m } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
       const mRows = (m as { empresa_id: string }[]) || [];
       if (mRows[0]?.empresa_id) setEmpresaId(mRows[0].empresa_id);
-      const { data: c } = await (supabase as any).from("chamados").select("*").eq("id", id).single();
+      const { data: c } = await supabase.from("chamados").select("*").eq("id", id).single();
       setChamado((c as Chamado) || null);
-      const { data: msgs } = await (supabase as any)
+      const { data: msgs } = await supabase
         .from("chamado_mensagens")
         .select("*")
         .eq("chamado_id", id)

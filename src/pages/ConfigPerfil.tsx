@@ -25,11 +25,11 @@ const ConfigPerfil = () => {
         setEmail(user.email ?? "");
         setNome(((user.user_metadata as { full_name?: string } | undefined)?.full_name ?? "") as string);
         setCreatedAt(user.created_at ?? null);
-        const { data: mem } = await (supabase as any).from("membros").select("empresa_id, perfil").eq("user_id", user.id);
+        const { data: mem } = await supabase.from("membros").select("empresa_id, perfil").eq("user_id", user.id);
         const memRows = (mem as { empresa_id: string; perfil: string }[]) || [];
         const ids = Array.from(new Set(memRows.map((m) => m.empresa_id)));
         if (ids.length) {
-          const { data: emp } = await (supabase as any).from("empresas").select("id, nome").in("id", ids);
+          const { data: emp } = await supabase.from("empresas").select("id, nome").in("id", ids);
           const empRows = (emp as { id: string; nome: string }[]) || [];
           const map = new Map(empRows.map((e) => [e.id, e.nome]));
           const combined = memRows.map((m) => ({ id: m.empresa_id, nome: map.get(m.empresa_id) ?? m.empresa_id, perfil: m.perfil }));

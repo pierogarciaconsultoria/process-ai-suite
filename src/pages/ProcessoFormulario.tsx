@@ -579,6 +579,93 @@ const ProcessoFormulario = () => {
           <div className="space-y-4">
             <CardTitle className="text-lg">Mapa AS IS (BPMN)</CardTitle>
             <p className="text-sm text-muted-foreground">Visualize o fluxo atual do processo. Clique em "Gerar Mapa com IA" para criar o diagrama automaticamente.</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (!file) return;
+                  try {
+                    const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
+                    GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
+                    const buf = await file.arrayBuffer();
+                    const loadingTask = getDocument({ data: buf });
+                    const pdf = await loadingTask.promise;
+                    let fullText = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                      const page = await pdf.getPage(i);
+                      const content = await page.getTextContent();
+                      const pageText = content.items
+                        .map((it: unknown) => {
+                          const rec = it as { str?: unknown };
+                          return typeof rec.str === "string" ? rec.str : "";
+                        })
+                        .filter((s) => s && s.trim().length > 0)
+                        .join(" ");
+                      fullText += "\n" + pageText;
+                    }
+                    const lines = fullText
+                      .split(/\n|\. |\r/)
+                      .map((s) => s.trim())
+                      .filter((s) => s.length > 0);
+                    const stepCandidates = lines.filter((s) =>
+                      /^[0-9]+\s*[).\-\u2013]|^[•\-\u2013]\s+|^\w.{20,}$/.test(s)
+                    );
+                    const uniqueSteps: string[] = [];
+                    for (const s of stepCandidates) {
+                      const cleaned = s.replace(/^[0-9]+\s*[).\-\u2013]\s*/, "").replace(/^[•\-\u2013]\s+/, "").trim();
+                      if (cleaned.length < 4) continue;
+                      if (!uniqueSteps.some((u) => u.toLowerCase() === cleaned.toLowerCase())) {
+                        uniqueSteps.push(cleaned);
+                      }
+                    }
+                    const etapasFromPdf = uniqueSteps.slice(0, 40).map((txt, idx) => ({
+                      ordem: idx + 1,
+                      atividade: txt,
+                      responsavel: "",
+                      ferramentaDocumento: "",
+                    }));
+                    if (etapasFromPdf.length > 0) {
+                      updateField("etapas", etapasFromPdf);
+                      toast({ title: "PDF importado", description: `Etapas extraídas: ${etapasFromPdf.length}. Gerando o mapa automaticamente...` });
+                      try {
+                        const { data, error } = await supabase.functions.invoke("ai-generate-bpmn", {
+                          body: {
+                            etapas: etapasFromPdf,
+                            decisoes: form.decisoes,
+                            gatilho: form.gatilho,
+                            entradas: form.entradas,
+                            saidas: form.saidas,
+                            nomeProcesso: form.nomeProcesso,
+                            mode: "as-is",
+                          },
+                        });
+                        if (error) throw error;
+                        if ((data as unknown as { error?: string })?.error) throw new Error((data as { error: string }).error);
+                        const generatedXml = (data as unknown as { xml?: string }).xml || data;
+                        updateField("bpmnAsIs", generatedXml as string);
+                        toast({ title: "Mapa AS-IS gerado", description: "O diagrama foi atualizado com base no PDF." });
+                      } catch (genErr) {
+                        const msg = genErr instanceof Error ? genErr.message : String(genErr);
+                        toast({ title: "Falha ao gerar BPMN", description: msg, variant: "destructive" });
+                      }
+                    } else {
+                      toast({
+                        title: "Nenhuma etapa encontrada",
+                        description: "Não foi possível identificar etapas no PDF. Edite manualmente ou tente outro arquivo.",
+                        variant: "destructive",
+                      });
+                    }
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    toast({ title: "Falha ao importar PDF", description: msg, variant: "destructive" });
+                  } finally {
+                    e.currentTarget.value = "";
+                  }
+                }}
+              />
+            </div>
             <BPMNCanvas
               xml={form.bpmnAsIs}
               onChange={(xml) => updateField("bpmnAsIs", xml)}
