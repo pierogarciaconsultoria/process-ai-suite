@@ -32,6 +32,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import BPMNCanvas from "@/components/BPMNCanvas";
 
+type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
+
 // ── Phase / Tab structure ──
 
 interface PhaseConfig {
@@ -115,6 +117,7 @@ const ProcessoFormulario = () => {
 
   const [activeTab, setActiveTab] = useState("identificacao");
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [descricaoIA, setDescricaoIA] = useState("");
   const [isFillingAI, setIsFillingAI] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
@@ -136,6 +139,16 @@ const ProcessoFormulario = () => {
       } catch (e) { void e; }
     }
   }, [location.state]);
+
+  useEffect(() => {
+    try {
+      const sid = localStorage.getItem("process:lastInterviewSessionId") || "";
+      const sessionsRaw = localStorage.getItem("process:interviewSessions") || "[]";
+      const sessions = JSON.parse(sessionsRaw) as Array<{ id: string; messages: ChatMessage[]; at: string }>;
+      const found = sessions.find((s) => s.id === sid) || sessions[sessions.length - 1];
+      if (found?.messages?.length) setChatHistory(found.messages);
+    } catch (e) { void e; }
+  }, []);
 
   const tabIndex = ALL_TABS.indexOf(activeTab);
   const activePhase = getPhaseForTab(activeTab);
@@ -724,6 +737,23 @@ const ProcessoFormulario = () => {
         <div className="flex-1 min-w-0">
           <Card>
             <CardContent className="pt-6">
+              {chatHistory.length > 0 && (
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="chat-history">
+                    <AccordionTrigger>Histórico da Entrevista</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="h-[280px] overflow-auto rounded-md border p-3 space-y-3">
+                        {chatHistory.map((m, i) => (
+                          <div key={i} className={`p-3 rounded-md ${m.role === "assistant" ? "bg-muted" : "bg-card border"}`}>
+                            <div className="text-xs text-muted-foreground mb-1">{m.role === "assistant" ? "IA" : m.role === "user" ? "Você" : "Sistema"}</div>
+                            <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
               {renderContent()}
 
               {/* Navigation */}

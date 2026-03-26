@@ -310,6 +310,7 @@ export default function EntrevistaProcesso() {
     try {
       localStorage.setItem("process:formPrefill", JSON.stringify(form));
       saveSession("manual");
+      localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
     } catch (e) { void e; }
     navigate("/processos/novo", { state: { formPrefill: form } });
   };
