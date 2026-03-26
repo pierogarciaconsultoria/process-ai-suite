@@ -59,6 +59,18 @@ Regra: avance cobrindo objetivo, contexto, SIPOC (entradas/saídas/clientes), at
     });
 
     if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos em Configurações." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const txt = await response.text();
       return new Response(JSON.stringify({ error: `AI error ${response.status}: ${txt}` }), {
         status: 500,
