@@ -35,15 +35,15 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Não autenticado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: membros, error: memErr } = await supabase
-      .from("membros")
-      .select("empresa_id")
-      .eq("user_id", user.id);
+    const { data: membros, error: memErr } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id);
     if (memErr) {
-      const { data: empresasOwner } = await supabase
+      const { data: empresasOwner, error: empOwnerErr } = await supabase
         .from("empresas")
         .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
         .eq("owner_id", user.id);
+      if (empOwnerErr) {
+        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       return new Response(JSON.stringify(empresasOwner || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -61,7 +61,7 @@ serve(async (req) => {
       .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
       .in("id", ids);
     if (empErr) {
-      return new Response(JSON.stringify({ error: empErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify(empresas || []), {

@@ -15,13 +15,21 @@ serve(async (req) => {
     const history = body?.history ?? [];
     const page = body?.page ?? "/";
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const lastUser = Array.isArray(history) ? [...history].reverse().find((m: any) => m?.role === "user")?.content?.toLowerCase?.() ?? "" : "";
+    const quickIntents = [
+      {
+        test: (t: string) => /mapa|bpmn/.test(t) && /analis|diagnost|relat/.test(t),
+        answer:
+          "Para analisar seu mapa com IA:\n\n1) Acesse Processos > Novo Processo.\n2) Na FASE 2, abra a aba “Mapa AS IS (BPMN)” e cole ou importe o XML do seu mapa.\n3) Opcional: na FASE 3, aba “Mapa TO BE (BPMN)”, adicione o cenário desejado.\n4) Vá para a FASE 4 > “Relatório”. A análise é gerada automaticamente e você será redirecionado para o Diagnóstico.\n\nDica: complete os campos do contexto e problemas para enriquecer o relatório.",
+      },
+      {
+        test: (t: string) => /entrevista|ajuda inicial|como começar|onboarding/.test(t),
+        answer:
+          "Para começar rápido:\n\n1) Cadastre sua empresa em Configurações > Empresas (ou no primeiro acesso).\n2) Acesse Processos > Entrevista com IA para mapear rapidamente.\n3) Revise no formulário de processo e gere o Relatório em FASE 4.\n\nPosso detalhar qualquer etapa se preferir.",
+      },
+    ];
+    const intentHit = quickIntents.find((i) => i.test(lastUser));
+    const fallbackLocal = intentHit?.answer || null;
 
     const systemPrompt = `Você é o assistente de autoatendimento da plataforma Process Suite IA.
 Responda sempre em Português do Brasil, de forma objetiva e prática.
@@ -39,21 +47,24 @@ Formato: responda em texto simples, com listas curtas quando necessário.`;
     const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
     const isOpenAI = AI_MODEL.startsWith("openai/");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    const response = await fetch(
-      isOpenAI && OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: isOpenAI && OPENAI_API_KEY ? `Bearer ${OPENAI_API_KEY}` : `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
-          messages,
-        }),
-      }
-    );
+    if (!OPENAI_API_KEY && !LOVABLE_API_KEY) {
+      const content = fallbackLocal || "Certo. Em que posso ajudar dentro da plataforma?";
+      return new Response(JSON.stringify({ answer: content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const response = await fetch(isOpenAI && OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: isOpenAI && OPENAI_API_KEY ? `Bearer ${OPENAI_API_KEY}` : `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
+        messages,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -69,6 +80,9 @@ Formato: responda em texto simples, com listas curtas quando necessário.`;
         });
       }
       const txt = await response.text();
+      if (fallbackLocal) {
+        return new Response(JSON.stringify({ answer: fallbackLocal }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       return new Response(JSON.stringify({ error: `AI error ${response.status}: ${txt}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,10 +93,6 @@ Formato: responda em texto simples, com listas curtas quando necessário.`;
     const content = json.choices?.[0]?.message?.content || "Certo. Em que mais posso ajudar?";
     return new Response(JSON.stringify({ answer: content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ answer: "Não consegui acessar o mecanismo de IA no momento. Você pode tentar:\n\n1) Verificar conexão e tentar novamente.\n2) Gerar o Relatório em Processos > Novo Processo > FASE 4.\n3) Abrir um chamado em Configurações > Chamados." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
-
