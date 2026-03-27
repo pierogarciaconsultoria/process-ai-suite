@@ -31,6 +31,7 @@ import {
 } from "@/data/processo-form-types";
 import { Badge } from "@/components/ui/badge";
 import BPMNCanvas from "@/components/BPMNCanvas";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
@@ -587,10 +588,10 @@ const ProcessoFormulario = () => {
                   const file = e.target.files?.[0] || null;
                   if (!file) return;
                   try {
-                    const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
-                    GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
+                    const pdfjs = await import("pdfjs-dist");
+                    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker as string;
                     const buf = await file.arrayBuffer();
-                    const loadingTask = getDocument({ data: buf });
+                    const loadingTask = pdfjs.getDocument({ data: buf });
                     const pdf = await loadingTask.promise;
                     let fullText = "";
                     for (let i = 1; i <= pdf.numPages; i++) {

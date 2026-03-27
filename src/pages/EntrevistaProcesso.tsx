@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Send, ArrowRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import {
@@ -343,7 +344,7 @@ export default function EntrevistaProcesso() {
 
   const extractFromPdf = async (file: File): Promise<string> => {
     const mod = await import("pdfjs-dist");
-    mod.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
+    mod.GlobalWorkerOptions.workerSrc = pdfjsWorker as string;
     const buf = await file.arrayBuffer();
     const loadingTask = mod.getDocument({ data: buf });
     const pdf = await loadingTask.promise;
