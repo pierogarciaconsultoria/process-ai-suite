@@ -23,6 +23,8 @@ const ConfigPerfil = React.lazy(() => import("./pages/ConfigPerfil"));
 const ConfigAlterarSenha = React.lazy(() => import("./pages/ConfigAlterarSenha"));
 const ConfigChamados = React.lazy(() => import("./pages/ConfigChamados"));
 const ChamadoDetalhe = React.lazy(() => import("./pages/ChamadoDetalhe"));
+const ConfigRoteiroEntrevista = React.lazy(() => import("./pages/ConfigRoteiroEntrevista"));
+const ConfigSkinIA = React.lazy(() => import("./pages/ConfigSkinIA"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const EntrevistaProcesso = React.lazy(() => import("./pages/EntrevistaProcesso"));
 
@@ -84,6 +86,8 @@ const App = () => (
               <Route path="/configuracoes/usuarios" element={<Usuarios />} />
               <Route path="/configuracoes/perfil" element={<ConfigPerfil />} />
               <Route path="/configuracoes/alterar-senha" element={<ConfigAlterarSenha />} />
+              <Route path="/configuracoes/roteiro-entrevista" element={<ConfigRoteiroEntrevista />} />
+              <Route path="/configuracoes/skin-ia" element={<ConfigSkinIA />} />
               <Route path="/configuracoes/chamados" element={<ConfigChamados />} />
               <Route path="/configuracoes/chamados/:id" element={<ChamadoDetalhe />} />
               <Route path="/usuarios" element={<Navigate to="/configuracoes/usuarios" replace />} />

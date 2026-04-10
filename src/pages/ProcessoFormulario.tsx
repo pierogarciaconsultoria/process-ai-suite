@@ -224,7 +224,15 @@ const ProcessoFormulario = () => {
     }
     setIsFillingAI(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-fill-process", { body: { descricao: descricaoIA } });
+      const customScript = localStorage.getItem("process:routeScript");
+      const aiSkin = localStorage.getItem("process:aiSkin");
+      const { data, error } = await supabase.functions.invoke("ai-fill-process", { 
+        body: { 
+          descricao: descricaoIA,
+          customScript: customScript || null,
+          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+        } 
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setForm((prev) => ({
@@ -268,7 +276,15 @@ const ProcessoFormulario = () => {
   const handleDiagnose = useCallback(async () => {
     setIsDiagnosing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { body: { processoData: form } });
+      const customScript = localStorage.getItem("process:routeScript");
+      const aiSkin = localStorage.getItem("process:aiSkin");
+      const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { 
+        body: { 
+          processoData: form,
+          customScript: customScript || null,
+          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+        } 
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       navigate("/processos/novo/diagnostico", { state: { diagnostico: data } });

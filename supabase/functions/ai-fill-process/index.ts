@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { descricao } = await req.json();
+    const { descricao, customScript, aiSkin } = await req.json();
     if (!descricao || typeof descricao !== "string" || descricao.trim().length < 10) {
       return new Response(
         JSON.stringify({ error: "Descrição deve ter pelo menos 10 caracteres." }),
@@ -25,7 +25,12 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `Você é um analista sênior de processos de negócio. 
+    const personaName = aiSkin?.nome || "Analista Sênior";
+    const personaTone = aiSkin?.tom || "profissional e técnico";
+    const personaStyle = aiSkin?.estilo || "profissional";
+
+    const systemPrompt = `Seu nome é ${personaName}. Você é um analista sênior de processos de negócio com tom de voz ${personaTone} e estilo ${personaStyle}.
+${customScript ? `\n### DIRETRIZES DA EMPRESA:\n${customScript}\n` : ""}
 Com base na descrição fornecida pelo usuário, preencha TODOS os campos do mapeamento de processo.
 Seja objetivo, prático e específico. Use linguagem profissional em português brasileiro.
 Limite etapas a 4-8 itens. Gere 2-4 riscos. Gere 2-4 indicadores. Gere 1-3 ações no plano de ação.

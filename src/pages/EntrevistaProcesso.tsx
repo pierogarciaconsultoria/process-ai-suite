@@ -31,13 +31,7 @@ type InterviewResponse = {
 
 export default function EntrevistaProcesso() {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Olá! Vou conduzir uma entrevista para mapear seu processo. Vamos começar pelo objetivo: em poucas palavras, qual é o objetivo principal do processo?",
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
@@ -45,6 +39,40 @@ export default function EntrevistaProcesso() {
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
+
+  // Inicia a conversa com a IA para garantir que o roteiro personalizado seja seguido desde o início
+  useEffect(() => {
+    const startInterview = async () => {
+      setLoading(true);
+      try {
+        const customScript = localStorage.getItem("process:routeScript");
+        const aiSkin = localStorage.getItem("process:aiSkin");
+        const { data, error } = await supabase.functions.invoke("ai-interview", {
+          body: {
+            history: [],
+            current: emptyProcessoForm,
+            customScript: customScript || null,
+            aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+          },
+        });
+        if (!error && data?.nextQuestion) {
+          setMessages([{ role: "assistant", content: data.nextQuestion }]);
+        } else {
+          // Fallback caso a API falhe no início
+          setMessages([{ 
+            role: "assistant", 
+            content: "Olá! Sou seu assistente de mapeamento. Para começarmos, qual o nome do processo que vamos analisar hoje?" 
+          }]);
+        }
+      } catch (e) {
+        setMessages([{ role: "assistant", content: "Olá! Vamos iniciar o mapeamento. Qual é o objetivo do seu processo?" }]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    startInterview();
+  }, []);
   const saveSession = (reason: "auto" | "manual") => {
     try {
       const key = "process:interviewSessions";
@@ -146,10 +174,14 @@ export default function EntrevistaProcesso() {
     setInput("");
     setLoading(true);
     try {
+      const customScript = localStorage.getItem("process:routeScript");
+      const aiSkin = localStorage.getItem("process:aiSkin");
       const { data, error } = await supabase.functions.invoke("ai-interview", {
         body: {
           history: [...messages, userMsg],
           current: form,
+          customScript: customScript || null,
+          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
         },
       });
       const hasErrorField = (d: unknown): d is { error: string } =>

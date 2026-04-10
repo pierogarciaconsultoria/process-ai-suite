@@ -55,13 +55,9 @@ const Processos = () => {
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => navigate("/processos/novo")}>
+          <Button onClick={() => navigate("/processos/entrevista")}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Processo
-          </Button>
-          <Button variant="outline" onClick={() => navigate("/processos/entrevista")}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            Entrevista com IA
           </Button>
         </div>
       </div>

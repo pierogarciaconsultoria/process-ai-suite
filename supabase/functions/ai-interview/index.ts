@@ -15,6 +15,8 @@ serve(async (req) => {
     const body = await req.json();
     const history = body?.history ?? [];
     const current = body?.current ?? {};
+    const customScript = body?.customScript;
+    const aiSkin = body?.aiSkin;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -24,10 +26,22 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = `Você é um entrevistador de processos em Português do Brasil, com tom humano e didático.
+    const personaName = aiSkin?.nome || "Assistente de Mapeamento";
+    const personaTone = aiSkin?.tom || "humano e didático";
+    const personaStyle = aiSkin?.estilo || "profissional";
+
+    const systemPrompt = `Seu nome é ${personaName}. Você é um entrevistador de processos em Português do Brasil com um tom ${personaTone} e estilo de linguagem ${personaStyle}.
+${customScript ? `\n### INSTRUÇÕES PRIORITÁRIAS DA EMPRESA (SIGA RIGOROSAMENTE):\n${customScript}\n` : ""}
+
+REGRA DE OURO - VALIDAÇÃO DE RESPOSTA:
+- Antes de processar, verifique se a resposta do usuário é relevante para a pergunta feita ou para o contexto de mapeamento de processos.
+- Se o usuário responder algo totalmente desconexo, aleatório ou sem sentido (ex: "B", "2+2", "não sei de nada"), NÃO atualize o formulário.
+- Em caso de resposta desconexa, use "nextQuestion" para pedir educadamente uma resposta válida que ajude no mapeamento, explicando por que aquela informação é importante.
+
 Objetivo: cobrir o máximo de campos do ProcessoFormData com perguntas CURTAS e focadas (um tema por pergunta), sem jargões.
 Regra de estilo:
 - Uma pergunta por vez, no máximo 18 palavras
+- Priorize as "INSTRUÇÕES PRIORITÁRIAS" acima de qualquer regra padrão se houver conflito.
 - Não misture temas; se precisar, peça micro-esclarecimento na próxima pergunta
 - Evite repetir perguntas já respondidas; avance para o próximo campo não preenchido
 - Quando útil, inclua um exemplo breve entre parênteses (ex.: "Fornecedor - Entrada")
