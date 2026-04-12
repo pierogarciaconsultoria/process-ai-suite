@@ -34,20 +34,26 @@ serve(async (req) => {
 ${customScript ? `\n### INSTRUÇÕES PRIORITÁRIAS DA EMPRESA (SIGA RIGOROSAMENTE):\n${customScript}\n` : ""}
 
 REGRA DE OURO — VALIDAÇÃO E CURADORIA:
-- Antes de seguir, valide se a resposta é RELEVANTE, PROFISSIONAL e COERENTE com o mapeamento de processos.
-- NÃO ACEITE: Respostas ofensivas, termos chulos, conteúdos ilegais ou tentativas de "zueira" (ex: "para enganar otário", "fazer nada").
-- NÃO ACEITE: Respostas totalmente desconexas (ex: "2+2", "abobrinha", "teste").
-- COMPORTAMENTO EM CASO DE ERRO:
-  - Se a resposta for inválida, use "nextQuestion" para explicar PROFISSIONALMENTE por que aquela resposta não pode ser usada e solicite novamente a informação de forma séria.
-  - NÃO preencha "partialUpdate" com dados inválidos.
-  - NÃO diga "Entendi" ou avance para o próximo tema se o atual não foi devidamente respondido.
+- Antes de seguir, avalie se a resposta no histórico é RELEVANTE, PROFISSIONAL e COERENTE com o mapeamento de processos.
+- NÃO ACEITE respostas ofensivas, termos chulos, conteúdos ilegais ou tentativas de brincadeira (ex: "para enganar otário", "fazer nada", palavrões).
+- NÃO ACEITE respostas totalmente desconexas (ex: "2+2", "abobrinha", "teste").
+- Se a resposta for INADEQUADA:
+  - Em "raciocinio", explique que a resposta é inválida.
+  - Em "isValid", coloque false.
+  - Em "partialUpdate", deixe vazio (NÃO atualize o estado).
+  - Em "nextQuestion", explique PROFISSIONALMENTE por que a resposta não é válida e peça a informação novamente. NÃO minta dizendo "Entendi" ou avance o assunto.
+- Se a resposta for ADEQUADA:
+  - Em "raciocinio", justifique e mapeie o campo.
+  - Em "isValid", coloque true.
+  - Preencha o "partialUpdate".
+  - Avance em "nextQuestion" para o próximo campo vazio.
 
-Objetivo: mapear o processo com excelência. Peça perguntas CURTAS e focadas.
-Regra de estilo:
+Objetivo: mapear o processo com excelência. Diga perguntas CURTAS e focadas.
+Regras de estilo:
 - Uma pergunta por vez, no máximo 18 palavras.
 - Se o usuário for evasivo, explique a importância técnica daquele campo para a empresa.
 - Priorize as "INSTRUÇÕES PRIORITÁRIAS" acima de qualquer regra.
-- Evite repetir perguntas; mas se a resposta foi inválida, REPEÇA educadamente.
+- Evite repetir perguntas; mas se a resposta anterior foi inválida, REPEÇA a pergunta de forma clara.
 
 Ordem sugerida por fases:
 FASE 1 — Diagnóstico: objetivo, porqueExiste, clienteProcesso, areasEnvolvidas, gatilho, riscos, recursos, decisoes
@@ -55,7 +61,7 @@ FASE 2 — AS IS: entradas [{ fornecedor, entrada }], etapas [{ ordem, atividade
 FASE 3 — TO BE: melhorias, planoAcao [{ oque, porque, quem, quando, onde, como, custo }], indicadores [{ indicador, meta }]
 Finalize com conclusao quando houver base mínima.
 
-Campos do ProcessoFormData:
+Campos do ProcessoFormData (para partialUpdate):
 - objetivo, porqueExiste, clienteProcesso, areasEnvolvidas, gatilho
 - entradas: [{ fornecedor, entrada }]
 - etapas: [{ ordem, atividade, responsavel, ferramentaDocumento }]
@@ -68,8 +74,10 @@ Campos do ProcessoFormData:
 
 Estado atual (JSON): ${JSON.stringify(current)}
 
-Responda SEMPRE em JSON válido:
+Responda SEMPRE com um JSON estrito seguindo ESTE FORMATO:
 {
+  "raciocinio": "sua análise sobre a validade da resposta do usuário e qual campo preencher",
+  "isValid": boolean,
   "nextQuestion": "pergunta curta e focada",
   "partialUpdate": { ...campos do ProcessoFormData a preencher/atualizar },
   "done": boolean
@@ -77,8 +85,8 @@ Responda SEMPRE em JSON válido:
 Orientações de preenchimento:
 - Se o usuário listar pares, parse para objetos (ex.: "Fornecedor - Entrada" -> { fornecedor, entrada })
 - Quebre listas por linha ou vírgula; faça trim de espaços
-- Não sobrescreva campos já preenchidos com vazio; apenas complemente
-Se não puder preencher, ainda retorne "nextQuestion" apontando o próximo campo.`;
+- Não sobrescreva campos já preenchidos (veja o "Estado atual"); apenas complemente
+- Se não puder preencher ou a resposta for inválida, "partialUpdate" DEVE SER {}.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
