@@ -123,22 +123,29 @@ export default function Index() {
             <strong className="text-[#006B6B] font-semibold">mapeia seu negócio em minutos</strong> e devolve o seu tempo.
           </p>
 
-          {/* Bullets */}
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 py-2">
+          {/* Feature cards logo abaixo da headline */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4">
             {[
-              "Mapeamento inteligente sem planilhas",
-              "Operação autônoma e independente",
-              "Crescimento mensurável e previsível",
-            ].map((item) => (
-              <span key={item} className="flex items-center gap-2 text-[#004444] font-medium">
-                <CheckCircle2 className="h-5 w-5 text-[#006B6B] flex-shrink-0" />
-                {item}
-              </span>
+              { icon: <Bot className="h-5 w-5" />, title: "Entrevista por IA", desc: "Mapeia seu processo via conversa" },
+              { icon: <FileText className="h-5 w-5" />, title: "Padronização", desc: "Manuais prontos para a equipe" },
+              { icon: <BarChart3 className="h-5 w-5" />, title: "Diagnóstico", desc: "Gargalos identificados em segundos" },
+              { icon: <Shield className="h-5 w-5" />, title: "Plano de Ação", desc: "5W2H gerado automaticamente" },
+            ].map((card, i) => (
+              <div
+                key={i}
+                className="bg-white/70 backdrop-blur-sm border border-[#006B6B]/15 rounded-xl p-4 text-left hover:bg-white hover:border-[#006B6B]/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default"
+              >
+                <div className="h-9 w-9 bg-[#006B6B]/10 rounded-lg flex items-center justify-center text-[#006B6B] mb-3">
+                  {card.icon}
+                </div>
+                <p className="font-semibold text-[#002B2B] text-sm">{card.title}</p>
+                <p className="text-[#004444]/60 text-xs mt-0.5 leading-snug">{card.desc}</p>
+              </div>
             ))}
           </div>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             <Button
               size="lg"
               className="h-14 px-10 text-base font-semibold w-full sm:w-auto bg-[#006B6B] hover:bg-[#005555] text-white shadow-xl shadow-[#006B6B]/20 hover:shadow-2xl hover:shadow-[#006B6B]/30 transition-all duration-300 hover:-translate-y-0.5"
