@@ -429,8 +429,15 @@ export default function EntrevistaProcesso() {
         content: `Extraí o seguinte conteúdo do arquivo anexado. Analise e use para preencher o formulário do processo, propondo objetivo, entradas, etapas, decisões e saídas quando possível:\n\n${snippet}`,
       };
       setMessages((m) => [...m, userMsg]);
+      const customScript = localStorage.getItem("process:routeScript");
+      const aiSkin = localStorage.getItem("process:aiSkin");
       const { data, error } = await supabase.functions.invoke("ai-interview", {
-        body: { history: [...messages, userMsg], current: form },
+        body: {
+          history: [...messages, userMsg],
+          current: form,
+          customScript: customScript || null,
+          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+        },
       });
       const hasErrorField = (d: unknown): d is { error: string } =>
         typeof d === "object" && d !== null && "error" in d;
