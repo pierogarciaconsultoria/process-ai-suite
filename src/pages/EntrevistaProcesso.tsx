@@ -178,7 +178,7 @@ export default function EntrevistaProcesso() {
     if (!input.trim()) return;
     if (requestApply && isApplyCommand(input.trim())) {
       setRequestApply(false);
-      applyToForm();
+      applyToForm("manual");
       return;
     }
     const userMsg: ChatMessage = { role: "user", content: input.trim() };
@@ -208,11 +208,7 @@ export default function EntrevistaProcesso() {
         setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
       }
       if (resp.done) {
-        setRequestApply(true);
-        setMessages((m) => [
-          ...m,
-          { role: "assistant", content: "Entrevista concluída. Deseja aplicar os dados no formulário para revisão e geração de diagnóstico?" },
-        ]);
+        applyToForm("manual");
       } else if (resp.nextQuestion) {
         setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
       } else {
@@ -232,8 +228,8 @@ export default function EntrevistaProcesso() {
       setForm((prev) => ({ ...prev, ...fallback.partialUpdate! }));
     }
     if (fallback.done) {
-      setRequestApply(true);
-      saveSession("auto");
+      applyToForm("auto");
+      return;
     }
     setMessages((m) => [
       ...m,
@@ -377,10 +373,10 @@ export default function EntrevistaProcesso() {
     }
     return { done: true };
   };
-  const applyToForm = () => {
+  const applyToForm = (reason: "auto" | "manual" = "manual") => {
     try {
       localStorage.setItem("process:formPrefill", JSON.stringify(form));
-      saveSession("manual");
+      saveSession(reason);
       localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
     } catch (e) { void e; }
     navigate("/processos/novo", { state: { formPrefill: form } });
@@ -461,8 +457,7 @@ export default function EntrevistaProcesso() {
       const resp = data as InterviewResponse;
       if (resp.partialUpdate) setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
       if (resp.done) {
-        setRequestApply(true);
-        setMessages((m) => [...m, { role: "assistant", content: "Análise concluída. Deseja aplicar os dados no formulário?" }]);
+        applyToForm("manual");
       } else if (resp.nextQuestion) {
         setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
       }
@@ -538,7 +533,7 @@ export default function EntrevistaProcesso() {
 
           <div className="mt-6 flex justify-between">
             <Button variant="outline" onClick={() => navigate("/processos")}>Cancelar</Button>
-            <Button onClick={applyToForm}>
+            <Button onClick={() => applyToForm("manual")}>
               Aplicar no Formulário <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>

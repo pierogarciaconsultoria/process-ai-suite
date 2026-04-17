@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Eye, Pencil } from "lucide-react";
+import { processos as mockProcessos } from "@/data/mock-processos";
+import { demoProcessoForm } from "@/data/processo-form-types";
 type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado";
 type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
 type Processo = {
@@ -41,7 +43,7 @@ const Processos = () => {
   const [statusFilter, setStatusFilter] = useState<Status | "all" | "">("");
   const navigate = useNavigate();
 
-  const [lista] = useState<Processo[]>([]);
+  const [lista] = useState<Processo[]>(mockProcessos);
   const areas = useMemo(
     () => Array.from(new Set(lista.map((p) => p.area).filter((a) => a && a.trim().length > 0))),
     [lista],
@@ -76,6 +78,9 @@ const Processos = () => {
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate("/processos/novo", { state: { formPrefill: demoProcessoForm } })}>
+            Ver exemplo na prática
+          </Button>
           <Button onClick={() => navigate("/processos/entrevista")}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Processo

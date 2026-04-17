@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Building2, Users, User, KeyRound, MessageSquare, Sparkles } from "lucide-react";
+import { Building2, Users, User, KeyRound, MessageSquare, Sparkles, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Configuracoes = () => {
@@ -90,8 +89,19 @@ const Configuracoes = () => {
             <p className="text-sm text-muted-foreground">Personalize o nome e o estilo do assistente</p>
           </CardContent>
         </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/documentacao-processo")}>
+          <CardHeader className="flex-row items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <FileText className="h-5 w-5 text-secondary-foreground" />
+            </div>
+            <CardTitle>Documentação do Processo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Defina o modelo texto/anexo da documentação dos processos</p>
+          </CardContent>
+        </Card>
       </div>
- 
+
     </div>
   );
 };
