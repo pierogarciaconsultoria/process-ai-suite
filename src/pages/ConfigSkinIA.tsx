@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_SKIN = {
-  nome: "Assistente de Mapeamento",
-  tom: "humano e didático",
-  estilo: "profissional"
+  nome: "Peter",
+  tom: "descontraído e ágil",
+  estilo: "entusiasmado"
 };
 
 const ConfigSkinIA = () => {

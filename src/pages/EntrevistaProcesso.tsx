@@ -45,6 +45,7 @@ export default function EntrevistaProcesso() {
     const startInterview = async () => {
       setLoading(true);
       try {
+        const greeting = "Oi, eu sou o Peter, seu assistente de IA aqui da plataforma. Vou te ajudar, de forma leve, a mapear este processo passo a passo. Ao longo da conversa vou pedir também alguns dados de identificação, como nome do processo, área, dono, status, criticidade e data, combinado?";
         const customScript = localStorage.getItem("process:routeScript");
         const aiSkin = localStorage.getItem("process:aiSkin");
         const { data, error } = await supabase.functions.invoke("ai-interview", {
@@ -56,16 +57,27 @@ export default function EntrevistaProcesso() {
           },
         });
         if (!error && data?.nextQuestion) {
-          setMessages([{ role: "assistant", content: data.nextQuestion }]);
+          setMessages([
+            { role: "assistant", content: greeting },
+            { role: "assistant", content: data.nextQuestion },
+          ]);
         } else {
           // Fallback caso a API falhe no início
-          setMessages([{ 
-            role: "assistant", 
-            content: "Olá! Sou seu assistente de mapeamento. Para começarmos, qual o nome do processo que vamos analisar hoje?" 
-          }]);
+          setMessages([
+            {
+              role: "assistant",
+              content: `${greeting}\n\nPara começarmos, qual o nome do processo que vamos analisar hoje?`,
+            },
+          ]);
         }
       } catch (e) {
-        setMessages([{ role: "assistant", content: "Olá! Vamos iniciar o mapeamento. Qual é o objetivo do seu processo?" }]);
+        const greeting = "Oi, eu sou o Peter, seu assistente de IA aqui da plataforma. Vou te ajudar, de forma leve, a mapear este processo passo a passo. Ao longo da conversa vou pedir também alguns dados de identificação, como nome do processo, área, dono, status, criticidade e data, combinado?";
+        setMessages([
+          {
+            role: "assistant",
+            content: `${greeting}\n\nVamos iniciar o mapeamento. Qual é o objetivo principal deste processo?`,
+          },
+        ]);
       } finally {
         setLoading(false);
       }

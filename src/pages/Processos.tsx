@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Sparkles } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Eye, Pencil } from "lucide-react";
 type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado";
 type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
 type Processo = {
@@ -34,18 +36,37 @@ const criticidadeColors: Record<string, string> = {
 
 const Processos = () => {
   const [search, setSearch] = useState("");
+  const [areaFilter, setAreaFilter] = useState<string>("");
+  const [responsavelFilter, setResponsavelFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<Status | "all" | "">("");
   const navigate = useNavigate();
 
   const [lista] = useState<Processo[]>([]);
-  const filtered = useMemo(
-    () =>
-      lista.filter(
-        (p) =>
-          p.nome.toLowerCase().includes(search.toLowerCase()) ||
-          p.area.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [lista, search],
+  const areas = useMemo(
+    () => Array.from(new Set(lista.map((p) => p.area).filter((a) => a && a.trim().length > 0))),
+    [lista],
   );
+  const responsaveis = useMemo(
+    () => Array.from(new Set(lista.map((p) => p.responsavel).filter((r) => r && r.trim().length > 0))),
+    [lista],
+  );
+  const filtered = useMemo(() => {
+    const term = search.toLowerCase();
+    return lista.filter((p) => {
+      if (
+        term &&
+        !p.nome.toLowerCase().includes(term) &&
+        !p.area.toLowerCase().includes(term) &&
+        !p.responsavel.toLowerCase().includes(term)
+      ) {
+        return false;
+      }
+      if (areaFilter && areaFilter !== "all" && p.area !== areaFilter) return false;
+      if (responsavelFilter && responsavelFilter !== "all" && p.responsavel !== responsavelFilter) return false;
+      if (statusFilter && statusFilter !== "all" && p.status !== statusFilter) return false;
+      return true;
+    });
+  }, [lista, search, areaFilter, responsavelFilter, statusFilter]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -64,14 +85,65 @@ const Processos = () => {
 
       <Card>
         <CardHeader>
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar processo..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="relative max-w-sm w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar processo..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Área</Label>
+                <Select value={areaFilter} onValueChange={setAreaFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {areas.map((area) => (
+                      <SelectItem key={area} value={area}>
+                        {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Responsável</Label>
+                <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {responsaveis.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as Status | "all" | "")}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="Novo">Novo</SelectItem>
+                    <SelectItem value="Mapeado">Mapeado</SelectItem>
+                    <SelectItem value="Em Análise">Em Análise</SelectItem>
+                    <SelectItem value="Documentado">Documentado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -80,7 +152,7 @@ const Processos = () => {
               <TableRow>
                 <TableHead>Processo</TableHead>
                 <TableHead>Área</TableHead>
-                <TableHead>Responsável</TableHead>
+                <TableHead>Dono do Processo</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criticidade</TableHead>
                 <TableHead>Data</TableHead>

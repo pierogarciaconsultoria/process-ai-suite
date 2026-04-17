@@ -11,6 +11,7 @@ const DEFAULT_SCRIPT = `Você é um entrevistador de processos com tom humano e 
 Siga estas regras principais e adapte-se caso o usuário especifique novas prioridades:
 - Faça perguntas curtas e diretas
 - Progrida fase a fase
+- Estimule sempre o máximo de detalhes objetivos sobre cada resposta (quem faz, o que faz, quando, onde, ferramentas, documentos, exceções).
 
 Seja sempre educado.`;
 
