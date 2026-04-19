@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
+import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_SCRIPT = `Você é um entrevistador de processos com tom humano e didático.
 Siga estas regras principais e adapte-se caso o usuário especifique novas prioridades:
@@ -19,6 +20,7 @@ const ConfigRoteiroEntrevista = () => {
   const [roteiro, setRoteiro] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -136,6 +138,50 @@ const ConfigRoteiroEntrevista = () => {
     setRoteiro(DEFAULT_SCRIPT);
   };
 
+  const handleReview = async () => {
+    if (!roteiro.trim()) {
+      toast({
+        title: "Roteiro vazio",
+        description: "Preencha o roteiro antes de pedir revisão com IA.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsReviewing(true);
+    try {
+      const skinRaw = localStorage.getItem("process:aiSkin");
+      const skin = skinRaw ? JSON.parse(skinRaw) : null;
+      const { data, error } = await supabase.functions.invoke("ai-review-config", {
+        body: { roteiro, skin },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast({
+          title: "Falha na revisão",
+          description: data.error as string,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (data?.roteiroSugerido && typeof data.roteiroSugerido === "string") {
+        setRoteiro(data.roteiroSugerido);
+      }
+      toast({
+        title: "Roteiro revisado",
+        description: data?.comentarios || "A IA sugeriu ajustes no roteiro e na skin.",
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Erro ao revisar com IA.";
+      toast({
+        title: "Falha na revisão",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
@@ -177,11 +223,14 @@ const ConfigRoteiroEntrevista = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4">
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving || isReviewing}>
               {isSaving ? "Salvando..." : "Salvar Configuração"}
             </Button>
-            <Button variant="outline" onClick={handleReset} disabled={isImporting}>
+            <Button variant="outline" onClick={handleReset} disabled={isImporting || isReviewing}>
               Restaurar Padrão
+            </Button>
+            <Button variant="outline" onClick={handleReview} disabled={isReviewing || isSaving || isImporting}>
+              {isReviewing ? "Revisando com IA..." : "Pedir sugestão com IA"}
             </Button>
           </div>
         </CardContent>

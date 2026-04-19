@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_SKIN = {
   nome: "Peter",
@@ -15,6 +16,7 @@ const DEFAULT_SKIN = {
 const ConfigSkinIA = () => {
   const [skin, setSkin] = useState(DEFAULT_SKIN);
   const [isSaving, setIsSaving] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,6 +46,42 @@ const ConfigSkinIA = () => {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleReview = async () => {
+    setIsReviewing(true);
+    try {
+      const roteiro = localStorage.getItem("process:routeScript") || "";
+      const { data, error } = await supabase.functions.invoke("ai-review-config", {
+        body: { roteiro, skin },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast({
+          title: "Falha na revisão",
+          description: data.error as string,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (data?.skinSugerida && typeof data.skinSugerida === "object") {
+        setSkin(data.skinSugerida);
+        localStorage.setItem("process:aiSkin", JSON.stringify(data.skinSugerida));
+      }
+      toast({
+        title: "Skin revisada",
+        description: data?.comentarios || "A IA sugeriu ajustes na identidade do assistente.",
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Erro ao revisar com IA.";
+      toast({
+        title: "Falha na revisão",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsReviewing(false);
     }
   };
 
@@ -106,11 +144,14 @@ const ConfigSkinIA = () => {
           </div>
 
           <div className="flex items-center gap-2 mt-6">
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving || isReviewing}>
               {isSaving ? "Salvando..." : "Salvar Configuração"}
             </Button>
-            <Button variant="outline" onClick={() => setSkin(DEFAULT_SKIN)}>
+            <Button variant="outline" onClick={() => setSkin(DEFAULT_SKIN)} disabled={isReviewing}>
               Restaurar Padrão
+            </Button>
+            <Button variant="outline" onClick={handleReview} disabled={isReviewing || isSaving}>
+              {isReviewing ? "Revisando com IA..." : "Pedir sugestão com IA"}
             </Button>
           </div>
         </CardContent>
