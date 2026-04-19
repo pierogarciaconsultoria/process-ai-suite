@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.ai-review-config]
 verify_jwt = false
+
+[functions.ai-summarize-process]
+verify_jwt = false

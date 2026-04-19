@@ -12,11 +12,25 @@ serve(async (req) => {
   }
 
   try {
-    const { etapas, decisoes, gatilho, entradas, saidas, nomeProcesso, mode, sugestoes, automacao } = await req.json();
+    const {
+      etapas,
+      decisoes,
+      gatilho,
+      entradas,
+      saidas,
+      nomeProcesso,
+      mode,
+      sugestoes,
+      automacao,
+      resumo,
+    } = await req.json();
 
-    if (!etapas || !Array.isArray(etapas) || etapas.length === 0) {
+    const hasEtapas = Array.isArray(etapas) && etapas.length > 0;
+    const hasResumo = typeof resumo === "string" && resumo.trim().length > 0;
+
+    if (!hasEtapas && !hasResumo) {
       return new Response(
-        JSON.stringify({ error: "Preencha pelo menos uma atividade antes de gerar o mapa." }),
+        JSON.stringify({ error: "Preencha pelo menos uma atividade ou um resumo textual antes de gerar o mapa." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -24,9 +38,16 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const etapasText = etapas
-      .map((e: any, i: number) => `${i + 1}. ${e.atividade} (Responsável: ${e.responsavel || "N/A"}, Ferramenta: ${e.ferramentaDocumento || "N/A"})`)
-      .join("\n");
+    const etapasText = hasEtapas
+      ? etapas
+          .map(
+            (e: any, i: number) =>
+              `${i + 1}. ${e.atividade} (Responsável: ${e.responsavel || "N/A"}, Ferramenta: ${
+                e.ferramentaDocumento || "N/A"
+              })`
+          )
+          .join("\n")
+      : "Nenhuma atividade estruturada informada.";
 
     const entradasText = entradas?.map((e: any) => `${e.fornecedor} → ${e.entrada}`).join(", ") || "N/A";
     const saidasText = saidas?.map((s: any) => `${s.saida} → ${s.cliente}`).join(", ") || "N/A";
@@ -56,6 +77,9 @@ Gatilho: ${gatilho || "N/A"}
 Entradas: ${entradasText}
 Decisões: ${decisoes || "Nenhuma"}
 Saídas: ${saidasText}
+
+Resumo textual (se fornecido):
+${hasResumo ? resumo : "N/A"}
 
 Atividades:
 ${etapasText}
