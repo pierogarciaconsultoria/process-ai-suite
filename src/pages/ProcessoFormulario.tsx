@@ -344,7 +344,7 @@ const ProcessoFormulario = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      navigate("/processos/novo/diagnostico", { state: { diagnostico: data } });
+      navigate("/processos/novo/diagnostico", { state: { diagnostico: data, processo: form } });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Tente novamente.";
       console.error("Diagnose error:", err);
