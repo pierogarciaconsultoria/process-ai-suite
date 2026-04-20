@@ -379,7 +379,7 @@ export default function EntrevistaProcesso() {
       saveSession(reason);
       localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
     } catch (e) { void e; }
-    navigate("/processos/novo", { state: { formPrefill: form, fromInterview: true } });
+    navigate("/processos/diagnostico", { state: {} });
   };
 
   const extractFromPdf = async (file: File): Promise<string> => {

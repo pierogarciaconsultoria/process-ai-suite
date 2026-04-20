@@ -1,11 +1,14 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, TrendingUp, Target, BarChart3, Lightbulb, ClipboardList, Activity, Printer } from "lucide-react";
-import type { DiagnosticoResult } from "@/data/processo-form-types";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, TrendingUp, Target, BarChart3, Lightbulb, ClipboardList, Activity, Printer, Trash2 } from "lucide-react";
+import type { DiagnosticoResult, MelhoriaToBe } from "@/data/processo-form-types";
 
 const severidadeBadge = (s: string) => {
   switch (s) {
@@ -43,25 +46,59 @@ const ProcessoDiagnostico = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const diagnostico = location.state?.diagnostico as DiagnosticoResult | undefined;
+  const [localDiag, setLocalDiag] = useState<DiagnosticoResult | undefined>(diagnostico);
 
-  if (!diagnostico) {
+  if (!localDiag) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Diagnóstico do Processo</h1>
+            <p className="text-muted-foreground">
+              A entrevista foi concluída (ou ainda não há diagnóstico salvo). Escolha o próximo passo para continuar o trabalho com este processo.
+            </p>
+          </div>
           <Button variant="outline" onClick={() => navigate("/processos")}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
           </Button>
         </div>
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhum diagnóstico disponível. Gere um diagnóstico a partir do formulário de processo.
+          <CardHeader>
+            <CardTitle>Próximas ações</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Você pode gerar o mapa AS-IS, pedir um diagnóstico completo ou abrir os detalhes avançados do formulário do processo.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                className="flex-1"
+                onClick={() => navigate("/processos/novo", { state: { focusTab: "mapa-as-is" } })}
+              >
+                <ClipboardList className="h-4 w-4 mr-2" /> Gerar/atualizar mapa AS-IS
+              </Button>
+              <Button
+                className="flex-1"
+                variant="outline"
+                onClick={() => navigate("/processos/novo", { state: { focusTab: "relatorio" } })}
+              >
+                <Activity className="h-4 w-4 mr-2" /> Gerar diagnóstico
+              </Button>
+              <Button
+                className="flex-1"
+                variant="outline"
+                onClick={() => navigate("/processos/novo", { state: { focusTab: "identificacao" } })}
+              >
+                <Target className="h-4 w-4 mr-2" /> Ver detalhes avançados do processo
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const { fase1, fase2, fase3, fase4, fase5, fase6, analiseFinal } = diagnostico;
+  const { fase1, fase2, fase3, fase4, fase5, fase6, analiseFinal } = localDiag;
   const nivelRaw = fase3.nivelMaturidade;
   const nivel0a4 = (nivelRaw >= 1 && nivelRaw <= 5) ? nivelRaw - 1 : Math.max(0, Math.min(4, nivelRaw));
   const classificacaoFaixa =
@@ -241,6 +278,32 @@ const ProcessoDiagnostico = () => {
               <p className="font-semibold text-foreground">{fase4.potencialAutomacao}</p>
             </div>
           </div>
+          <div className="flex justify-between items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              Revise ou ajuste as melhorias sugeridas pela IA antes de construir o plano de ação.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setLocalDiag((prev) => {
+                  if (!prev) return prev;
+                  const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                  next.fase4.melhorias.push({
+                    problemaIdentificado: "",
+                    solucaoProposta: "",
+                    tipoTecnologia: "Workflow",
+                    impactoEsperado: "",
+                    complexidade: "Baixa",
+                    prioridade: "Media",
+                  });
+                  return next;
+                });
+              }}
+            >
+              Adicionar melhoria
+            </Button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -250,17 +313,135 @@ const ProcessoDiagnostico = () => {
                 <TableHead>Impacto</TableHead>
                 <TableHead>Complexidade</TableHead>
                 <TableHead>Prioridade</TableHead>
+                <TableHead className="w-[60px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {fase4.melhorias.map((m, i) => (
                 <TableRow key={i}>
-                  <TableCell className="text-sm">{m.problemaIdentificado}</TableCell>
-                  <TableCell className="text-sm">{m.solucaoProposta}</TableCell>
-                  <TableCell><Badge variant="outline">{m.tipoTecnologia}</Badge></TableCell>
-                  <TableCell className="text-sm">{m.impactoEsperado}</TableCell>
-                  <TableCell><Badge variant="secondary">{m.complexidade}</Badge></TableCell>
-                  <TableCell>{prioridadeBadge(m.prioridade)}</TableCell>
+                  <TableCell className="text-sm align-top">
+                    <Input
+                      value={m.problemaIdentificado}
+                      onChange={(e) =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias[i] = { ...next.fase4.melhorias[i], problemaIdentificado: e.target.value };
+                          return next;
+                        })
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="text-sm align-top">
+                    <Input
+                      value={m.solucaoProposta}
+                      onChange={(e) =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias[i] = { ...next.fase4.melhorias[i], solucaoProposta: e.target.value };
+                          return next;
+                        })
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <Select
+                      value={m.tipoTecnologia}
+                      onValueChange={(value) =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias[i] = { ...next.fase4.melhorias[i], tipoTecnologia: value as MelhoriaToBe["tipoTecnologia"] };
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Processo">Processo</SelectItem>
+                        <SelectItem value="Workflow">Workflow</SelectItem>
+                        <SelectItem value="Automação">Automação</SelectItem>
+                        <SelectItem value="Integração">Integração</SelectItem>
+                        <SelectItem value="IA">IA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-sm align-top">
+                    <Input
+                      value={m.impactoEsperado}
+                      onChange={(e) =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias[i] = { ...next.fase4.melhorias[i], impactoEsperado: e.target.value };
+                          return next;
+                        })
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <Select
+                      value={m.complexidade}
+                      onValueChange={(value) =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias[i] = { ...next.fase4.melhorias[i], complexidade: value as MelhoriaToBe["complexidade"] };
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Baixa">Baixa</SelectItem>
+                        <SelectItem value="Média">Média</SelectItem>
+                        <SelectItem value="Alta">Alta</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <Select
+                      value={m.prioridade}
+                      onValueChange={(value) =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias[i] = { ...next.fase4.melhorias[i], prioridade: value as MelhoriaToBe["prioridade"] };
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Alta">Alta</SelectItem>
+                        <SelectItem value="Media">Média</SelectItem>
+                        <SelectItem value="Baixa">Baixa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-right align-top">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        setLocalDiag((prev) => {
+                          if (!prev) return prev;
+                          const next = { ...prev, fase4: { ...prev.fase4, melhorias: [...prev.fase4.melhorias] } };
+                          next.fase4.melhorias.splice(i, 1);
+                          return next;
+                        })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

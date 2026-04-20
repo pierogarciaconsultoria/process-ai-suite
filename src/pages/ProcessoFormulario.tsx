@@ -134,13 +134,21 @@ const ProcessoFormulario = () => {
   const [autoSummarizePending, setAutoSummarizePending] = useState(false);
 
   useEffect(() => {
-    type PrefillState = { formPrefill?: ProcessoFormData; fromInterview?: boolean } | null;
+    type PrefillState = { formPrefill?: ProcessoFormData; fromInterview?: boolean; focusTab?: string } | null;
     const state = location.state as PrefillState;
     const pre = state?.formPrefill;
+
+    const resolveInitialTab = () => {
+      if (state?.focusTab && ALL_TABS.includes(state.focusTab)) return state.focusTab;
+      if (!isEditing && state?.fromInterview) return "resumo";
+      return "identificacao";
+    };
+
     if (pre) {
       setForm(pre);
-      if (!isEditing && state?.fromInterview) {
-        setActiveTab("resumo");
+      const initialTab = resolveInitialTab();
+      setActiveTab(initialTab);
+      if (!isEditing && initialTab === "resumo") {
         setAutoSummarizePending(true);
       }
     } else {
@@ -150,14 +158,15 @@ const ProcessoFormulario = () => {
           const parsed = JSON.parse(raw) as ProcessoFormData;
           setForm(parsed);
           localStorage.removeItem("process:formPrefill");
-          if (!isEditing) {
-            setActiveTab("resumo");
+          const initialTab = resolveInitialTab();
+          setActiveTab(initialTab);
+          if (!isEditing && initialTab === "resumo") {
             setAutoSummarizePending(true);
           }
         }
       } catch (e) { void e; }
     }
-  }, [location.state]);
+  }, [location.state, isEditing]);
 
   useEffect(() => {
     if (!autoSummarizePending) return;
