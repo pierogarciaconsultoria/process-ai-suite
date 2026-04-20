@@ -535,20 +535,6 @@ export default function EntrevistaProcesso() {
             ))}
           </div>
 
-          <div className="mt-4 space-y-2">
-            <Label>Anexo para análise (PDF, DOCX, JPG/PNG)</Label>
-            <Input
-              type="file"
-              accept=".pdf,.docx,image/*"
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                if (f) void analyzeFile(f);
-                e.currentTarget.value = "";
-              }}
-              disabled={loading}
-            />
-          </div>
-
           <div className="mt-4 flex gap-2">
             <Input
               placeholder="Digite sua resposta…"
@@ -566,6 +552,20 @@ export default function EntrevistaProcesso() {
                 Enviar <Send className="h-4 w-4 ml-2" />
               </>}
             </Button>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <Label>Anexo para análise (PDF, DOCX, JPG/PNG)</Label>
+            <Input
+              type="file"
+              accept=".pdf,.docx,image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                if (f) void analyzeFile(f);
+                e.currentTarget.value = "";
+              }}
+              disabled={loading}
+            />
           </div>
 
           <div className="mt-6 flex justify-between">
