@@ -54,7 +54,7 @@ export default function Index() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#004444]">
             <button onClick={() => scrollTo("diagnostico")} className="hover:text-[#006B6B] transition-colors">Diagnóstico</button>
             <button onClick={() => scrollTo("solucao")} className="hover:text-[#006B6B] transition-colors">Solução</button>
-            <button onClick={() => scrollTo("como-funciona")} className="hover:text-[#006B6B] transition-colors">Como funciona</button>
+            <button onClick={() => scrollTo("como-funciona")} className="hover:text-[#006B6B] transition-colors">Fluxo</button>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -106,11 +106,11 @@ export default function Index() {
 
           {/* Headline */}
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.05]">
-            Sua empresa não está travada
-            <br />por falta de esforço.
+            Mapeie processos com IA,
+            <br />gere diagnóstico AS IS,
             <br />
             <span className="relative inline-block mt-2">
-              <span className="text-[#006B6B]">Está travada por falta de processo.</span>
+              <span className="text-[#006B6B]">desenhe TO BE e execute com clareza.</span>
               <svg className="absolute -bottom-2 left-0 w-full" height="8" viewBox="0 0 100 8" preserveAspectRatio="none">
                 <path d="M0 7 Q50 1 100 7" stroke="#006B6B" strokeWidth="2" fill="none" opacity="0.4" />
               </svg>
@@ -119,18 +119,18 @@ export default function Index() {
 
           {/* Subheadline */}
           <p className="text-xl md:text-2xl text-[#004444]/70 max-w-3xl mx-auto leading-relaxed">
-            Organize, padronize e escale sua operação com a IA que elimina o retrabalho,{" "}
-            <strong className="text-[#006B6B] font-semibold">mapeia seu negócio em minutos</strong> e devolve o seu tempo.
+            Conduza entrevistas guiadas, consolide o detalhamento do processo em texto único, gere mapa BPMN AS IS/TO BE
+            e publique relatórios acionáveis para cada empresa/workspace.
           </p>
 
           {/* Feature cards horizontais abaixo da headline */}
           <div className="w-full overflow-x-auto pb-1 -mb-1">
             <div className="flex gap-3 pt-4 min-w-max mx-auto md:min-w-0 md:grid md:grid-cols-4">
               {[
-                { icon: <Bot className="h-5 w-5" />, title: "Entrevista por IA", desc: "Mapeia via conversa" },
-                { icon: <FileText className="h-5 w-5" />, title: "Padronização", desc: "Manuais automáticos" },
-                { icon: <BarChart3 className="h-5 w-5" />, title: "Diagnóstico", desc: "Gargalos em segundos" },
-                { icon: <Shield className="h-5 w-5" />, title: "Plano de Ação", desc: "5W2H automático" },
+                { icon: <Bot className="h-5 w-5" />, title: "Entrevista por IA", desc: "Coleta guiada e humanizada" },
+                { icon: <FileText className="h-5 w-5" />, title: "Resumo do Processo", desc: "Texto contínuo editável" },
+                { icon: <BarChart3 className="h-5 w-5" />, title: "Diagnóstico AS IS", desc: "Dores e maturidade" },
+                { icon: <Shield className="h-5 w-5" />, title: "TO BE + Relatório", desc: "Ações priorizadas" },
               ].map((card, i) => (
                 <div
                   key={i}
@@ -155,7 +155,7 @@ export default function Index() {
               className="h-14 px-10 text-base font-semibold w-full sm:w-auto bg-[#006B6B] hover:bg-[#005555] text-white shadow-xl shadow-[#006B6B]/20 hover:shadow-2xl hover:shadow-[#006B6B]/30 transition-all duration-300 hover:-translate-y-0.5"
               onClick={() => navigate("/dashboard")}
             >
-              Organizar minha operação agora
+            Iniciar meu mapeamento
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button
@@ -171,7 +171,7 @@ export default function Index() {
 
           {/* Trust indicator */}
           <p className="text-sm text-[#004444]/50 pt-2">
-            ✦ Sem cartão de crédito · Diagnóstico gratuito · Setup em minutos
+            ✦ Fluxo completo: Entrevista → AS IS → TO BE → Relatório
           </p>
         </div>
 
@@ -188,10 +188,10 @@ export default function Index() {
       <section id="stats" className="bg-[#006B6B] py-12 px-6">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-white text-center">
           {[
-            { value: "40%", label: "Redução de retrabalho", icon: <TrendingUp className="h-5 w-5" /> },
-            { value: "3×", label: "Mais velocidade de escala", icon: <Zap className="h-5 w-5" /> },
-            { value: "2 min", label: "Para o 1° diagnóstico", icon: <Clock className="h-5 w-5" /> },
-            { value: "100%", label: "Orientado a resultado", icon: <Star className="h-5 w-5" /> },
+            { value: "5 etapas", label: "Fluxo guiado completo", icon: <TrendingUp className="h-5 w-5" /> },
+            { value: "AS IS + TO BE", label: "Mapeamento de ponta a ponta", icon: <Zap className="h-5 w-5" /> },
+            { value: "BPMN", label: "Diagrama com IA", icon: <Clock className="h-5 w-5" /> },
+            { value: "Workspace", label: "Operação por empresa", icon: <Star className="h-5 w-5" /> },
           ].map((stat) => (
             <div key={stat.label} className="space-y-1">
               <div className="flex items-center justify-center gap-1.5 text-white/60 text-xs font-medium uppercase tracking-wider mb-2">
@@ -209,10 +209,11 @@ export default function Index() {
           <div className="text-center space-y-4 max-w-3xl mx-auto">
             <p className="text-[#006B6B] font-semibold text-sm uppercase tracking-widest">O Diagnóstico</p>
             <h2 className="text-4xl md:text-5xl font-bold text-[#002B2B]">
-              O problema não é visível. Mas o impacto é.
+              Diagnóstico claro para decisões rápidas.
             </h2>
             <p className="text-lg text-[#004444]/70 leading-relaxed">
-              Sua equipe trabalha muito, mas produz pouco. Você cresce, mas a operação se torna um caos. Sem perceber, <strong>você virou o gargalo da própria empresa.</strong>
+              A ProcessAI Suite transforma entrevistas em diagnóstico estruturado, mostra gargalos reais e organiza melhorias
+              em um roteiro prático de execução.
             </p>
           </div>
 
@@ -223,16 +224,16 @@ export default function Index() {
                 <AlertTriangle className="h-3 w-3" /> Auto-diagnóstico
               </div>
               <h3 className="text-lg font-semibold mb-6 text-white/90">
-                Identifica 2 ou mais dos itens abaixo? Seu problema é processo — não equipe.
+                A plataforma identifica automaticamente os pontos de atenção do processo, com base em dados da entrevista e análise AS IS.
               </h3>
               <div className="grid sm:grid-cols-2 gap-4">
                 {[
-                  "Falhas operacionais frequentes",
+                  "Gargalos operacionais e retrabalho",
                   "Dependência de pessoas-chave",
-                  "Zero padrão nas entregas",
-                  "Retrabalho que corrói o lucro",
-                  "Tentativa dolorosa de escalar",
-                  "Incêndios diários na operação",
+                  "Falta de padrão nas entregas",
+                  "Riscos e baixa maturidade de processo",
+                  "Dificuldade em escalar com previsibilidade",
+                  "Falta de plano de melhoria priorizado",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-3 transition-colors cursor-pointer">
                     <div className="h-5 w-5 rounded border border-white/30 flex-shrink-0" />
@@ -242,7 +243,7 @@ export default function Index() {
               </div>
               <div className="mt-8 pt-6 border-t border-white/10 text-center">
                 <p className="text-white/60 text-sm italic">
-                  "Gargalos operacionais nunca são óbvios — mas sempre custam caro."
+                  "Entrevista guiada, diagnóstico acionável e melhoria contínua em um fluxo único."
                 </p>
               </div>
             </div>
@@ -256,19 +257,19 @@ export default function Index() {
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <p className="text-[#006B6B] font-semibold text-sm uppercase tracking-widest">A Solução</p>
             <h2 className="text-4xl md:text-5xl font-bold text-[#002B2B]">
-              Gestão BPM combinada com IA
+              Funcionalidades da ProcessAI Suite
             </h2>
             <p className="text-lg text-[#004444]/70">
-              O ProcessAI Suite não é só mais uma ferramenta de tarefas. É o motor inteligente que transforma operações desorganizadas em sistemas previsíveis e escaláveis — <strong>sem que você precise desenhar fluxogramas do zero.</strong>
+              Da entrevista ao relatório final, a suíte organiza o ciclo completo de melhoria de processos por empresa, com governança e rastreabilidade.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: <Bot className="h-6 w-6" />, title: "Entrevista por IA", desc: "O sistema extrai suas rotinas via conversa guiada e inteligente. Sem formulários chatos." },
-              { icon: <FileText className="h-6 w-6" />, title: "Padronização Imediata", desc: "Manuais, etapas e procedimentos documentados e prontos para sua equipe executar." },
-              { icon: <BarChart3 className="h-6 w-6" />, title: "Visão Clínica", desc: "Diagnósticos automáticos apontam onde estão os gargalos que estão corroendo sua margem." },
-              { icon: <Shield className="h-6 w-6" />, title: "Ação Imediata", desc: "Planos de ação 5W2H gerados sob medida para alavancar a eficiência contínua." },
+              { icon: <Bot className="h-6 w-6" />, title: "Entrevista Guiada por IA", desc: "Peter conduz a coleta e transforma respostas em estrutura de processo." },
+              { icon: <FileText className="h-6 w-6" />, title: "Detalhamento Textual", desc: "Resumo único e editável para facilitar validação com o time e liderança." },
+              { icon: <BarChart3 className="h-6 w-6" />, title: "Diagnóstico AS IS", desc: "Maturidade, gargalos, riscos e oportunidades priorizadas automaticamente." },
+              { icon: <Shield className="h-6 w-6" />, title: "TO BE e Relatório", desc: "Plano de ação 5W2H, indicadores e relatório executivo em sequência lógica." },
             ].map((card, i) => (
               <div
                 key={i}
@@ -342,14 +343,15 @@ export default function Index() {
         <div className="max-w-6xl mx-auto space-y-16">
           <div className="text-center space-y-4">
             <p className="text-[#006B6B] font-semibold text-sm uppercase tracking-widest">O Processo</p>
-            <h2 className="text-4xl md:text-5xl font-bold text-[#002B2B]">Organizar a casa nunca foi tão rápido.</h2>
+            <h2 className="text-4xl md:text-5xl font-bold text-[#002B2B]">Fluxo da plataforma em 5 etapas</h2>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8">
             {[
-              { icon: <Bot className="h-6 w-6" />, title: "A IA Te Entrevista", desc: "Perguntas cirúrgicas que capturam o DNA da sua operação numa conversa natural." },
-              { icon: <BarChart3 className="h-6 w-6" />, title: "Diagnóstico Automático", desc: "Falhas, riscos e nível de maturidade identificados em segundos." },
-              { icon: <FileText className="h-6 w-6" />, title: "Receita de Execução", desc: "Plano de ação pronto e estruturado para implementar imediatamente." },
-              { icon: <TrendingUp className="h-6 w-6" />, title: "Evolução Contínua", desc: "Empresa padronizada, documentada e pronta para escalar sem travar." },
+              { icon: <Bot className="h-6 w-6" />, title: "1) Entrevista", desc: "Coleta guiada dos dados do processo e dos responsáveis de cada atividade." },
+              { icon: <BarChart3 className="h-6 w-6" />, title: "2) Diagnóstico AS IS", desc: "Consolidação textual + análise de dores, riscos e maturidade atual." },
+              { icon: <FileText className="h-6 w-6" />, title: "3) Processo TO BE", desc: "Definição de melhorias com prioridade, complexidade e impacto esperado." },
+              { icon: <Shield className="h-6 w-6" />, title: "4) BPMN AS IS/TO BE", desc: "Geração e atualização de diagrama para visualização e alinhamento do fluxo." },
+              { icon: <TrendingUp className="h-6 w-6" />, title: "5) Relatório Executivo", desc: "Plano 5W2H, indicadores e visão final para implementação e acompanhamento." },
             ].map((step, i) => (
               <div key={i} className="relative group">
                 <div className="text-[120px] font-black text-[#006B6B]/5 absolute -top-8 -left-2 leading-none select-none">
@@ -375,13 +377,13 @@ export default function Index() {
       <section className="py-24 px-6 bg-white">
         <div className="max-w-5xl mx-auto text-center space-y-8">
           <p className="text-[#006B6B] font-semibold text-sm uppercase tracking-widest">Resultados</p>
-          <h2 className="text-4xl font-bold text-[#002B2B]">Não é teoria. É operação funcionando.</h2>
-          <p className="text-[#004444]/70 max-w-xl mx-auto">Aplicado em empresas reais que precisavam organizar, reduzir falhas e ganhar produtividade.</p>
+          <h2 className="text-4xl font-bold text-[#002B2B]">Estrutura pronta para operação multiempresa.</h2>
+          <p className="text-[#004444]/70 max-w-xl mx-auto">Consultores podem atuar em workspaces separados por empresa, mantendo dados, processos e diagnósticos isolados por cliente.</p>
           <div className="grid sm:grid-cols-3 gap-6 mt-8">
             {[
-              { icon: <Users className="h-8 w-8" />, title: "Empresas atendidas", value: "50+" },
-              { icon: <Clock className="h-8 w-8" />, title: "Horas economizadas", value: "2.000+" },
-              { icon: <CheckCircle2 className="h-8 w-8" />, title: "Processos mapeados", value: "300+" },
+              { icon: <Users className="h-8 w-8" />, title: "Workspace por empresa", value: "Multiempresa" },
+              { icon: <Clock className="h-8 w-8" />, title: "Fluxo orientado", value: "Entrevista → AS IS → TO BE → Relatório" },
+              { icon: <CheckCircle2 className="h-8 w-8" />, title: "Rastreabilidade", value: "Sessões, diagnóstico e plano salvos por empresa" },
             ].map((stat) => (
               <div key={stat.title} className="bg-[#f0f7f7] rounded-2xl p-8 text-center border border-[#006B6B]/10">
                 <div className="text-[#006B6B] mb-3 flex justify-center">{stat.icon}</div>
@@ -390,8 +392,8 @@ export default function Index() {
               </div>
             ))}
           </div>
-          <div className="mt-10 border border-dashed border-[#006B6B]/30 rounded-2xl p-10 text-[#004444]/40 text-sm">
-            📸 Espaço reservado para inserir depoimentos, prints e cases de sucesso
+          <div className="mt-10 border border-dashed border-[#006B6B]/30 rounded-2xl p-10 text-[#004444]/50 text-sm">
+            Área preparada para inserir cases, depoimentos e indicadores reais da operação.
           </div>
         </div>
       </section>
