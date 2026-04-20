@@ -40,6 +40,15 @@ export default function EntrevistaProcesso() {
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
 
+  const steps = [
+    "Novo processo",
+    "Entrevista",
+    "Diagnóstico AS IS",
+    "Processo TO BE",
+    "Relatório",
+  ];
+  const currentStep = 1;
+
   // Inicia a conversa com a IA para garantir que o roteiro personalizado seja seguido desde o início
   useEffect(() => {
     const startInterview = async () => {
@@ -471,6 +480,34 @@ export default function EntrevistaProcesso() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {steps.map((step, index) => {
+              const isActive = index === currentStep;
+              const isDone = index < currentStep;
+              return (
+                <div key={step} className="flex items-center gap-2">
+                  <div
+                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : isDone
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <span className="font-semibold">{index + 1}</span>
+                    <span>{step}</span>
+                  </div>
+                  {index < steps.length - 1 && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Entrevista com IA</h1>

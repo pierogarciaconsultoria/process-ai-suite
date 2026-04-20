@@ -48,9 +48,45 @@ const ProcessoDiagnostico = () => {
   const diagnostico = location.state?.diagnostico as DiagnosticoResult | undefined;
   const [localDiag, setLocalDiag] = useState<DiagnosticoResult | undefined>(diagnostico);
 
+  const steps = [
+    "Novo processo",
+    "Entrevista",
+    "Diagnóstico AS IS",
+    "Processo TO BE",
+    "Relatório",
+  ];
+  const currentStep = 2;
+
   if (!localDiag) {
     return (
       <div className="space-y-6 animate-fade-in">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap items-center gap-2">
+              {steps.map((step, index) => {
+                const isActive = index === currentStep;
+                const isDone = index < currentStep;
+                return (
+                  <div key={step} className="flex items-center gap-2">
+                    <div
+                      className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : isDone
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <span className="font-semibold">{index + 1}</span>
+                      <span>{step}</span>
+                    </div>
+                    {index < steps.length - 1 && <Activity className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Diagnóstico do Processo</h1>
@@ -109,6 +145,34 @@ const ProcessoDiagnostico = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {steps.map((step, index) => {
+              const isActive = index === currentStep;
+              const isDone = index < currentStep;
+              return (
+                <div key={step} className="flex items-center gap-2">
+                  <div
+                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : isDone
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <span className="font-semibold">{index + 1}</span>
+                    <span>{step}</span>
+                  </div>
+                  {index < steps.length - 1 && <Activity className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Diagnóstico do Processo</h1>

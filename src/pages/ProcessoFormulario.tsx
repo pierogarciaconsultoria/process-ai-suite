@@ -133,6 +133,22 @@ const ProcessoFormulario = () => {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [autoSummarizePending, setAutoSummarizePending] = useState(false);
 
+  const globalSteps = [
+    "Novo processo",
+    "Entrevista",
+    "Diagnóstico AS IS",
+    "Processo TO BE",
+    "Relatório",
+  ];
+  const getCurrentGlobalStep = () => {
+    if (["melhorias", "planoAcao", "indicadores", "mapa-to-be"].includes(activeTab)) return 3;
+    if (activeTab === "relatorio") return 4;
+    if (["resumo", "identificacao", "contexto", "dores", "riscos", "maturidade", "entradas", "atividades", "saidas", "recursos", "decisoes", "sipoc", "mapa-as-is"].includes(activeTab)) {
+      return 2;
+    }
+    return 2;
+  };
+
   useEffect(() => {
     type PrefillState = { formPrefill?: ProcessoFormData; fromInterview?: boolean; focusTab?: string } | null;
     const state = location.state as PrefillState;
@@ -913,6 +929,35 @@ const ProcessoFormulario = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {globalSteps.map((step, index) => {
+              const current = getCurrentGlobalStep();
+              const isActive = index === current;
+              const isDone = index < current;
+              return (
+                <div key={step} className="flex items-center gap-2">
+                  <div
+                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : isDone
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <span className="font-semibold">{index + 1}</span>
+                    <span>{step}</span>
+                  </div>
+                  {index < globalSteps.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
