@@ -28,6 +28,7 @@ type InterviewResponse = {
   partialUpdate?: Partial<ProcessoFormData>;
   done?: boolean;
 };
+type InterviewStage = "askName" | "askDescription" | "aiFlow";
 
 export default function EntrevistaProcesso() {
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ export default function EntrevistaProcesso() {
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
+  const [stage, setStage] = useState<InterviewStage>("askName");
 
   const steps = [
     "Novo processo",
@@ -49,50 +51,15 @@ export default function EntrevistaProcesso() {
   ];
   const currentStep = 1;
 
-  // Inicia a conversa com a IA para garantir que o roteiro personalizado seja seguido desde o início
   useEffect(() => {
-    const startInterview = async () => {
-      setLoading(true);
-      try {
-        const greeting = "Oi, eu sou o Peter, seu assistente de IA aqui da plataforma. Vou te ajudar, de forma leve, a mapear este processo passo a passo. Ao longo da conversa vou pedir também alguns dados de identificação, como nome do processo, área, dono, status, criticidade e data, combinado?";
-        const customScript = localStorage.getItem("process:routeScript");
-        const aiSkin = localStorage.getItem("process:aiSkin");
-        const { data, error } = await supabase.functions.invoke("ai-interview", {
-          body: {
-            history: [],
-            current: emptyProcessoForm,
-            customScript: customScript || null,
-            aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
-          },
-        });
-        if (!error && data?.nextQuestion) {
-          setMessages([
-            { role: "assistant", content: greeting },
-            { role: "assistant", content: data.nextQuestion },
-          ]);
-        } else {
-          // Fallback caso a API falhe no início
-          setMessages([
-            {
-              role: "assistant",
-              content: `${greeting}\n\nPara começarmos, qual o nome do processo que vamos analisar hoje?`,
-            },
-          ]);
-        }
-      } catch (e) {
-        const greeting = "Oi, eu sou o Peter, seu assistente de IA aqui da plataforma. Vou te ajudar, de forma leve, a mapear este processo passo a passo. Ao longo da conversa vou pedir também alguns dados de identificação, como nome do processo, área, dono, status, criticidade e data, combinado?";
-        setMessages([
-          {
-            role: "assistant",
-            content: `${greeting}\n\nVamos iniciar o mapeamento. Qual é o objetivo principal deste processo?`,
-          },
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    startInterview();
+    const greeting =
+      "Oi, eu sou o Peter, seu assistente de IA aqui da plataforma. Vou te ajudar, de forma leve, a mapear este processo passo a passo. Ao longo da conversa vou pedir também alguns dados de identificação, como nome do processo, área, dono, status, criticidade e data, combinado?";
+    const firstQuestion =
+      "Para começarmos bem, qual o nome do processo que vamos analisar hoje?";
+    setMessages([
+      { role: "assistant", content: greeting },
+      { role: "assistant", content: firstQuestion },
+    ]);
   }, []);
   const saveSession = (reason: "auto" | "manual") => {
     try {
@@ -184,13 +151,77 @@ export default function EntrevistaProcesso() {
   }, [messages]);
 
   const send = async () => {
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    if (stage === "askName") {
+      const userMsg: ChatMessage = { role: "user", content: trimmed };
+      setForm((prev) => ({ ...prev, nomeProcesso: trimmed }));
+      setMessages((m) => [
+        ...m,
+        userMsg,
+        {
+          role: "assistant",
+          content:
+            `Perfeito, vamos trabalhar então o processo "${trimmed}". ` +
+            "Agora, para eu entender o cenário antes de fazer perguntas, descreva em um texto contínuo, com o máximo de detalhes que puder, como esse processo é realizado hoje na prática, incluindo: etapas principais na ordem em que acontecem, quem faz o quê (cargo ou área responsável), quais ferramentas, sistemas e documentos/planilhas são usados e qualquer variação ou exceção que aconteça com frequência. Quando terminar, é só enviar que eu leio tudo e faço perguntas pontuais, combinado?",
+        },
+      ]);
+      setInput("");
+      setStage("askDescription");
+      return;
+    }
+
+    if (stage === "askDescription") {
+      const userMsg: ChatMessage = { role: "user", content: trimmed };
+      setMessages((m) => [...m, userMsg]);
+      setInput("");
+      setStage("aiFlow");
+      setLoading(true);
+      try {
+        const customScript = localStorage.getItem("process:routeScript");
+        const aiSkin = localStorage.getItem("process:aiSkin");
+        const { data, error } = await supabase.functions.invoke("ai-interview", {
+          body: {
+            history: [...messages, userMsg],
+            current: form,
+            customScript: customScript || null,
+            aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+          },
+        });
+        const hasErrorField = (d: unknown): d is { error: string } =>
+          typeof d === "object" && d !== null && "error" in d;
+        if (error || hasErrorField(data)) {
+          const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
+          handleFallback(userMsg.content, detail);
+          return;
+        }
+        const resp = data as InterviewResponse;
+        if (resp.partialUpdate) {
+          setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
+        }
+        if (resp.done) {
+          applyToForm("manual");
+        } else if (resp.nextQuestion) {
+          setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
+        } else {
+          handleFallback(userMsg.content, "Resposta incompleta da IA");
+        }
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : "Erro desconhecido";
+        handleFallback(userMsg.content, detail);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (requestApply && isApplyCommand(input.trim())) {
       setRequestApply(false);
       applyToForm("manual");
       return;
     }
-    const userMsg: ChatMessage = { role: "user", content: input.trim() };
+    const userMsg: ChatMessage = { role: "user", content: trimmed };
     setMessages((m) => [...m, userMsg]);
     setInput("");
     setLoading(true);
