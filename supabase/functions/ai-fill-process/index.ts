@@ -31,11 +31,11 @@ serve(async (req) => {
 
     const systemPrompt = `Seu nome é ${personaName}. Você é um analista sênior de processos de negócio com tom de voz ${personaTone} e estilo ${personaStyle}.
 ${customScript ? `\n### DIRETRIZES DA EMPRESA:\n${customScript}\n` : ""}
-Com base na descrição fornecida pelo usuário, preencha TODOS os campos do mapeamento de processo.
+Com base na descrição fornecida pelo usuário, preencha TODOS os campos relevantes do mapeamento de processo.
 Seja objetivo, prático e específico. Use linguagem profissional em português brasileiro.
 Limite etapas a 4-8 itens. Gere 2-4 riscos. Gere 2-4 indicadores. Gere 1-3 ações no plano de ação.
 Para probabilidade e impacto de riscos, use valores entre 1 e 5.
-Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas os valores 1, 3 ou 5.`;
+`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -100,11 +100,6 @@ Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas 
                     },
                   },
                   recursos: { type: "string", description: "Recursos utilizados" },
-                  frequencia: {
-                    type: "string",
-                    enum: ["Diária", "Semanal", "Quinzenal", "Mensal", "Trimestral", "Semestral", "Anual", "Sob demanda"],
-                  },
-                  tempoExecucao: { type: "string", description: "Tempo médio de execução" },
                   problemas: {
                     type: "object",
                     properties: {
@@ -117,7 +112,6 @@ Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas 
                     required: ["retrabalho", "atrasos", "erros", "dependencia", "faltaPadrao"],
                   },
                   problemasTexto: { type: "string", description: "Descrição detalhada dos problemas" },
-                  gargalos: { type: "string", description: "Gargalos identificados" },
                   riscos: {
                     type: "array",
                     items: {
@@ -146,15 +140,6 @@ Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas 
                   sugestoes: { type: "string", description: "Sugestões de melhoria" },
                   automacao: { type: "string", description: "Oportunidades de automação" },
                   documentacao: { type: "string", description: "Documentação existente ou necessária" },
-                  criticidadeDetalhada: {
-                    type: "object",
-                    properties: {
-                      impactoNegocio: { type: "number", description: "Valor: 1, 3 ou 5" },
-                      impactoCliente: { type: "number", description: "Valor: 1, 3 ou 5" },
-                      riscoOperacional: { type: "number", description: "Valor: 1, 3 ou 5" },
-                    },
-                    required: ["impactoNegocio", "impactoCliente", "riscoOperacional"],
-                  },
                   planoAcao: {
                     type: "array",
                     items: {
@@ -176,9 +161,8 @@ Para criticidade (impactoNegocio, impactoCliente, riscoOperacional), use apenas 
                 required: [
                   "objetivo", "porqueExiste", "clienteProcesso", "areasEnvolvidas",
                   "entradas", "etapas", "decisoes", "saidas", "recursos",
-                  "frequencia", "tempoExecucao", "problemas", "problemasTexto",
-                  "gargalos", "riscos", "controles", "indicadores", "sugestoes",
-                  "automacao", "documentacao", "criticidadeDetalhada", "planoAcao", "conclusao",
+                  "problemas", "problemasTexto", "riscos", "controles", "indicadores",
+                  "sugestoes", "automacao", "documentacao", "planoAcao", "conclusao",
                 ],
               },
             },

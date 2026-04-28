@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -304,18 +303,14 @@ const ProcessoFormulario = () => {
         decisoes: data.decisoes || prev.decisoes,
         saidas: data.saidas?.length ? data.saidas : prev.saidas,
         recursos: data.recursos || prev.recursos,
-        frequencia: data.frequencia || prev.frequencia,
-        tempoExecucao: data.tempoExecucao || prev.tempoExecucao,
         problemas: data.problemas || prev.problemas,
         problemasTexto: data.problemasTexto || prev.problemasTexto,
-        gargalos: data.gargalos || prev.gargalos,
         riscos: data.riscos?.length ? data.riscos : prev.riscos,
         controles: data.controles || prev.controles,
         indicadores: data.indicadores?.length ? data.indicadores : prev.indicadores,
         sugestoes: data.sugestoes || prev.sugestoes,
         automacao: data.automacao || prev.automacao,
         documentacao: data.documentacao || prev.documentacao,
-        criticidadeDetalhada: data.criticidadeDetalhada || prev.criticidadeDetalhada,
         planoAcao: data.planoAcao?.length ? data.planoAcao : prev.planoAcao,
         conclusao: data.conclusao || prev.conclusao,
       }));
@@ -502,7 +497,7 @@ const ProcessoFormulario = () => {
 
       case "dores":
         return (
-          <div className="space-y-6">
+          <div className="space-y-3">
             <div className="space-y-3">
               <CardTitle className="text-lg">Dores e Problemas</CardTitle>
               <div className="flex flex-wrap gap-4">
@@ -514,10 +509,6 @@ const ProcessoFormulario = () => {
                 ))}
               </div>
               <Textarea value={form.problemasTexto} onChange={(e) => updateField("problemasTexto", e.target.value)} placeholder="Descreva os problemas em detalhes" rows={3} />
-            </div>
-            <div className="space-y-2">
-              <CardTitle className="text-lg">Gargalos do Processo</CardTitle>
-              <Textarea value={form.gargalos} onChange={(e) => updateField("gargalos", e.target.value)} placeholder="Onde o processo trava ou atrasa?" rows={3} />
             </div>
           </div>
         );
@@ -600,21 +591,7 @@ const ProcessoFormulario = () => {
 
       case "maturidade":
         return (
-          <div className="space-y-6">
-            <CardTitle className="text-lg">Maturidade / Criticidade do Processo</CardTitle>
-            <p className="text-sm text-muted-foreground">Avalie de 1 (baixo) a 5 (alto)</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {([["impactoNegocio", "Impacto no Negócio"], ["impactoCliente", "Impacto no Cliente"], ["riscoOperacional", "Risco Operacional"]] as const).map(([key, label]) => (
-                <div key={key} className="space-y-2">
-                  <Label>{label}</Label>
-                  <RadioGroup value={String(form.criticidadeDetalhada[key])} onValueChange={(v) => updateField("criticidadeDetalhada", { ...form.criticidadeDetalhada, [key]: Number(v) as 1 | 3 | 5 })} className="flex gap-4">
-                    {[1, 3, 5].map(val => (
-                      <div key={val} className="flex items-center gap-1"><RadioGroupItem value={String(val)} /><Label className="font-normal">{val}</Label></div>
-                    ))}
-                  </RadioGroup>
-                </div>
-              ))}
-            </div>
+          <div className="space-y-4">
             <div className="space-y-2">
               <CardTitle className="text-lg">Documentação Existente</CardTitle>
               <Textarea value={form.documentacao} onChange={(e) => updateField("documentacao", e.target.value)} placeholder="POP, instrução de trabalho, manual, fluxograma..." rows={3} />

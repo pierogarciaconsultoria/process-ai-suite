@@ -1,7 +1,6 @@
 // Types for the full process mapping form (aligned with PDF "Mapeamento de Processos")
 
 export type Classificacao = "Negócio" | "Apoio" | "Gestão";
-export type Frequencia = "Diária" | "Semanal" | "Quinzenal" | "Mensal" | "Trimestral" | "Semestral" | "Anual" | "Sob demanda";
 
 export interface EtapaForm {
   ordem: number;
@@ -58,12 +57,6 @@ export interface PlanoAcao5W2H {
   custo: string;
 }
 
-export interface CriticidadeDetalhada {
-  impactoNegocio: 1 | 3 | 5;
-  impactoCliente: 1 | 3 | 5;
-  riscoOperacional: 1 | 3 | 5;
-}
-
 export interface ProcessoFormData {
   // 1. Identificação
   data: string;
@@ -100,11 +93,7 @@ export interface ProcessoFormData {
   // 8. Recursos
   recursos: string;
 
-  // 9. Frequência
-  frequencia: Frequencia;
-  tempoExecucao: string;
-
-  // 10. Dores/Problemas
+  // 9. Dores/Problemas
   problemas: {
     retrabalho: boolean;
     atrasos: boolean;
@@ -114,37 +103,31 @@ export interface ProcessoFormData {
   };
   problemasTexto: string;
 
-  // 11. Gargalos
-  gargalos: string;
-
-  // 12. Riscos
+  // 10. Riscos
   riscos: RiscoForm[];
 
-  // 13. Controles
+  // 11. Controles
   controles: string;
 
-  // 14. Indicadores
+  // 12. Indicadores
   indicadores: IndicadorForm[];
 
-  // 15. Sugestões
+  // 13. Sugestões
   sugestoes: string;
 
-  // 16. Automação
+  // 14. Automação
   automacao: string;
 
-  // 17. Documentação
+  // 15. Documentação
   documentacao: string;
 
-  // 17b. Criticidade
-  criticidadeDetalhada: CriticidadeDetalhada;
-
-  // 18. Plano de Ação
+  // 16. Plano de Ação
   planoAcao: PlanoAcao5W2H[];
 
-  // 19. Conclusão
+  // 17. Conclusão
   conclusao: string;
 
-  // 20. BPMN Maps
+  // 18. BPMN Maps
   bpmnAsIs: string;
   bpmnToBe: string;
 }
@@ -270,18 +253,14 @@ export const emptyProcessoForm: ProcessoFormData = {
   decisoes: "",
   saidas: [{ saida: "", cliente: "" }],
   recursos: "",
-  frequencia: "Sob demanda",
-  tempoExecucao: "",
   problemas: { retrabalho: false, atrasos: false, erros: false, dependencia: false, faltaPadrao: false },
   problemasTexto: "",
-  gargalos: "",
   riscos: [{ risco: "", consequencia: "", probabilidade: 1, impacto: 1 }],
   controles: "",
   indicadores: [{ indicador: "", meta: "" }],
   sugestoes: "",
   automacao: "",
   documentacao: "",
-  criticidadeDetalhada: { impactoNegocio: 1, impactoCliente: 1, riscoOperacional: 1 },
   planoAcao: [{ oque: "", porque: "", quem: "", quando: "", onde: "", como: "", custo: "" }],
   conclusao: "",
   bpmnAsIs: "",
