@@ -61,7 +61,6 @@ const PHASES: PhaseConfig[] = [
     tabs: [
       { id: "dores", label: "Dores & Gargalos" },
       { id: "riscos", label: "Riscos" },
-      { id: "maturidade", label: "Maturidade" },
     ],
   },
   {
@@ -142,7 +141,7 @@ const ProcessoFormulario = () => {
   const getCurrentGlobalStep = () => {
     if (["melhorias", "planoAcao", "indicadores", "mapa-to-be"].includes(activeTab)) return 3;
     if (activeTab === "relatorio") return 4;
-    if (["resumo", "identificacao", "contexto", "dores", "riscos", "maturidade", "entradas", "atividades", "saidas", "recursos", "decisoes", "sipoc", "mapa-as-is"].includes(activeTab)) {
+    if (["resumo", "identificacao", "contexto", "dores", "riscos", "entradas", "atividades", "saidas", "recursos", "decisoes", "sipoc", "mapa-as-is"].includes(activeTab)) {
       return 2;
     }
     return 2;
@@ -581,16 +580,6 @@ const ProcessoFormulario = () => {
         return (
           <div className="space-y-4">
             <div className="space-y-2"><Label>Decisões do Processo</Label><Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={6} /></div>
-          </div>
-        );
-
-      case "maturidade":
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <CardTitle className="text-lg">Documentação Existente</CardTitle>
-              <Textarea value={form.documentacao} onChange={(e) => updateField("documentacao", e.target.value)} placeholder="POP, instrução de trabalho, manual, fluxograma..." rows={3} />
-            </div>
           </div>
         );
 
