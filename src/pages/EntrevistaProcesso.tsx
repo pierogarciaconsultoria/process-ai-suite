@@ -82,9 +82,9 @@ export default function EntrevistaProcesso() {
 
   useEffect(() => {
     const greeting =
-      "Oi, eu sou o Peter. Vou te acompanhar nessa conversa para mapear o processo com calma, de um jeito leve e sem complicação.";
+      "Oi, eu sou o Peter. Vou conduzir esta conversa com você para mapear o processo com clareza, leveza e sem complicação.";
     const reassurance =
-      "Pode ficar à vontade para responder no seu ritmo. A ideia aqui é te ouvir bem, organizar o contexto e transformar isso em um mapeamento claro e útil para você.";
+      "Pode ficar à vontade para responder no seu ritmo. Meu papel aqui é entender bem o contexto, organizar as informações e transformar tudo em um mapeamento claro e útil para você.";
     const askUserName =
       "Antes de começarmos, como você gostaria que eu te chamasse?";
     setMessages([{ role: "assistant", content: greeting }]);
@@ -192,7 +192,7 @@ export default function EntrevistaProcesso() {
       setMessages((m) => [...m, userMsg]);
       setInput("");
       setStage("askProcessName");
-      await enqueueAssistantMessage(`Prazer, ${trimmed}. Obrigado por estar aqui comigo. E qual é o processo que iremos mapear juntos hoje?`);
+      await enqueueAssistantMessage(`Prazer, ${trimmed}. Obrigado por estar aqui comigo. Qual é o processo que vamos mapear juntos hoje?`);
       return;
     }
 
@@ -204,7 +204,7 @@ export default function EntrevistaProcesso() {
       setStage("askDescription");
       await enqueueAssistantMessage(
         `${participantName ? `${participantName}, ` : ""}perfeito. Vamos trabalhar então o processo "${trimmed}". ` +
-          "Agora me conta, em um texto só, como esse processo acontece hoje na prática. Se puder, inclua as etapas, quem faz o quê, quais sistemas, ferramentas e documentos são usados e se existem exceções ou variações no caminho. Pode escrever do seu jeito. Depois eu leio com calma e te faço só as perguntas que realmente faltarem, combinado?",
+          "Agora me conte, em um único texto, como esse processo acontece hoje na prática. Se puder, inclua as etapas, quem faz o quê, quais sistemas, ferramentas e documentos são usados e se existem exceções ou variações no caminho. Pode escrever do seu jeito. Depois eu leio com atenção e faço apenas as perguntas que realmente faltarem, combinado?",
       );
       return;
     }
