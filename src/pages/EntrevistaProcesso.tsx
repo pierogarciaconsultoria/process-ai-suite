@@ -28,19 +28,25 @@ type InterviewResponse = {
   partialUpdate?: Partial<ProcessoFormData>;
   done?: boolean;
 };
-type InterviewStage = "askName" | "askDescription" | "aiFlow";
+type InterviewStage = "askUserName" | "askProcessName" | "askDescription" | "aiFlow";
 
 export default function EntrevistaProcesso() {
+  const ASSISTANT_MIN_DELAY_MS = 2000;
+  const ASSISTANT_MAX_DELAY_MS = 3000;
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isAssistantTyping, setIsAssistantTyping] = useState(false);
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
-  const [stage, setStage] = useState<InterviewStage>("askName");
+  const assistantQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const isMountedRef = useRef(true);
+  const [stage, setStage] = useState<InterviewStage>("askUserName");
+  const [participantName, setParticipantName] = useState("");
 
   const steps = [
     "Novo processo",
@@ -52,14 +58,40 @@ export default function EntrevistaProcesso() {
   const currentStep = 1;
 
   useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+  const getAssistantDelay = () =>
+    Math.floor(Math.random() * (ASSISTANT_MAX_DELAY_MS - ASSISTANT_MIN_DELAY_MS + 1)) + ASSISTANT_MIN_DELAY_MS;
+  const enqueueAssistantMessage = (content: string, delayMs = getAssistantDelay()) => {
+    assistantQueueRef.current = assistantQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (!isMountedRef.current) return;
+        setIsAssistantTyping(true);
+        await wait(delayMs);
+        if (!isMountedRef.current) return;
+        setMessages((m) => [...m, { role: "assistant", content }]);
+        setIsAssistantTyping(false);
+      });
+    return assistantQueueRef.current;
+  };
+
+  useEffect(() => {
     const greeting =
-      "Oi, eu sou o Peter, seu assistente de IA aqui da plataforma. Vou te ajudar, de forma leve, a mapear este processo passo a passo. Ao longo da conversa vou pedir também alguns dados de identificação, como nome do processo, área, dono, status, criticidade e data, combinado?";
-    const firstQuestion =
-      "Para começarmos bem, qual o nome do processo que vamos analisar hoje?";
-    setMessages([
-      { role: "assistant", content: greeting },
-      { role: "assistant", content: firstQuestion },
-    ]);
+      "Oi, eu sou o Peter. Vou te acompanhar nessa conversa para mapear o processo com calma, de um jeito leve e sem complicação.";
+    const reassurance =
+      "Pode ficar à vontade para responder no seu ritmo. A ideia aqui é te ouvir bem, organizar o contexto e transformar isso em um mapeamento claro e útil para você.";
+    const askUserName =
+      "Antes de começarmos, como você gostaria que eu te chamasse?";
+    setMessages([{ role: "assistant", content: greeting }]);
+    void (async () => {
+      await enqueueAssistantMessage(reassurance);
+      await enqueueAssistantMessage(askUserName);
+    })();
   }, []);
   const saveSession = (reason: "auto" | "manual") => {
     try {
@@ -148,27 +180,32 @@ export default function EntrevistaProcesso() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isAssistantTyping]);
 
   const send = async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
 
-    if (stage === "askName") {
+    if (stage === "askUserName") {
+      const userMsg: ChatMessage = { role: "user", content: trimmed };
+      setParticipantName(trimmed);
+      setMessages((m) => [...m, userMsg]);
+      setInput("");
+      setStage("askProcessName");
+      await enqueueAssistantMessage(`Prazer, ${trimmed}. Obrigado por estar aqui comigo. E qual é o processo que iremos mapear juntos hoje?`);
+      return;
+    }
+
+    if (stage === "askProcessName") {
       const userMsg: ChatMessage = { role: "user", content: trimmed };
       setForm((prev) => ({ ...prev, nomeProcesso: trimmed }));
-      setMessages((m) => [
-        ...m,
-        userMsg,
-        {
-          role: "assistant",
-          content:
-            `Perfeito, vamos trabalhar então o processo "${trimmed}". ` +
-            "Agora, para eu entender o cenário antes de fazer perguntas, descreva em um texto contínuo, com o máximo de detalhes que puder, como esse processo é realizado hoje na prática, incluindo: etapas principais na ordem em que acontecem, quem faz o quê (cargo ou área responsável), quais ferramentas, sistemas e documentos/planilhas são usados e qualquer variação ou exceção que aconteça com frequência. Quando terminar, é só enviar que eu leio tudo e faço perguntas pontuais, combinado?",
-        },
-      ]);
+      setMessages((m) => [...m, userMsg]);
       setInput("");
       setStage("askDescription");
+      await enqueueAssistantMessage(
+        `${participantName ? `${participantName}, ` : ""}perfeito. Vamos trabalhar então o processo "${trimmed}". ` +
+          "Agora me conta, em um texto só, como esse processo acontece hoje na prática. Se puder, inclua as etapas, quem faz o quê, quais sistemas, ferramentas e documentos são usados e se existem exceções ou variações no caminho. Pode escrever do seu jeito. Depois eu leio com calma e te faço só as perguntas que realmente faltarem, combinado?",
+      );
       return;
     }
 
@@ -193,7 +230,7 @@ export default function EntrevistaProcesso() {
           typeof d === "object" && d !== null && "error" in d;
         if (error || hasErrorField(data)) {
           const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
-          handleFallback(userMsg.content, detail);
+          await handleFallback(userMsg.content, detail);
           return;
         }
         const resp = data as InterviewResponse;
@@ -203,13 +240,13 @@ export default function EntrevistaProcesso() {
         if (resp.done) {
           applyToForm("manual");
         } else if (resp.nextQuestion) {
-          setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
+          await enqueueAssistantMessage(resp.nextQuestion);
         } else {
-          handleFallback(userMsg.content, "Resposta incompleta da IA");
+          await handleFallback(userMsg.content, "Resposta incompleta da IA");
         }
       } catch (e) {
         const detail = e instanceof Error ? e.message : "Erro desconhecido";
-        handleFallback(userMsg.content, detail);
+        await handleFallback(userMsg.content, detail);
       } finally {
         setLoading(false);
       }
@@ -240,7 +277,7 @@ export default function EntrevistaProcesso() {
         typeof d === "object" && d !== null && "error" in d;
       if (error || hasErrorField(data)) {
         const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
-        handleFallback(userMsg.content, detail);
+        await handleFallback(userMsg.content, detail);
         return;
       }
       const resp = data as InterviewResponse;
@@ -250,19 +287,19 @@ export default function EntrevistaProcesso() {
       if (resp.done) {
         applyToForm("manual");
       } else if (resp.nextQuestion) {
-        setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
+        await enqueueAssistantMessage(resp.nextQuestion);
       } else {
-        handleFallback(userMsg.content, "Resposta incompleta da IA");
+        await handleFallback(userMsg.content, "Resposta incompleta da IA");
       }
     } catch (e) {
       const detail = e instanceof Error ? e.message : "Erro desconhecido";
-      handleFallback(userMsg.content, detail);
+      await handleFallback(userMsg.content, detail);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFallback = (lastAnswer: string, detail: string) => {
+  const handleFallback = async (lastAnswer: string, detail: string) => {
     const fallback = computeFallback(form, lastAnswer);
     if (fallback.partialUpdate) {
       setForm((prev) => ({ ...prev, ...fallback.partialUpdate! }));
@@ -271,10 +308,9 @@ export default function EntrevistaProcesso() {
       applyToForm("auto");
       return;
     }
-    setMessages((m) => [
-      ...m,
-      { role: "assistant", content: `Ocorreu um erro técnico (${detail}). Vou continuar a entrevista de forma local.\n\n${fallback.nextQuestion ?? "Entrevista concluída. Deseja aplicar no formulário?"}` },
-    ]);
+    await enqueueAssistantMessage(
+      `Ocorreu um erro técnico (${detail}). Vou continuar a entrevista de forma local.\n\n${fallback.nextQuestion ?? "Entrevista concluída. Deseja aplicar no formulário?"}`,
+    );
   };
 
   const computeFallback = (currentForm: ProcessoFormData, answer: string): InterviewResponse => {
@@ -491,7 +527,7 @@ export default function EntrevistaProcesso() {
         typeof d === "object" && d !== null && "error" in d;
       if (error || hasErrorField(data)) {
         const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
-        handleFallback(userMsg.content, detail);
+        await handleFallback(userMsg.content, detail);
         return;
       }
       const resp = data as InterviewResponse;
@@ -499,15 +535,17 @@ export default function EntrevistaProcesso() {
       if (resp.done) {
         applyToForm("manual");
       } else if (resp.nextQuestion) {
-        setMessages((m) => [...m, { role: "assistant", content: resp.nextQuestion! }]);
+        await enqueueAssistantMessage(resp.nextQuestion);
       }
     } catch (e) {
       const detail = e instanceof Error ? e.message : "Erro desconhecido";
-      handleFallback("Arquivo anexado", detail);
+      await handleFallback("Arquivo anexado", detail);
     } finally {
       setLoading(false);
     }
   };
+
+  const assistantBusy = loading || isAssistantTyping;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -560,10 +598,16 @@ export default function EntrevistaProcesso() {
           <div ref={scrollRef} className="h-[420px] overflow-auto rounded-md border p-3 space-y-3">
             {messages.map((m, i) => (
               <div key={i} className={`p-3 rounded-md ${m.role === "assistant" ? "bg-muted" : "bg-card border"}`}>
-                <div className="text-xs text-muted-foreground mb-1">{m.role === "assistant" ? "IA" : "Você"}</div>
+                <div className="text-xs text-muted-foreground mb-1">{m.role === "assistant" ? "Peter" : "Você"}</div>
                 <div className="text-sm whitespace-pre-wrap">{m.content}</div>
               </div>
             ))}
+            {isAssistantTyping && (
+              <div className="p-3 rounded-md bg-muted">
+                <div className="text-xs text-muted-foreground mb-1">Peter</div>
+                <div className="text-sm text-muted-foreground">Peter está digitando...</div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 flex gap-2">
@@ -571,15 +615,16 @@ export default function EntrevistaProcesso() {
               placeholder="Digite sua resposta…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              disabled={assistantBusy}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !assistantBusy) {
                   e.preventDefault();
                   send();
                 }
               }}
             />
-            <Button onClick={send} disabled={loading}>
-              {loading ? "Aguarde..." : <>
+            <Button onClick={send} disabled={assistantBusy}>
+              {assistantBusy ? "Aguarde..." : <>
                 Enviar <Send className="h-4 w-4 ml-2" />
               </>}
             </Button>
@@ -595,7 +640,7 @@ export default function EntrevistaProcesso() {
                 if (f) void analyzeFile(f);
                 e.currentTarget.value = "";
               }}
-              disabled={loading}
+              disabled={assistantBusy}
             />
           </div>
 
