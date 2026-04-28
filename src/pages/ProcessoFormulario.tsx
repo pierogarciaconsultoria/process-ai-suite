@@ -49,7 +49,6 @@ const PHASES: PhaseConfig[] = [
     label: "1. Identificação & Contexto",
     icon: Search,
     tabs: [
-      { id: "resumo", label: "Resumo" },
       { id: "identificacao", label: "Identificação" },
       { id: "contexto", label: "Contexto" },
     ],
@@ -128,8 +127,6 @@ const ProcessoFormulario = () => {
   const [descricaoIA, setDescricaoIA] = useState("");
   const [isFillingAI, setIsFillingAI] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [autoSummarizePending, setAutoSummarizePending] = useState(false);
 
   const globalSteps = [
     "Novo processo",
@@ -141,7 +138,7 @@ const ProcessoFormulario = () => {
   const getCurrentGlobalStep = () => {
     if (["melhorias", "planoAcao", "indicadores", "mapa-to-be"].includes(activeTab)) return 3;
     if (activeTab === "relatorio") return 4;
-    if (["resumo", "identificacao", "contexto", "dores", "riscos", "entradas", "atividades", "saidas", "recursos", "decisoes", "sipoc", "mapa-as-is"].includes(activeTab)) {
+    if (["identificacao", "contexto", "dores", "riscos", "entradas", "atividades", "saidas", "recursos", "decisoes", "sipoc", "mapa-as-is"].includes(activeTab)) {
       return 2;
     }
     return 2;
@@ -154,7 +151,7 @@ const ProcessoFormulario = () => {
 
     const resolveInitialTab = () => {
       if (state?.focusTab && ALL_TABS.includes(state.focusTab)) return state.focusTab;
-      if (!isEditing && state?.fromInterview) return "resumo";
+      if (!isEditing && state?.fromInterview) return "contexto";
       return "identificacao";
     };
 
@@ -162,9 +159,6 @@ const ProcessoFormulario = () => {
       setForm(pre);
       const initialTab = resolveInitialTab();
       setActiveTab(initialTab);
-      if (!isEditing && initialTab === "resumo") {
-        setAutoSummarizePending(true);
-      }
     } else {
       try {
         const raw = localStorage.getItem("process:formPrefill");
@@ -174,27 +168,10 @@ const ProcessoFormulario = () => {
           localStorage.removeItem("process:formPrefill");
           const initialTab = resolveInitialTab();
           setActiveTab(initialTab);
-          if (!isEditing && initialTab === "resumo") {
-            setAutoSummarizePending(true);
-          }
         }
       } catch (e) { void e; }
     }
   }, [location.state, isEditing]);
-
-  useEffect(() => {
-    if (!autoSummarizePending) return;
-    if (form.documentacao && form.documentacao.trim().length > 0) {
-      setAutoSummarizePending(false);
-      return;
-    }
-    const run = async () => {
-      setAutoSummarizePending(false);
-      await handleSummarize();
-    };
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSummarizePending]);
 
   useEffect(() => {
     (async () => {
@@ -349,57 +326,6 @@ const ProcessoFormulario = () => {
     }
   }, [form, navigate, toast]);
 
-  const handleSummarize = async () => {
-    if (isSummarizing) return;
-    setIsSummarizing(true);
-    try {
-      const customScript = localStorage.getItem("process:routeScript");
-      const aiSkinRaw = localStorage.getItem("process:aiSkin");
-      const aiSkin = aiSkinRaw ? JSON.parse(aiSkinRaw) : null;
-      const { data, error } = await supabase.functions.invoke("ai-summarize-process", {
-        body: {
-          processoData: form,
-          customScript: customScript || null,
-          aiSkin,
-        },
-      });
-      if (error) throw error;
-      if ((data as { error?: string })?.error) {
-        toast({
-          title: "Erro ao gerar resumo",
-          description: (data as { error: string }).error,
-          variant: "destructive",
-        });
-        return;
-      }
-      const resumo =
-        (data as { resumo?: string }).resumo ??
-        (typeof data === "string" ? data : "");
-      if (!resumo) {
-        toast({
-          title: "Resumo vazio",
-          description: "A IA não retornou um texto válido. Tente novamente.",
-          variant: "destructive",
-        });
-        return;
-      }
-      updateField("documentacao", resumo);
-      toast({
-        title: "Resumo gerado",
-        description: "Revise o texto do processo antes de seguir para as próximas fases.",
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Tente novamente.";
-      toast({
-        title: "Erro ao gerar resumo",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
-
   const handleSave = () => {
     toast({ title: "Mapeamento concluido", description: "Escolha o proximo passo para continuar o trabalho com este processo." });
     navigate("/processos/diagnostico", { state: { processo: form } });
@@ -409,38 +335,6 @@ const ProcessoFormulario = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case "resumo":
-        return (
-          <div className="space-y-4">
-            <CardTitle className="text-lg">Resumo do Processo (Texto Corrido)</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Este texto descreve o processo em linguagem natural. Ele é gerado a partir das respostas da entrevista e dos campos estruturados,
-              e pode ser editado livremente antes de gerar mapas e diagnósticos.
-            </p>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handleSummarize} disabled={isSummarizing}>
-                {isSummarizing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    Gerando resumo com IA...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-1" />
-                    Gerar/Atualizar resumo com IA
-                  </>
-                )}
-              </Button>
-            </div>
-            <Textarea
-              className="min-h-[260px]"
-              placeholder="Descreva aqui, em texto corrido, como funciona este processo de ponta a ponta..."
-              value={form.documentacao}
-              onChange={(e) => updateField("documentacao", e.target.value)}
-            />
-          </div>
-        );
-
       case "identificacao":
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -481,7 +375,6 @@ const ProcessoFormulario = () => {
             </Card>
             <CardHeader className="p-0 pb-4"><CardTitle className="text-lg">Contexto do Processo</CardTitle></CardHeader>
             <div className="space-y-2"><Label>Objetivo do Processo</Label><Textarea value={form.objetivo} onChange={(e) => updateField("objetivo", e.target.value)} placeholder="Qual o objetivo?" /></div>
-            <div className="space-y-2"><Label>Por que este processo existe?</Label><Textarea value={form.porqueExiste} onChange={(e) => updateField("porqueExiste", e.target.value)} placeholder="Justificativa" /></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Cliente do Processo</Label><Input value={form.clienteProcesso} onChange={(e) => updateField("clienteProcesso", e.target.value)} placeholder="Quem recebe o resultado" /></div>
               <div className="space-y-2"><Label>Áreas Envolvidas</Label><Input value={form.areasEnvolvidas} onChange={(e) => updateField("areasEnvolvidas", e.target.value)} placeholder="Comercial, Financeiro..." /></div>
