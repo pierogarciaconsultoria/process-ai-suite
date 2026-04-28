@@ -12,6 +12,7 @@ const Landing = React.lazy(() => import("./pages/Landing"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Empresas = React.lazy(() => import("./pages/Empresas"));
 const Processos = React.lazy(() => import("./pages/Processos"));
+const ProcessoNovo = React.lazy(() => import("./pages/ProcessoNovo"));
 const ProcessoFormulario = React.lazy(() => import("./pages/ProcessoFormulario"));
 const ProcessoDetalhe = React.lazy(() => import("./pages/ProcessoDetalhe"));
 const ProcessoDiagnostico = React.lazy(() => import("./pages/ProcessoDiagnostico"));
@@ -75,8 +76,11 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empresas" element={<Empresas />} />
                 <Route path="/processos" element={<Processos />} />
-                <Route path="/processos/entrevista" element={<EntrevistaProcesso />} />
-                <Route path="/processos/novo" element={<ProcessoFormulario />} />
+                <Route path="/processos/novo" element={<ProcessoNovo />} />
+                <Route path="/processos/novo/formulario" element={<ProcessoFormulario />} />
+                <Route path="/processos/novo/entrevista" element={<EntrevistaProcesso />} />
+                <Route path="/processos/entrevista" element={<Navigate to="/processos/novo/entrevista" replace />} />
+                <Route path="/processos/diagnostico" element={<ProcessoDiagnostico />} />
                 <Route path="/processos/:id" element={<ProcessoDetalhe />} />
               <Route path="/processos/:id/editar" element={<ProcessoFormulario />} />
               <Route path="/processos/:id/diagnostico" element={<ProcessoDiagnostico />} />

@@ -76,7 +76,7 @@ const Processos = () => {
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => navigate("/processos/entrevista")}>
+          <Button onClick={() => navigate("/processos/novo")}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Processo
           </Button>

@@ -109,21 +109,21 @@ const ProcessoDiagnostico = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 className="flex-1"
-                onClick={() => navigate("/processos/novo", { state: { focusTab: "mapa-as-is" } })}
+                onClick={() => navigate("/processos/novo/formulario", { state: { focusTab: "mapa-as-is" } })}
               >
                 <ClipboardList className="h-4 w-4 mr-2" /> Gerar/atualizar mapa AS-IS
               </Button>
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() => navigate("/processos/novo", { state: { focusTab: "relatorio" } })}
+                onClick={() => navigate("/processos/novo/formulario", { state: { focusTab: "relatorio" } })}
               >
                 <Activity className="h-4 w-4 mr-2" /> Gerar diagnóstico
               </Button>
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() => navigate("/processos/novo", { state: { focusTab: "identificacao" } })}
+                onClick={() => navigate("/processos/novo/formulario", { state: { focusTab: "identificacao" } })}
               >
                 <Target className="h-4 w-4 mr-2" /> Ver detalhes avançados do processo
               </Button>
