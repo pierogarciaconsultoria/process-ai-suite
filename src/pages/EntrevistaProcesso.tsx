@@ -40,6 +40,7 @@ export default function EntrevistaProcesso() {
   const [isAssistantTyping, setIsAssistantTyping] = useState(false);
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
@@ -131,7 +132,6 @@ export default function EntrevistaProcesso() {
     const keys: (keyof ProcessoFormData)[] = [
       "nomeProcesso",
       "area",
-      "empresa",
       "donoProcesso",
       "classificacao",
       "entrevistados",
@@ -145,6 +145,9 @@ export default function EntrevistaProcesso() {
       "decisoes",
       "saidas",
       "recursos",
+      "documentacao",
+      "problemasTexto",
+      "controles",
       "riscos",
       "indicadores",
       "planoAcao",
@@ -182,6 +185,134 @@ export default function EntrevistaProcesso() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isAssistantTyping]);
 
+  const assistantBusy = loading || isAssistantTyping;
+
+  useEffect(() => {
+    if (!assistantBusy) {
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [assistantBusy]);
+
+  const inferClassification = (source: Partial<ProcessoFormData>): Classificacao => {
+    const text = [
+      source.nomeProcesso,
+      source.area,
+      source.objetivo,
+      source.porqueExiste,
+      source.clienteProcesso,
+    ]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .join(" ")
+      .toLowerCase();
+
+    if (/(governan|compliance|auditor|estrateg|estrat[ée]g|planej|diretoria|gest[aã]o|indicador|controladoria)/i.test(text)) {
+      return "Gestão";
+    }
+
+    if (/(rh|recursos humanos|financeir|compras|jur[ií]dic|ti|tecnologia|infra|suprimentos|faturamento|backoffice|administrativ)/i.test(text)) {
+      return "Apoio";
+    }
+
+    return "Negócio";
+  };
+
+  const mergeFormUpdate = (base: ProcessoFormData, partial?: Partial<ProcessoFormData>) => {
+    const merged = { ...base, ...(partial ?? {}) };
+    if (participantName.trim()) {
+      merged.entrevistados = participantName.trim();
+    }
+    merged.classificacao = partial?.classificacao ?? inferClassification(merged);
+    return merged;
+  };
+
+  const hasMeaningfulArrayData = (key: keyof ProcessoFormData, arr: unknown[]) => {
+    switch (key) {
+      case "entradas":
+        return (arr as EntradaForm[]).some((e) => e.fornecedor.trim() || e.entrada.trim());
+      case "etapas":
+        return (arr as EtapaForm[]).some((e) => e.atividade.trim() || e.responsavel.trim() || (e.ferramentaDocumento ?? "").trim());
+      case "saidas":
+        return (arr as SaidaForm[]).some((s) => s.saida.trim() || s.cliente.trim());
+      case "riscos":
+        return (arr as RiscoForm[]).some((r) => r.risco.trim() || r.consequencia.trim());
+      case "indicadores":
+        return (arr as IndicadorForm[]).some((i) => i.indicador.trim() || i.meta.trim());
+      case "planoAcao":
+        return (arr as PlanoAcao5W2H[]).some((p) => p.oque.trim() || p.porque.trim() || p.quem.trim() || p.quando.trim() || p.onde.trim() || p.como.trim() || p.custo.trim());
+      default:
+        return arr.length > 0;
+    }
+  };
+
+  const suggestsNoExistingItem = (text: string) =>
+    /(não temos|nao temos|não tem|nao tem|não existe|nao existe|não há|nao ha|nenhum|nenhuma|não usamos|nao usamos|não acompanhamos|nao acompanhamos|sem isso|ainda não|ainda nao)/i.test(text);
+
+  const suggestRisks = (currentForm: ProcessoFormData): RiscoForm[] => {
+    const context = [currentForm.objetivo, currentForm.recursos, currentForm.decisoes, currentForm.gatilho]
+      .join(" ")
+      .toLowerCase();
+
+    const risks: RiscoForm[] = [
+      {
+        risco: "Atraso na execução das etapas do processo",
+        consequencia: "Comprometimento de prazo, acúmulo de demanda e impacto na entrega final",
+        probabilidade: 3,
+        impacto: 4,
+      },
+      {
+        risco: "Retrabalho por falha ou ausência de informação",
+        consequencia: "Correções recorrentes, perda de produtividade e aumento do tempo total do processo",
+        probabilidade: 3,
+        impacto: 4,
+      },
+    ];
+
+    if (/(planilha|excel|manual|e-mail|email|whatsapp)/i.test(context)) {
+      risks.push({
+        risco: "Dependência de controles manuais e registros dispersos",
+        consequencia: "Erros de atualização, perda de rastreabilidade e falhas no acompanhamento",
+        probabilidade: 4,
+        impacto: 4,
+      });
+    } else {
+      risks.push({
+        risco: "Dependência de pessoas-chave para executar ou destravar o fluxo",
+        consequencia: "Paradas no processo, baixa previsibilidade e risco operacional",
+        probabilidade: 3,
+        impacto: 4,
+      });
+    }
+
+    return risks;
+  };
+
+  const suggestIndicators = (currentForm: ProcessoFormData): IndicadorForm[] => [
+    { indicador: `Tempo total do processo ${currentForm.nomeProcesso ? `- ${currentForm.nomeProcesso}` : ""}`.trim(), meta: "Reduzir o tempo médio de execução" },
+    { indicador: "Cumprimento de prazo", meta: "Manter pelo menos 95% das entregas dentro do prazo" },
+    { indicador: "Taxa de retrabalho", meta: "Reduzir reincidências e correções ao mínimo necessário" },
+  ];
+
+  const suggestPlanActions = (currentForm: ProcessoFormData): PlanoAcao5W2H[] => [
+    {
+      oque: `Padronizar o fluxo do processo${currentForm.nomeProcesso ? ` ${currentForm.nomeProcesso}` : ""}`.trim(),
+      porque: "Reduzir variações, retrabalho e dúvidas operacionais",
+      quem: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+      quando: "Curto prazo",
+      onde: currentForm.area || "Área responsável",
+      como: "Documentar etapas, responsáveis, critérios e pontos de controle",
+      custo: "Baixo",
+    },
+    {
+      oque: "Implantar rotina de acompanhamento com indicadores",
+      porque: "Dar visibilidade ao desempenho e apoiar decisões de melhoria",
+      quem: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+      quando: "Curto prazo",
+      onde: currentForm.area || "Área responsável",
+      como: "Definir indicadores, frequência de análise e responsável pelo monitoramento",
+      custo: "Baixo",
+    },
+  ];
+
   const send = async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -189,6 +320,7 @@ export default function EntrevistaProcesso() {
     if (stage === "askUserName") {
       const userMsg: ChatMessage = { role: "user", content: trimmed };
       setParticipantName(trimmed);
+      setForm((prev) => mergeFormUpdate(prev, { entrevistados: trimmed }));
       setMessages((m) => [...m, userMsg]);
       setInput("");
       setStage("askProcessName");
@@ -198,13 +330,13 @@ export default function EntrevistaProcesso() {
 
     if (stage === "askProcessName") {
       const userMsg: ChatMessage = { role: "user", content: trimmed };
-      setForm((prev) => ({ ...prev, nomeProcesso: trimmed }));
+      setForm((prev) => mergeFormUpdate(prev, { nomeProcesso: trimmed }));
       setMessages((m) => [...m, userMsg]);
       setInput("");
       setStage("askDescription");
       await enqueueAssistantMessage(
         `${participantName ? `${participantName}, ` : ""}perfeito. Vamos trabalhar então o processo "${trimmed}". ` +
-          "Agora me conte, em um único texto, como esse processo acontece hoje na prática. Se puder, inclua as etapas, quem faz o quê, quais sistemas, ferramentas e documentos são usados e se existem exceções ou variações no caminho. Pode escrever do seu jeito. Depois eu leio com atenção e faço apenas as perguntas que realmente faltarem, combinado?",
+          "Agora me conte, em um único texto, como esse processo acontece hoje na prática. Se puder, inclua as etapas, quem faz o quê, quais sistemas, ferramentas e documentos são usados, quais dores ou problemas operacionais aparecem no dia a dia, se existem regras de negócio importantes e se há exceções ou variações no caminho. Pode escrever do seu jeito. Depois eu leio com atenção e faço apenas as perguntas que realmente faltarem, combinado?",
       );
       return;
     }
@@ -235,7 +367,7 @@ export default function EntrevistaProcesso() {
         }
         const resp = data as InterviewResponse;
         if (resp.partialUpdate) {
-          setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
+          setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
         }
         if (resp.done) {
           applyToForm("manual");
@@ -282,7 +414,7 @@ export default function EntrevistaProcesso() {
       }
       const resp = data as InterviewResponse;
       if (resp.partialUpdate) {
-        setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
+        setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
       }
       if (resp.done) {
         applyToForm("manual");
@@ -302,7 +434,7 @@ export default function EntrevistaProcesso() {
   const handleFallback = async (lastAnswer: string, detail: string) => {
     const fallback = computeFallback(form, lastAnswer);
     if (fallback.partialUpdate) {
-      setForm((prev) => ({ ...prev, ...fallback.partialUpdate! }));
+      setForm((prev) => mergeFormUpdate(prev, fallback.partialUpdate));
     }
     if (fallback.done) {
       applyToForm("auto");
@@ -314,27 +446,9 @@ export default function EntrevistaProcesso() {
   };
 
   const computeFallback = (currentForm: ProcessoFormData, answer: string): InterviewResponse => {
-    const arrayHasData = (key: keyof ProcessoFormData, arr: unknown[]): boolean => {
-      switch (key) {
-        case "entradas":
-          return (arr as EntradaForm[]).some((e) => e.fornecedor.trim() || e.entrada.trim());
-        case "etapas":
-          return (arr as EtapaForm[]).some((e) => e.atividade.trim() || e.responsavel.trim() || (e.ferramentaDocumento ?? "").trim());
-        case "saidas":
-          return (arr as SaidaForm[]).some((s) => s.saida.trim() || s.cliente.trim());
-        case "riscos":
-          return (arr as RiscoForm[]).some((r) => r.risco.trim() || r.consequencia.trim());
-        case "indicadores":
-          return (arr as IndicadorForm[]).some((i) => i.indicador.trim() || i.meta.trim());
-        case "planoAcao":
-          return (arr as PlanoAcao5W2H[]).some((p) => p.oque.trim() || p.porque.trim() || p.quem.trim() || p.quando.trim() || p.onde.trim() || p.como.trim() || p.custo.trim());
-        default:
-          return arr.length > 0;
-      }
-    };
     const isFilled = (key: keyof ProcessoFormData) => {
       const value = currentForm[key] as unknown;
-      if (Array.isArray(value)) return arrayHasData(key, value);
+      if (Array.isArray(value)) return hasMeaningfulArrayData(key, value);
       if (typeof value === "string") return value.trim().length > 0;
       return !!value;
     };
@@ -342,23 +456,22 @@ export default function EntrevistaProcesso() {
       const map: Partial<Record<keyof ProcessoFormData, string>> = {
         nomeProcesso: "Qual é o nome do processo?",
         area: "Qual é a área responsável pelo processo?",
-        empresa: "Qual é a empresa ou unidade organizacional?",
         donoProcesso: "Quem é o dono do processo?",
-        classificacao: "Classificação do processo (Negócio, Apoio ou Gestão)?",
-        entrevistados: "Quem foram os entrevistados? (nomes separados por vírgula)",
         objetivo: "Qual é o objetivo principal do processo?",
         porqueExiste: "Por que este processo existe?",
-        clienteProcesso: "Quem é o cliente do processo (quem recebe o resultado)?",
+        clienteProcesso: "Só para eu fechar esse ponto com precisão: quem recebe o resultado final desse processo? Pode ser uma área interna, um cliente externo ou outro time.",
         areasEnvolvidas: "Quais áreas estão envolvidas?",
-        gatilho: "Qual é o gatilho que inicia o processo?",
-        entradas: "Liste fornecedores e entradas (uma por linha: Fornecedor - Entrada).",
-        saidas: "Liste saídas e clientes (uma por linha: Saída - Cliente).",
+        gatilho: "Só para eu confirmar: o que dá início a esse processo na prática? O processo começa quando acontece qual evento, solicitação ou necessidade?",
+        entradas: "Quais são as principais entradas que esse processo recebe para começar ou seguir adiante? Se fizer sentido, me diga também de quem ou de onde essas entradas vêm.",
+        saidas: "E no final, quais são as principais saídas ou entregas geradas por esse processo? Quem recebe essas entregas?",
         etapas: "Liste atividades e responsáveis (uma por linha: Atividade - Responsável).",
-        decisoes: "Quais decisões ocorrem ao longo do processo?",
-        recursos: "Quais recursos são necessários? (um por linha)",
-        riscos: "Principais riscos (uma por linha: Risco - Consequência).",
-        indicadores: "Quais indicadores você acompanha? (uma por linha: Indicador - Meta).",
-        planoAcao: "Plano de ação 5W2H (uma por linha: O que; Porque; Quem; Quando; Onde; Como; Custo).",
+        decisoes: "Existe algum ponto em que alguém precisa aprovar, reprovar, validar ou escolher um caminho dentro do processo? Se sim, em que momento isso acontece?",
+        recursos: "Só para eu não deixar lacuna: quais recursos são necessários para esse processo funcionar bem? Pode incluir pessoas, sistemas, planilhas, documentos, equipamentos ou acessos.",
+        documentacao: "Quais documentos são necessários ou usados ao longo desse processo? Pode incluir POP, instrução de trabalho, formulários, planilhas, políticas, checklists ou modelos.",
+        problemasTexto: "Quais são as principais dores, rupturas ou problemas operacionais que acontecem nesse processo no dia a dia?",
+        controles: "Há alguma regra de negócio aplicada nesse processo? Se sim, qual? Pode ser critério de aprovação, prazo, limite, validação obrigatória ou alguma condição específica.",
+        indicadores: "Hoje vocês acompanham algum indicador desse processo, como prazo, volume, retrabalho, SLA, qualidade ou produtividade?",
+        planoAcao: "Existe hoje algum plano de ação, melhoria priorizada ou iniciativa em andamento para esse processo?",
       };
       return map[key] ?? "Deseja finalizar e aplicar ao formulário?";
     };
@@ -367,30 +480,14 @@ export default function EntrevistaProcesso() {
       const [a, b] = line.split(/[-–—;:]/).map(s => s.trim());
       return [a ?? line, b ?? ""];
     });
-    const parseClassificacao = (txt: string): Classificacao => {
-      const t = txt.toLowerCase();
-      if (t.includes("apoio")) return "Apoio";
-      if (t.includes("gest")) return "Gestão";
-      return "Negócio";
-    };
-
     if (!isFilled("nomeProcesso")) {
       return { partialUpdate: { nomeProcesso: answer }, nextQuestion: nextText("area"), done: false };
     }
     if (!isFilled("area")) {
-      return { partialUpdate: { area: answer }, nextQuestion: nextText("empresa"), done: false };
-    }
-    if (!isFilled("empresa")) {
-      return { partialUpdate: { empresa: answer }, nextQuestion: nextText("donoProcesso"), done: false };
+      return { partialUpdate: { area: answer }, nextQuestion: nextText("donoProcesso"), done: false };
     }
     if (!isFilled("donoProcesso")) {
-      return { partialUpdate: { donoProcesso: answer }, nextQuestion: nextText("classificacao"), done: false };
-    }
-    if (!isFilled("classificacao")) {
-      return { partialUpdate: { classificacao: parseClassificacao(answer) }, nextQuestion: nextText("entrevistados"), done: false };
-    }
-    if (!isFilled("entrevistados")) {
-      return { partialUpdate: { entrevistados: parseList(answer).join(", ") }, nextQuestion: nextText("objetivo"), done: false };
+      return { partialUpdate: { donoProcesso: answer, classificacao: inferClassification({ ...currentForm, donoProcesso: answer }) }, nextQuestion: nextText("objetivo"), done: false };
     }
     if (!isFilled("objetivo")) {
       return { partialUpdate: { objetivo: answer }, nextQuestion: nextText("porqueExiste"), done: false };
@@ -428,17 +525,60 @@ export default function EntrevistaProcesso() {
       return { partialUpdate: { decisoes: answer }, nextQuestion: nextText("recursos"), done: false };
     }
     if (!isFilled("recursos")) {
-      return { partialUpdate: { recursos: parseList(answer).join("\n") }, nextQuestion: nextText("riscos"), done: false };
+      return {
+        partialUpdate: {
+          recursos: parseList(answer).join("\n"),
+        },
+        nextQuestion: nextText("documentacao"),
+        done: false,
+      };
+    }
+    if (!isFilled("documentacao")) {
+      return {
+        partialUpdate: { documentacao: answer },
+        nextQuestion: nextText("problemasTexto"),
+        done: false,
+      };
+    }
+    if (!isFilled("problemasTexto")) {
+      return {
+        partialUpdate: { problemasTexto: answer },
+        nextQuestion: nextText("controles"),
+        done: false,
+      };
+    }
+    if (!isFilled("controles")) {
+      return {
+        partialUpdate: { controles: answer },
+        nextQuestion: hasMeaningfulArrayData("riscos", currentForm.riscos) ? nextText("indicadores") : "Com base no que você me explicou, já consigo sugerir alguns riscos prováveis desse processo. Depois disso, quero só confirmar se vocês acompanham algum indicador, como prazo, volume, retrabalho, SLA, qualidade ou produtividade.",
+        done: false,
+      };
     }
     if (!isFilled("riscos")) {
-      const riscos: RiscoForm[] = parsePairs(answer).map(([risco, consequencia]) => ({ risco, consequencia, probabilidade: 3, impacto: 3 }));
-      return { partialUpdate: { riscos: riscos.length ? riscos : [{ risco: answer, consequencia: "", probabilidade: 3, impacto: 3 }] }, nextQuestion: nextText("indicadores"), done: false };
+      return {
+        partialUpdate: { riscos: suggestRisks(currentForm) },
+        nextQuestion: nextText("indicadores"),
+        done: false,
+      };
     }
     if (!isFilled("indicadores")) {
+      if (suggestsNoExistingItem(answer)) {
+        return {
+          partialUpdate: { indicadores: suggestIndicators(currentForm) },
+          nextQuestion: "Sem problema. Se ainda não existir um plano de ação definido, eu posso sugerir algumas ações iniciais com base no que você me explicou. Hoje existe algum plano de ação, melhoria priorizada ou iniciativa em andamento para esse processo?",
+          done: false,
+        };
+      }
       const indicadores: IndicadorForm[] = parsePairs(answer).map(([indicador, meta]) => ({ indicador, meta }));
       return { partialUpdate: { indicadores: indicadores.length ? indicadores : [{ indicador: answer, meta: "" }] }, nextQuestion: nextText("planoAcao"), done: false };
     }
     if (!isFilled("planoAcao")) {
+      if (suggestsNoExistingItem(answer)) {
+        return {
+          partialUpdate: { planoAcao: suggestPlanActions(currentForm) },
+          done: true,
+        };
+      }
       const linhas = answer.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
       const planoAcao: PlanoAcao5W2H[] = linhas.map(line => {
         const parts = line.split(";").map(s => s.trim());
@@ -531,7 +671,7 @@ export default function EntrevistaProcesso() {
         return;
       }
       const resp = data as InterviewResponse;
-      if (resp.partialUpdate) setForm((prev) => ({ ...prev, ...resp.partialUpdate }));
+      if (resp.partialUpdate) setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
       if (resp.done) {
         applyToForm("manual");
       } else if (resp.nextQuestion) {
@@ -544,8 +684,6 @@ export default function EntrevistaProcesso() {
       setLoading(false);
     }
   };
-
-  const assistantBusy = loading || isAssistantTyping;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -612,6 +750,7 @@ export default function EntrevistaProcesso() {
 
           <div className="mt-4 flex gap-2">
             <Input
+              ref={inputRef}
               placeholder="Digite sua resposta…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
