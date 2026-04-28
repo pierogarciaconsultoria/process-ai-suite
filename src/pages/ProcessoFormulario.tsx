@@ -326,6 +326,7 @@ const ProcessoFormulario = () => {
 
   // ── Diagnose ──
   const handleDiagnose = useCallback(async () => {
+    if (isDiagnosing) return;
     setIsDiagnosing(true);
     try {
       const customScript = localStorage.getItem("process:routeScript");
@@ -339,7 +340,7 @@ const ProcessoFormulario = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      navigate("/processos/novo/diagnostico", { state: { diagnostico: data, processo: form } });
+      navigate("/processos/diagnostico", { state: { diagnostico: data, processo: form } });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Tente novamente.";
       console.error("Diagnose error:", err);
@@ -400,15 +401,9 @@ const ProcessoFormulario = () => {
     }
   };
 
-  useEffect(() => {
-    if (activeTab === "relatorio") {
-      handleDiagnose();
-    }
-  }, [activeTab, handleDiagnose]);
-
   const handleSave = () => {
-    toast({ title: "Processo salvo", description: "O mapeamento foi salvo com sucesso." });
-    navigate("/processos");
+    toast({ title: "Mapeamento concluido", description: "Escolha o proximo passo para continuar o trabalho com este processo." });
+    navigate("/processos/diagnostico", { state: { processo: form } });
   };
 
   // ── Tab content renderers ──
@@ -887,11 +882,22 @@ const ProcessoFormulario = () => {
           <div className="space-y-6">
             <CardTitle className="text-lg">Relatório de Diagnóstico por IA</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Compilando automaticamente todas as informações das fases anteriores para gerar o diagnóstico completo.
+              Conclua o mapeamento para seguir para a tela de proximas acoes, ou gere o diagnostico agora se ja quiser partir para a analise.
             </p>
-            <div className="flex items-center gap-2 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {isDiagnosing ? "Gerando diagnóstico..." : "Preparando diagnóstico..."}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button onClick={handleSave}>
+                Concluir mapeamento
+              </Button>
+              <Button variant="outline" onClick={handleDiagnose} disabled={isDiagnosing}>
+                {isDiagnosing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando diagnostico...
+                  </>
+                ) : (
+                  "Gerar diagnostico agora"
+                )}
+              </Button>
             </div>
           </div>
         );

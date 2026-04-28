@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, TrendingUp, Target, BarChart3, Lightbulb, ClipboardList, Activity, Printer, Trash2 } from "lucide-react";
-import type { DiagnosticoResult, MelhoriaToBe } from "@/data/processo-form-types";
+import type { DiagnosticoResult, MelhoriaToBe, ProcessoFormData } from "@/data/processo-form-types";
 
 const severidadeBadge = (s: string) => {
   switch (s) {
@@ -46,6 +46,7 @@ const ProcessoDiagnostico = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const diagnostico = location.state?.diagnostico as DiagnosticoResult | undefined;
+  const processo = location.state?.processo as ProcessoFormData | undefined;
   const [localDiag, setLocalDiag] = useState<DiagnosticoResult | undefined>(diagnostico);
 
   const steps = [
@@ -89,9 +90,9 @@ const ProcessoDiagnostico = () => {
         </Card>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Diagnóstico do Processo</h1>
+            <h1 className="text-2xl font-bold text-foreground">Mapeamento concluido</h1>
             <p className="text-muted-foreground">
-              A entrevista foi concluída (ou ainda não há diagnóstico salvo). Escolha o próximo passo para continuar o trabalho com este processo.
+              Escolha o proximo passo para continuar o trabalho com este processo.
             </p>
           </div>
           <Button variant="outline" onClick={() => navigate("/processos")}>
@@ -104,26 +105,26 @@ const ProcessoDiagnostico = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Você pode gerar o mapa AS-IS, pedir um diagnóstico completo ou abrir os detalhes avançados do formulário do processo.
+              Voce pode gerar o mapa AS-IS, pedir um diagnostico completo ou abrir os detalhes avancados do formulario do processo.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 className="flex-1"
-                onClick={() => navigate("/processos/novo/formulario", { state: { focusTab: "mapa-as-is" } })}
+                onClick={() => navigate("/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "mapa-as-is" } })}
               >
                 <ClipboardList className="h-4 w-4 mr-2" /> Gerar/atualizar mapa AS-IS
               </Button>
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() => navigate("/processos/novo/formulario", { state: { focusTab: "relatorio" } })}
+                onClick={() => navigate("/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "relatorio" } })}
               >
                 <Activity className="h-4 w-4 mr-2" /> Gerar diagnóstico
               </Button>
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() => navigate("/processos/novo/formulario", { state: { focusTab: "identificacao" } })}
+                onClick={() => navigate("/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "identificacao" } })}
               >
                 <Target className="h-4 w-4 mr-2" /> Ver detalhes avançados do processo
               </Button>
