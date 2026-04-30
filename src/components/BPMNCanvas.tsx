@@ -165,7 +165,7 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
     if (!formData) {
       toast({
         title: "Dados insuficientes",
-        description: "Preencha as atividades ou o resumo do processo antes de gerar o mapa.",
+        description: "Preencha as atividades ou o objetivo do processo antes de gerar o mapa.",
         variant: "destructive",
       });
       return;
@@ -181,10 +181,9 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
           entradas: formData.entradas,
           saidas: formData.saidas,
           nomeProcesso: formData.nomeProcesso,
-          resumo: formData.documentacao,
+          resumo: formData.objetivo,
           mode,
-          sugestoes: mode === "to-be" ? formData.sugestoes : undefined,
-          automacao: mode === "to-be" ? formData.automacao : undefined,
+          oportunidadesMelhoria: mode === "to-be" ? formData.oportunidadesMelhoria : undefined,
         },
       });
 

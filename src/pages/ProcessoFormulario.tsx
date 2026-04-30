@@ -136,7 +136,7 @@ const ProcessoFormulario = () => {
     "Relatório",
   ];
   const getCurrentGlobalStep = () => {
-    if (["melhorias", "planoAcao", "indicadores", "mapa-to-be"].includes(activeTab)) return 3;
+    if (["melhorias", "plano", "indicadores", "mapa-to-be"].includes(activeTab)) return 3;
     if (activeTab === "relatorio") return 4;
     if (["identificacao", "contexto", "dores", "riscos", "entradas", "atividades", "saidas", "recursos", "decisoes", "sipoc", "mapa-as-is"].includes(activeTab)) {
       return 2;
@@ -234,7 +234,7 @@ const ProcessoFormulario = () => {
     const updated = [...form.riscos]; updated[i] = { ...updated[i], [field]: value }; updateField("riscos", updated);
   };
 
-  const addIndicador = () => updateField("indicadores", [...form.indicadores, { indicador: "", meta: "" }]);
+  const addIndicador = () => updateField("indicadores", [...form.indicadores, { nome: "", objetivo: "", formulaCalculo: "", meta: "", periodicidade: "", responsavel: "" }]);
   const removeIndicador = (i: number) => updateField("indicadores", form.indicadores.filter((_, idx) => idx !== i));
   const updateIndicador = (i: number, field: keyof IndicadorForm, value: string) => {
     const updated = [...form.indicadores]; updated[i] = { ...updated[i], [field]: value }; updateField("indicadores", updated);
@@ -270,7 +270,6 @@ const ProcessoFormulario = () => {
       setForm((prev) => ({
         ...prev,
         objetivo: data.objetivo || prev.objetivo,
-        porqueExiste: data.porqueExiste || prev.porqueExiste,
         clienteProcesso: data.clienteProcesso || prev.clienteProcesso,
         areasEnvolvidas: data.areasEnvolvidas || prev.areasEnvolvidas,
         gatilho: data.gatilho || prev.gatilho,
@@ -282,13 +281,9 @@ const ProcessoFormulario = () => {
         problemas: data.problemas || prev.problemas,
         problemasTexto: data.problemasTexto || prev.problemasTexto,
         riscos: data.riscos?.length ? data.riscos : prev.riscos,
-        controles: data.controles || prev.controles,
         indicadores: data.indicadores?.length ? data.indicadores : prev.indicadores,
-        sugestoes: data.sugestoes || prev.sugestoes,
-        automacao: data.automacao || prev.automacao,
-        documentacao: data.documentacao || prev.documentacao,
+        oportunidadesMelhoria: data.oportunidadesMelhoria || prev.oportunidadesMelhoria,
         planoAcao: data.planoAcao?.length ? data.planoAcao : prev.planoAcao,
-        conclusao: data.conclusao || prev.conclusao,
       }));
       toast({ title: "Preenchimento concluído!", description: "Revise os dados gerados pela IA." });
     } catch (err) {
@@ -343,7 +338,7 @@ const ProcessoFormulario = () => {
             <div className="space-y-2"><Label>Empresa</Label><Input value={form.empresa} onChange={(e) => updateField("empresa", e.target.value)} placeholder="Nome da empresa" /></div>
             <div className="space-y-2"><Label>Nome do Processo</Label><Input value={form.nomeProcesso} onChange={(e) => updateField("nomeProcesso", e.target.value)} placeholder="Ex: Gestão de Vendas" /></div>
             <div className="space-y-2">
-              <Label>Classificação</Label>
+              <Label>Tipo de Processo</Label>
               <Select value={form.classificacao} onValueChange={(v) => updateField("classificacao", v as Classificacao)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -354,9 +349,8 @@ const ProcessoFormulario = () => {
               </Select>
             </div>
             <div className="space-y-2"><Label>Área</Label><Input value={form.area} onChange={(e) => updateField("area", e.target.value)} placeholder="Área responsável" /></div>
-            <div className="space-y-2"><Label>Dono do Processo</Label><Input value={form.donoProcesso} onChange={(e) => updateField("donoProcesso", e.target.value)} placeholder="Responsável principal" /></div>
+            <div className="space-y-2"><Label>Responsável pelo Processo</Label><Input value={form.donoProcesso} onChange={(e) => updateField("donoProcesso", e.target.value)} placeholder="Responsável principal" /></div>
             <div className="space-y-2"><Label>Entrevistados</Label><Input value={form.entrevistados} onChange={(e) => updateField("entrevistados", e.target.value)} placeholder="Pessoas entrevistadas" /></div>
-            <div className="space-y-2 md:col-span-2"><Label>Informações Adicionais</Label><Textarea value={form.infoAdicionais} onChange={(e) => updateField("infoAdicionais", e.target.value)} placeholder="Observações relevantes" /></div>
           </div>
         );
 
@@ -376,7 +370,7 @@ const ProcessoFormulario = () => {
             <CardHeader className="p-0 pb-4"><CardTitle className="text-lg">Contexto do Processo</CardTitle></CardHeader>
             <div className="space-y-2"><Label>Objetivo do Processo</Label><Textarea value={form.objetivo} onChange={(e) => updateField("objetivo", e.target.value)} placeholder="Qual o objetivo?" /></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Cliente do Processo</Label><Input value={form.clienteProcesso} onChange={(e) => updateField("clienteProcesso", e.target.value)} placeholder="Quem recebe o resultado" /></div>
+              <div className="space-y-2"><Label>Cliente Principal do Processo</Label><Input value={form.clienteProcesso} onChange={(e) => updateField("clienteProcesso", e.target.value)} placeholder="Quem recebe o resultado principal" /></div>
               <div className="space-y-2"><Label>Áreas Envolvidas</Label><Input value={form.areasEnvolvidas} onChange={(e) => updateField("areasEnvolvidas", e.target.value)} placeholder="Comercial, Financeiro..." /></div>
             </div>
           </div>
@@ -395,7 +389,7 @@ const ProcessoFormulario = () => {
                   </div>
                 ))}
               </div>
-              <Textarea value={form.problemasTexto} onChange={(e) => updateField("problemasTexto", e.target.value)} placeholder="Descreva os problemas em detalhes" rows={3} />
+              <Textarea value={form.problemasTexto} onChange={(e) => updateField("problemasTexto", e.target.value)} placeholder="Descreva as principais dores do processo" rows={3} />
             </div>
           </div>
         );
@@ -447,14 +441,14 @@ const ProcessoFormulario = () => {
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Recursos necessários</Label>
+              <Label>Recursos, Sistemas e Documentos Usados</Label>
               <Textarea
                 value={form.recursos}
                 onChange={(e) => updateField("recursos", e.target.value)}
-                placeholder="Digite um recurso por linha (ex.: ERP, CRM, Máquina X)"
+                placeholder="Digite um item por linha (ex.: ERP, CRM, POP comercial, planilha de controle)"
                 rows={6}
               />
-              <p className="text-xs text-muted-foreground">Um por linha. Ex.: ERP, CRM, Máquina X.</p>
+              <p className="text-xs text-muted-foreground">Um por linha. Ex.: ERP, CRM, POP, planilha, equipamento ou acesso.</p>
             </div>
             {recursosList.length > 0 && (
               <div className="space-y-2">
@@ -472,7 +466,7 @@ const ProcessoFormulario = () => {
       case "decisoes":
         return (
           <div className="space-y-4">
-            <div className="space-y-2"><Label>Decisões do Processo</Label><Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, verificações, análises necessárias" rows={6} /></div>
+            <div className="space-y-2"><Label>Pontos de Decisão e Aprovação</Label><Textarea value={form.decisoes} onChange={(e) => updateField("decisoes", e.target.value)} placeholder="Aprovações, validações, exceções e escolhas de caminho" rows={6} /></div>
           </div>
         );
 
@@ -689,8 +683,15 @@ const ProcessoFormulario = () => {
       case "melhorias":
         return (
           <div className="space-y-6">
-            <div className="space-y-2"><CardTitle className="text-lg">Sugestões de Melhoria</CardTitle><Textarea value={form.sugestoes} onChange={(e) => updateField("sugestoes", e.target.value)} placeholder="O que mudaria?" rows={3} /></div>
-            <div className="space-y-2"><CardTitle className="text-lg">Oportunidade de Automação</CardTitle><Textarea value={form.automacao} onChange={(e) => updateField("automacao", e.target.value)} placeholder="Atividades automatizáveis?" rows={3} /></div>
+            <div className="space-y-2">
+              <CardTitle className="text-lg">Oportunidades de Melhoria</CardTitle>
+              <Textarea
+                value={form.oportunidadesMelhoria}
+                onChange={(e) => updateField("oportunidadesMelhoria", e.target.value)}
+                placeholder="Liste melhorias, automações e otimizações priorizadas para o processo"
+                rows={5}
+              />
+            </div>
           </div>
         );
 
@@ -719,7 +720,6 @@ const ProcessoFormulario = () => {
                 </TableBody>
               </Table>
             </div>
-            <div className="space-y-2"><CardTitle className="text-lg">Conclusão</CardTitle><Textarea value={form.conclusao} onChange={(e) => updateField("conclusao", e.target.value)} placeholder="Conclusão final do mapeamento" rows={4} /></div>
           </div>
         );
 
@@ -745,12 +745,16 @@ const ProcessoFormulario = () => {
               <Button size="sm" variant="outline" onClick={addIndicador}><Plus className="h-4 w-4 mr-1" /> Indicador</Button>
             </div>
             <Table>
-              <TableHeader><TableRow><TableHead>Indicador</TableHead><TableHead>Meta</TableHead><TableHead className="w-12"></TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Objetivo</TableHead><TableHead>Fórmula</TableHead><TableHead>Meta</TableHead><TableHead>Periodicidade</TableHead><TableHead>Responsável</TableHead><TableHead className="w-12"></TableHead></TableRow></TableHeader>
               <TableBody>
                 {form.indicadores.map((ind, i) => (
                   <TableRow key={i}>
-                    <TableCell><Input value={ind.indicador} onChange={(e) => updateIndicador(i, "indicador", e.target.value)} placeholder="Nome do indicador" /></TableCell>
+                    <TableCell><Input value={ind.nome} onChange={(e) => updateIndicador(i, "nome", e.target.value)} placeholder="Nome do indicador" /></TableCell>
+                    <TableCell><Input value={ind.objetivo} onChange={(e) => updateIndicador(i, "objetivo", e.target.value)} placeholder="Objetivo do indicador" /></TableCell>
+                    <TableCell><Input value={ind.formulaCalculo} onChange={(e) => updateIndicador(i, "formulaCalculo", e.target.value)} placeholder="Como calcular" /></TableCell>
                     <TableCell><Input value={ind.meta} onChange={(e) => updateIndicador(i, "meta", e.target.value)} placeholder="Meta" /></TableCell>
+                    <TableCell><Input value={ind.periodicidade} onChange={(e) => updateIndicador(i, "periodicidade", e.target.value)} placeholder="Semanal, mensal..." /></TableCell>
+                    <TableCell><Input value={ind.responsavel} onChange={(e) => updateIndicador(i, "responsavel", e.target.value)} placeholder="Responsável" /></TableCell>
                     <TableCell>{form.indicadores.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeIndicador(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}</TableCell>
                   </TableRow>
                 ))}

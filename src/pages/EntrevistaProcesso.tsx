@@ -136,7 +136,6 @@ export default function EntrevistaProcesso() {
       "classificacao",
       "entrevistados",
       "objetivo",
-      "porqueExiste",
       "clienteProcesso",
       "areasEnvolvidas",
       "gatilho",
@@ -145,10 +144,9 @@ export default function EntrevistaProcesso() {
       "decisoes",
       "saidas",
       "recursos",
-      "documentacao",
       "problemasTexto",
-      "controles",
       "riscos",
+      "oportunidadesMelhoria",
       "indicadores",
       "planoAcao",
     ];
@@ -163,7 +161,7 @@ export default function EntrevistaProcesso() {
         case "riscos":
           return (arr as RiscoForm[]).some((r) => r.risco.trim() || r.consequencia.trim());
         case "indicadores":
-          return (arr as IndicadorForm[]).some((i) => i.indicador.trim() || i.meta.trim());
+          return (arr as IndicadorForm[]).some((i) => i.nome.trim() || i.meta.trim() || i.objetivo.trim() || i.formulaCalculo.trim());
         case "planoAcao":
           return (arr as PlanoAcao5W2H[]).some((p) => p.oque.trim() || p.porque.trim() || p.quem.trim() || p.quando.trim() || p.onde.trim() || p.como.trim() || p.custo.trim());
         default:
@@ -198,7 +196,6 @@ export default function EntrevistaProcesso() {
       source.nomeProcesso,
       source.area,
       source.objetivo,
-      source.porqueExiste,
       source.clienteProcesso,
     ]
       .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
@@ -236,7 +233,7 @@ export default function EntrevistaProcesso() {
       case "riscos":
         return (arr as RiscoForm[]).some((r) => r.risco.trim() || r.consequencia.trim());
       case "indicadores":
-        return (arr as IndicadorForm[]).some((i) => i.indicador.trim() || i.meta.trim());
+        return (arr as IndicadorForm[]).some((i) => i.nome.trim() || i.meta.trim() || i.objetivo.trim() || i.formulaCalculo.trim());
       case "planoAcao":
         return (arr as PlanoAcao5W2H[]).some((p) => p.oque.trim() || p.porque.trim() || p.quem.trim() || p.quando.trim() || p.onde.trim() || p.como.trim() || p.custo.trim());
       default:
@@ -287,9 +284,30 @@ export default function EntrevistaProcesso() {
   };
 
   const suggestIndicators = (currentForm: ProcessoFormData): IndicadorForm[] => [
-    { indicador: `Tempo total do processo ${currentForm.nomeProcesso ? `- ${currentForm.nomeProcesso}` : ""}`.trim(), meta: "Reduzir o tempo médio de execução" },
-    { indicador: "Cumprimento de prazo", meta: "Manter pelo menos 95% das entregas dentro do prazo" },
-    { indicador: "Taxa de retrabalho", meta: "Reduzir reincidências e correções ao mínimo necessário" },
+    {
+      nome: `Tempo total do processo ${currentForm.nomeProcesso ? `- ${currentForm.nomeProcesso}` : ""}`.trim(),
+      objetivo: "Reduzir o tempo médio do processo",
+      formulaCalculo: "Soma do tempo total dos casos concluídos / quantidade de casos concluídos",
+      meta: "Reduzir o tempo médio de execução",
+      periodicidade: "Mensal",
+      responsavel: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+    },
+    {
+      nome: "Cumprimento de prazo",
+      objetivo: "Aumentar a previsibilidade das entregas",
+      formulaCalculo: "(Quantidade de entregas no prazo / quantidade total de entregas) x 100",
+      meta: "Manter pelo menos 95% das entregas dentro do prazo",
+      periodicidade: "Mensal",
+      responsavel: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+    },
+    {
+      nome: "Taxa de retrabalho",
+      objetivo: "Reduzir correções e reincidências",
+      formulaCalculo: "(Quantidade de casos com retrabalho / quantidade total de casos) x 100",
+      meta: "Reduzir reincidências e correções ao mínimo necessário",
+      periodicidade: "Mensal",
+      responsavel: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+    },
   ];
 
   const suggestPlanActions = (currentForm: ProcessoFormData): PlanoAcao5W2H[] => [
@@ -458,7 +476,6 @@ export default function EntrevistaProcesso() {
         area: "Qual é a área responsável pelo processo?",
         donoProcesso: "Quem é o dono do processo?",
         objetivo: "Qual é o objetivo principal do processo?",
-        porqueExiste: "Por que este processo existe?",
         clienteProcesso: "Só para eu fechar esse ponto com precisão: quem recebe o resultado final desse processo? Pode ser uma área interna, um cliente externo ou outro time.",
         areasEnvolvidas: "Quais áreas estão envolvidas?",
         gatilho: "Só para eu confirmar: o que dá início a esse processo na prática? O processo começa quando acontece qual evento, solicitação ou necessidade?",
@@ -466,10 +483,9 @@ export default function EntrevistaProcesso() {
         saidas: "E no final, quais são as principais saídas ou entregas geradas por esse processo? Quem recebe essas entregas?",
         etapas: "Liste atividades e responsáveis (uma por linha: Atividade - Responsável).",
         decisoes: "Existe algum ponto em que alguém precisa aprovar, reprovar, validar ou escolher um caminho dentro do processo? Se sim, em que momento isso acontece?",
-        recursos: "Só para eu não deixar lacuna: quais recursos são necessários para esse processo funcionar bem? Pode incluir pessoas, sistemas, planilhas, documentos, equipamentos ou acessos.",
-        documentacao: "Quais documentos são necessários ou usados ao longo desse processo? Pode incluir POP, instrução de trabalho, formulários, planilhas, políticas, checklists ou modelos.",
+        recursos: "Só para eu não deixar lacuna: quais recursos, sistemas e documentos são necessários para esse processo funcionar bem? Pode incluir pessoas, planilhas, equipamentos ou acessos.",
         problemasTexto: "Quais são as principais dores, rupturas ou problemas operacionais que acontecem nesse processo no dia a dia?",
-        controles: "Há alguma regra de negócio aplicada nesse processo? Se sim, qual? Pode ser critério de aprovação, prazo, limite, validação obrigatória ou alguma condição específica.",
+        oportunidadesMelhoria: "Quais melhorias, automações ou otimizações fariam mais sentido para esse processo?",
         indicadores: "Hoje vocês acompanham algum indicador desse processo, como prazo, volume, retrabalho, SLA, qualidade ou produtividade?",
         planoAcao: "Existe hoje algum plano de ação, melhoria priorizada ou iniciativa em andamento para esse processo?",
       };
@@ -490,10 +506,7 @@ export default function EntrevistaProcesso() {
       return { partialUpdate: { donoProcesso: answer, classificacao: inferClassification({ ...currentForm, donoProcesso: answer }) }, nextQuestion: nextText("objetivo"), done: false };
     }
     if (!isFilled("objetivo")) {
-      return { partialUpdate: { objetivo: answer }, nextQuestion: nextText("porqueExiste"), done: false };
-    }
-    if (!isFilled("porqueExiste")) {
-      return { partialUpdate: { porqueExiste: answer }, nextQuestion: nextText("clienteProcesso"), done: false };
+      return { partialUpdate: { objetivo: answer }, nextQuestion: nextText("clienteProcesso"), done: false };
     }
     if (!isFilled("clienteProcesso")) {
       return { partialUpdate: { clienteProcesso: answer }, nextQuestion: nextText("areasEnvolvidas"), done: false };
@@ -529,13 +542,6 @@ export default function EntrevistaProcesso() {
         partialUpdate: {
           recursos: parseList(answer).join("\n"),
         },
-        nextQuestion: nextText("documentacao"),
-        done: false,
-      };
-    }
-    if (!isFilled("documentacao")) {
-      return {
-        partialUpdate: { documentacao: answer },
         nextQuestion: nextText("problemasTexto"),
         done: false,
       };
@@ -543,20 +549,20 @@ export default function EntrevistaProcesso() {
     if (!isFilled("problemasTexto")) {
       return {
         partialUpdate: { problemasTexto: answer },
-        nextQuestion: nextText("controles"),
-        done: false,
-      };
-    }
-    if (!isFilled("controles")) {
-      return {
-        partialUpdate: { controles: answer },
-        nextQuestion: hasMeaningfulArrayData("riscos", currentForm.riscos) ? nextText("indicadores") : "Com base no que você me explicou, já consigo sugerir alguns riscos prováveis desse processo. Depois disso, quero só confirmar se vocês acompanham algum indicador, como prazo, volume, retrabalho, SLA, qualidade ou produtividade.",
+        nextQuestion: hasMeaningfulArrayData("riscos", currentForm.riscos) ? nextText("oportunidadesMelhoria") : "Com base no que você me explicou, já consigo sugerir alguns riscos prováveis desse processo. Depois disso, quero te ouvir sobre quais melhorias, automações ou otimizações fariam mais sentido.",
         done: false,
       };
     }
     if (!isFilled("riscos")) {
       return {
         partialUpdate: { riscos: suggestRisks(currentForm) },
+        nextQuestion: nextText("oportunidadesMelhoria"),
+        done: false,
+      };
+    }
+    if (!isFilled("oportunidadesMelhoria")) {
+      return {
+        partialUpdate: { oportunidadesMelhoria: answer },
         nextQuestion: nextText("indicadores"),
         done: false,
       };
@@ -569,8 +575,15 @@ export default function EntrevistaProcesso() {
           done: false,
         };
       }
-      const indicadores: IndicadorForm[] = parsePairs(answer).map(([indicador, meta]) => ({ indicador, meta }));
-      return { partialUpdate: { indicadores: indicadores.length ? indicadores : [{ indicador: answer, meta: "" }] }, nextQuestion: nextText("planoAcao"), done: false };
+      const indicadores: IndicadorForm[] = parsePairs(answer).map(([nome, meta]) => ({
+        nome,
+        objetivo: "Acompanhar o desempenho do processo",
+        formulaCalculo: "",
+        meta,
+        periodicidade: "",
+        responsavel: currentForm.donoProcesso || "",
+      }));
+      return { partialUpdate: { indicadores: indicadores.length ? indicadores : [{ nome: answer, objetivo: "Acompanhar o desempenho do processo", formulaCalculo: "", meta: "", periodicidade: "", responsavel: currentForm.donoProcesso || "" }] }, nextQuestion: nextText("planoAcao"), done: false };
     }
     if (!isFilled("planoAcao")) {
       if (suggestsNoExistingItem(answer)) {

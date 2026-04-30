@@ -43,8 +43,12 @@ export interface RiscoForm {
 }
 
 export interface IndicadorForm {
-  indicador: string;
+  nome: string;
+  objetivo: string;
+  formulaCalculo: string;
   meta: string;
+  periodicidade: string;
+  responsavel: string;
 }
 
 export interface PlanoAcao5W2H {
@@ -67,11 +71,9 @@ export interface ProcessoFormData {
   area: string;
   donoProcesso: string;
   entrevistados: string;
-  infoAdicionais: string;
 
   // 2. Contexto
   objetivo: string;
-  porqueExiste: string;
   clienteProcesso: string;
   areasEnvolvidas: string;
 
@@ -106,28 +108,16 @@ export interface ProcessoFormData {
   // 10. Riscos
   riscos: RiscoForm[];
 
-  // 11. Controles
-  controles: string;
-
-  // 12. Indicadores
+  // 11. Indicadores
   indicadores: IndicadorForm[];
 
-  // 13. Sugestões
-  sugestoes: string;
+  // 12. Oportunidades de Melhoria
+  oportunidadesMelhoria: string;
 
-  // 14. Automação
-  automacao: string;
-
-  // 15. Documentação
-  documentacao: string;
-
-  // 16. Plano de Ação
+  // 13. Plano de Ação
   planoAcao: PlanoAcao5W2H[];
 
-  // 17. Conclusão
-  conclusao: string;
-
-  // 18. BPMN Maps
+  // 14. BPMN Maps
   bpmnAsIs: string;
   bpmnToBe: string;
 }
@@ -242,9 +232,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   area: "",
   donoProcesso: "",
   entrevistados: "",
-  infoAdicionais: "",
   objetivo: "",
-  porqueExiste: "",
   clienteProcesso: "",
   areasEnvolvidas: "",
   gatilho: "",
@@ -256,13 +244,9 @@ export const emptyProcessoForm: ProcessoFormData = {
   problemas: { retrabalho: false, atrasos: false, erros: false, dependencia: false, faltaPadrao: false },
   problemasTexto: "",
   riscos: [{ risco: "", consequencia: "", probabilidade: 1, impacto: 1 }],
-  controles: "",
-  indicadores: [{ indicador: "", meta: "" }],
-  sugestoes: "",
-  automacao: "",
-  documentacao: "",
+  indicadores: [{ nome: "", objetivo: "", formulaCalculo: "", meta: "", periodicidade: "", responsavel: "" }],
+  oportunidadesMelhoria: "",
   planoAcao: [{ oque: "", porque: "", quem: "", quando: "", onde: "", como: "", custo: "" }],
-  conclusao: "",
   bpmnAsIs: "",
   bpmnToBe: "",
 };

@@ -59,7 +59,6 @@ Para probabilidade e impacto de riscos, use valores entre 1 e 5.
                 type: "object",
                 properties: {
                   objetivo: { type: "string", description: "Objetivo do processo" },
-                  porqueExiste: { type: "string", description: "Justificativa da existência do processo" },
                   clienteProcesso: { type: "string", description: "Cliente que recebe o resultado" },
                   areasEnvolvidas: { type: "string", description: "Áreas envolvidas, separadas por vírgula" },
                   gatilho: { type: "string", description: "O que dispara o processo" },
@@ -125,21 +124,22 @@ Para probabilidade e impacto de riscos, use valores entre 1 e 5.
                       required: ["risco", "consequencia", "probabilidade", "impacto"],
                     },
                   },
-                  controles: { type: "string", description: "Controles existentes" },
                   indicadores: {
                     type: "array",
                     items: {
                       type: "object",
                       properties: {
-                        indicador: { type: "string" },
+                        nome: { type: "string" },
+                        objetivo: { type: "string" },
+                        formulaCalculo: { type: "string" },
                         meta: { type: "string" },
+                        periodicidade: { type: "string" },
+                        responsavel: { type: "string" },
                       },
-                      required: ["indicador", "meta"],
+                      required: ["nome", "objetivo", "formulaCalculo", "meta", "periodicidade", "responsavel"],
                     },
                   },
-                  sugestoes: { type: "string", description: "Sugestões de melhoria" },
-                  automacao: { type: "string", description: "Oportunidades de automação" },
-                  documentacao: { type: "string", description: "Documentação existente ou necessária" },
+                  oportunidadesMelhoria: { type: "string", description: "Melhorias e automações priorizadas para o processo" },
                   planoAcao: {
                     type: "array",
                     items: {
@@ -156,13 +156,12 @@ Para probabilidade e impacto de riscos, use valores entre 1 e 5.
                       required: ["oque", "porque", "quem", "quando", "onde", "como", "custo"],
                     },
                   },
-                  conclusao: { type: "string", description: "Conclusão do mapeamento" },
                 },
                 required: [
-                  "objetivo", "porqueExiste", "clienteProcesso", "areasEnvolvidas",
+                  "objetivo", "clienteProcesso", "areasEnvolvidas",
                   "entradas", "etapas", "decisoes", "saidas", "recursos",
-                  "problemas", "problemasTexto", "riscos", "controles", "indicadores",
-                  "sugestoes", "automacao", "documentacao", "planoAcao", "conclusao",
+                  "problemas", "problemasTexto", "riscos", "indicadores",
+                  "oportunidadesMelhoria", "planoAcao",
                 ],
               },
             },

@@ -20,8 +20,7 @@ serve(async (req) => {
       saidas,
       nomeProcesso,
       mode,
-      sugestoes,
-      automacao,
+      oportunidadesMelhoria,
       resumo,
     } = await req.json();
 
@@ -53,7 +52,7 @@ serve(async (req) => {
     const saidasText = saidas?.map((s: any) => `${s.saida} → ${s.cliente}`).join(", ") || "N/A";
 
     const modeInstruction = mode === "to-be"
-      ? `Este é o mapa TO-BE (futuro/otimizado). Incorpore as seguintes melhorias:\n- Sugestões: ${sugestoes || "N/A"}\n- Automação: ${automacao || "N/A"}\nAdicione atividades otimizadas, remova gargalos e inclua automações como ServiceTasks.`
+      ? `Este é o mapa TO-BE (futuro/otimizado). Incorpore as seguintes oportunidades de melhoria:\n- Oportunidades priorizadas: ${oportunidadesMelhoria || "N/A"}\nAdicione atividades otimizadas, remova gargalos e inclua automações quando fizer sentido.`
       : `Este é o mapa AS-IS (situação atual). Represente fielmente o processo como descrito.`;
 
     const systemPrompt = `Você é um especialista em modelagem BPMN 2.0. Gere XML BPMN 2.0 válido e completo.

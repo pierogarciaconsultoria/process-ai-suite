@@ -51,8 +51,7 @@ Objetivo do texto:
 Instruções:
 - Comece com um parágrafo de CONTEXTO (onde o processo se encaixa na operação).
 - Em seguida descreva o FLUXO principal em ordem lógica: gatilho, principais etapas, decisões, saídas.
-- Destaque, em frases naturais, principais riscos, controles e pontos de atenção.
-- Se houver frequência e tempo de execução, incorpore isso naturalmente na narrativa.
+- Destaque, em frases naturais, principais riscos, dores e pontos de atenção.
 - Evite bullets e títulos; escreva como um texto corrido de 3 a 6 parágrafos curtos.
 - Não use markdown, não use listas. Apenas texto puro.
 `;
@@ -121,4 +120,3 @@ Instruções:
     );
   }
 });
-
