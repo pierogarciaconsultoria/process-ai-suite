@@ -65,7 +65,6 @@ export interface ProcessoFormData {
   // 1. Identificação
   data: string;
   analista: string;
-  empresa: string;
   nomeProcesso: string;
   classificacao: Classificacao;
   area: string;
@@ -226,7 +225,6 @@ export interface DiagnosticoResult {
 export const emptyProcessoForm: ProcessoFormData = {
   data: new Date().toISOString().split("T")[0],
   analista: "",
-  empresa: "",
   nomeProcesso: "",
   classificacao: "Negócio",
   area: "",

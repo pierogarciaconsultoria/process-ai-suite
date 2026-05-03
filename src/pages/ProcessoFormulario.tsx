@@ -335,7 +335,6 @@ const ProcessoFormulario = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Data</Label><Input type="date" value={form.data} onChange={(e) => updateField("data", e.target.value)} /></div>
             <div className="space-y-2"><Label>Analista</Label><Input value={form.analista} onChange={(e) => updateField("analista", e.target.value)} placeholder="Nome do analista" /></div>
-            <div className="space-y-2"><Label>Empresa</Label><Input value={form.empresa} onChange={(e) => updateField("empresa", e.target.value)} placeholder="Nome da empresa" /></div>
             <div className="space-y-2"><Label>Nome do Processo</Label><Input value={form.nomeProcesso} onChange={(e) => updateField("nomeProcesso", e.target.value)} placeholder="Ex: Gestão de Vendas" /></div>
             <div className="space-y-2">
               <Label>Tipo de Processo</Label>
