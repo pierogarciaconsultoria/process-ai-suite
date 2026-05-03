@@ -105,6 +105,7 @@ export interface ProcessoFormData {
   problemasTexto: string;
 
   // 10. Riscos
+  riscosTexto: string;
   riscos: RiscoForm[];
 
   // 11. Indicadores
@@ -241,6 +242,7 @@ export const emptyProcessoForm: ProcessoFormData = {
   recursos: "",
   problemas: { retrabalho: false, atrasos: false, erros: false, dependencia: false, faltaPadrao: false },
   problemasTexto: "",
+  riscosTexto: "",
   riscos: [{ risco: "", consequencia: "", probabilidade: 1, impacto: 1 }],
   indicadores: [{ nome: "", objetivo: "", formulaCalculo: "", meta: "", periodicidade: "", responsavel: "" }],
   oportunidadesMelhoria: "",

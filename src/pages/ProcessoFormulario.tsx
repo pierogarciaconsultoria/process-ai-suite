@@ -112,6 +112,33 @@ const getRiscoNivel = (score: number) => {
   return { label: "Crítico", color: "bg-red-100 text-red-800" };
 };
 
+const inferRiscoProbabilidade = (text: string): NivelRisco => {
+  if (/(sempre|frequente|recorrente|constante|di[áa]rio)/i.test(text)) return 5;
+  if (/(muitas vezes|alto volume|semanal|comum)/i.test(text)) return 4;
+  if (/(eventual|ocasional|algumas vezes)/i.test(text)) return 3;
+  if (/(raro|baixa ocorr[êe]ncia)/i.test(text)) return 2;
+  return 3;
+};
+
+const inferRiscoImpacto = (text: string): NivelRisco => {
+  if (/(multa|fraude|parada|cliente|receita|jur[ií]dico|compliance)/i.test(text)) return 5;
+  if (/(atraso|retrabalho|erro|perda|bloqueio)/i.test(text)) return 4;
+  if (/(lentid[aã]o|depend[êe]ncia|fila)/i.test(text)) return 3;
+  return 3;
+};
+
+const buildRiscosFromText = (text: string): RiscoForm[] =>
+  text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({
+      risco: line,
+      consequencia: "Impacto operacional no processo caso o risco ocorra.",
+      probabilidade: inferRiscoProbabilidade(line),
+      impacto: inferRiscoImpacto(line),
+    }));
+
 // ── Component ──
 
 const ProcessoFormulario = () => {
@@ -232,6 +259,15 @@ const ProcessoFormulario = () => {
   const removeRisco = (i: number) => updateField("riscos", form.riscos.filter((_, idx) => idx !== i));
   const updateRisco = (i: number, field: keyof RiscoForm, value: string | number) => {
     const updated = [...form.riscos]; updated[i] = { ...updated[i], [field]: value }; updateField("riscos", updated);
+  };
+  const analyzeRiskText = () => {
+    const parsed = buildRiscosFromText(form.riscosTexto || "");
+    if (!parsed.length) {
+      toast({ title: "Descreva os riscos", description: "Informe ao menos um risco por linha para analisar.", variant: "destructive" });
+      return;
+    }
+    updateField("riscos", parsed);
+    toast({ title: "Riscos analisados", description: `${parsed.length} risco(s) estruturado(s) com probabilidade e impacto.` });
   };
 
   const addIndicador = () => updateField("indicadores", [...form.indicadores, { nome: "", objetivo: "", formulaCalculo: "", meta: "", periodicidade: "", responsavel: "" }]);
@@ -395,10 +431,22 @@ const ProcessoFormulario = () => {
 
       case "riscos":
         return (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Descrição dos Riscos Identificados</Label>
+              <Textarea
+                value={form.riscosTexto}
+                onChange={(e) => updateField("riscosTexto", e.target.value)}
+                placeholder="Descreva um risco por linha. Ex.: Atraso na aprovação por dependência de diretoria"
+                rows={5}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={analyzeRiskText}>Analisar riscos</Button>
+                <Button size="sm" variant="outline" onClick={addRisco}><Plus className="h-4 w-4 mr-1" /> Risco manual</Button>
+              </div>
+            </div>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Riscos do Processo</CardTitle>
-              <Button size="sm" variant="outline" onClick={addRisco}><Plus className="h-4 w-4 mr-1" /> Risco</Button>
+              <CardTitle className="text-lg">Matriz de Riscos do Processo</CardTitle>
             </div>
             <Table>
               <TableHeader><TableRow>
