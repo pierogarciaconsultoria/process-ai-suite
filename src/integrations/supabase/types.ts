@@ -177,6 +177,563 @@ export type Database = {
         }
         Relationships: []
       }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          chunk_text: string
+          company_id: string
+          created_at: string
+          document_id: string
+          embedding: string | null
+          id: string
+          metadata: Json
+          process_id: string | null
+        }
+        Insert: {
+          chunk_index: number
+          chunk_text: string
+          company_id: string
+          created_at?: string
+          document_id: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          process_id?: string | null
+        }
+        Update: {
+          chunk_index?: number
+          chunk_text?: string
+          company_id?: string
+          created_at?: string
+          document_id?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          process_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_generation_settings: {
+        Row: {
+          approval_role: string | null
+          auto_publish_after_approval: boolean
+          company_id: string
+          created_at: string
+          default_template_id: string | null
+          id: string
+          require_approval: boolean
+          review_period_days: number
+          updated_at: string
+          versioning_enabled: boolean
+        }
+        Insert: {
+          approval_role?: string | null
+          auto_publish_after_approval?: boolean
+          company_id: string
+          created_at?: string
+          default_template_id?: string | null
+          id?: string
+          require_approval?: boolean
+          review_period_days?: number
+          updated_at?: string
+          versioning_enabled?: boolean
+        }
+        Update: {
+          approval_role?: string | null
+          auto_publish_after_approval?: boolean
+          company_id?: string
+          created_at?: string
+          default_template_id?: string | null
+          id?: string
+          require_approval?: boolean
+          review_period_days?: number
+          updated_at?: string
+          versioning_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_generation_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_generation_settings_default_template_id_fkey"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_template_prompts: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          detail_level: string | null
+          generation_instructions: string | null
+          id: string
+          include_action_plan: boolean
+          include_checklist: boolean
+          include_improvements: boolean
+          include_indicators: boolean
+          include_risks: boolean
+          prompt_type: string
+          system_prompt: string | null
+          target_audience: string | null
+          template_id: string
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          detail_level?: string | null
+          generation_instructions?: string | null
+          id?: string
+          include_action_plan?: boolean
+          include_checklist?: boolean
+          include_improvements?: boolean
+          include_indicators?: boolean
+          include_risks?: boolean
+          prompt_type?: string
+          system_prompt?: string | null
+          target_audience?: string | null
+          template_id: string
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          detail_level?: string | null
+          generation_instructions?: string | null
+          id?: string
+          include_action_plan?: boolean
+          include_checklist?: boolean
+          include_improvements?: boolean
+          include_indicators?: boolean
+          include_risks?: boolean
+          prompt_type?: string
+          system_prompt?: string | null
+          target_audience?: string | null
+          template_id?: string
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_template_prompts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_template_prompts_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_template_sections: {
+        Row: {
+          allows_attachments: boolean
+          company_id: string | null
+          created_at: string
+          generated_by_ai: boolean
+          id: string
+          include_in_ai_indexing: boolean
+          include_in_final_document: boolean
+          is_active: boolean
+          is_required: boolean
+          section_description: string | null
+          section_key: string
+          section_title: string
+          sort_order: number
+          source_type: string
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          allows_attachments?: boolean
+          company_id?: string | null
+          created_at?: string
+          generated_by_ai?: boolean
+          id?: string
+          include_in_ai_indexing?: boolean
+          include_in_final_document?: boolean
+          is_active?: boolean
+          is_required?: boolean
+          section_description?: string | null
+          section_key: string
+          section_title: string
+          sort_order?: number
+          source_type?: string
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          allows_attachments?: boolean
+          company_id?: string | null
+          created_at?: string
+          generated_by_ai?: boolean
+          id?: string
+          include_in_ai_indexing?: boolean
+          include_in_final_document?: boolean
+          is_active?: boolean
+          is_required?: boolean
+          section_description?: string | null
+          section_key?: string
+          section_title?: string
+          sort_order?: number
+          source_type?: string
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_template_sections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_template_sections_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_template_variables: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          data_type: string | null
+          example_value: string | null
+          id: string
+          is_required: boolean
+          source_field: string | null
+          template_id: string
+          updated_at: string
+          variable_description: string | null
+          variable_key: string
+          variable_label: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          data_type?: string | null
+          example_value?: string | null
+          id?: string
+          is_required?: boolean
+          source_field?: string | null
+          template_id: string
+          updated_at?: string
+          variable_description?: string | null
+          variable_key: string
+          variable_label: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          data_type?: string | null
+          example_value?: string | null
+          id?: string
+          is_required?: boolean
+          source_field?: string | null
+          template_id?: string
+          updated_at?: string
+          variable_description?: string | null
+          variable_key?: string
+          variable_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_template_variables_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_template_variables_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          document_type: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          is_system_template: boolean
+          name: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          document_type: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          is_system_template?: boolean
+          name: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          document_type?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          is_system_template?: boolean
+          name?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_document_attachments: {
+        Row: {
+          company_id: string
+          created_at: string
+          document_id: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          uploaded_by: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          document_id: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          uploaded_by: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          document_id?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_document_attachments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_document_attachments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_document_versions: {
+        Row: {
+          change_summary: string | null
+          company_id: string
+          content_markdown: string
+          content_text: string | null
+          created_at: string
+          created_by: string
+          document_id: string
+          id: string
+          version: string
+        }
+        Insert: {
+          change_summary?: string | null
+          company_id: string
+          content_markdown: string
+          content_text?: string | null
+          created_at?: string
+          created_by: string
+          document_id: string
+          id?: string
+          version: string
+        }
+        Update: {
+          change_summary?: string | null
+          company_id?: string
+          content_markdown?: string
+          content_text?: string | null
+          created_at?: string
+          created_by?: string
+          document_id?: string
+          id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_document_versions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generated_documents: {
+        Row: {
+          ai_model: string | null
+          ai_prompt_used: string | null
+          approved_at: string | null
+          approved_by: string | null
+          archived_at: string | null
+          company_id: string
+          content_markdown: string
+          content_text: string | null
+          created_at: string
+          created_by: string
+          description_input: string | null
+          document_origin: string
+          document_type: string
+          generation_metadata: Json
+          id: string
+          process_id: string | null
+          process_mapping_id: string | null
+          published_at: string | null
+          status: string
+          template_id: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          ai_model?: string | null
+          ai_prompt_used?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          archived_at?: string | null
+          company_id: string
+          content_markdown: string
+          content_text?: string | null
+          created_at?: string
+          created_by: string
+          description_input?: string | null
+          document_origin: string
+          document_type: string
+          generation_metadata?: Json
+          id?: string
+          process_id?: string | null
+          process_mapping_id?: string | null
+          published_at?: string | null
+          status?: string
+          template_id: string
+          title: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          ai_model?: string | null
+          ai_prompt_used?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          archived_at?: string | null
+          company_id?: string
+          content_markdown?: string
+          content_text?: string | null
+          created_at?: string
+          created_by?: string
+          description_input?: string | null
+          document_origin?: string
+          document_type?: string
+          generation_metadata?: Json
+          id?: string
+          process_id?: string | null
+          process_mapping_id?: string | null
+          published_at?: string | null
+          status?: string
+          template_id?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_documents_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interview_sessions: {
         Row: {
           applied: boolean

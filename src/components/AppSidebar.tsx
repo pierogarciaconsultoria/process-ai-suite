@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Processos", url: "/processos", icon: ClipboardList },
+  { title: "Documentos", url: "/documentos", icon: FileText },
   { title: "Relatórios", url: "/relatorios", icon: FileText },
 ];
 

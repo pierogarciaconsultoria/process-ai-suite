@@ -16,6 +16,7 @@ const ProcessoNovo = React.lazy(() => import("./pages/ProcessoNovo"));
 const ProcessoFormulario = React.lazy(() => import("./pages/ProcessoFormulario"));
 const ProcessoDetalhe = React.lazy(() => import("./pages/ProcessoDetalhe"));
 const ProcessoDiagnostico = React.lazy(() => import("./pages/ProcessoDiagnostico"));
+const Documentos = React.lazy(() => import("./pages/Documentos"));
 const Arquitetura = React.lazy(() => import("./pages/Arquitetura"));
 const Usuarios = React.lazy(() => import("./pages/Usuarios"));
 const Relatorios = React.lazy(() => import("./pages/Relatorios"));
@@ -82,6 +83,7 @@ const App = () => (
                 <Route path="/processos/entrevista" element={<Navigate to="/processos/novo/entrevista" replace />} />
                 <Route path="/processos/diagnostico" element={<ProcessoDiagnostico />} />
                 <Route path="/processos/:id" element={<ProcessoDetalhe />} />
+                <Route path="/documentos" element={<Documentos />} />
               <Route path="/processos/:id/editar" element={<ProcessoFormulario />} />
               <Route path="/processos/:id/diagnostico" element={<ProcessoDiagnostico />} />
                 <Route path="/arquitetura" element={<Arquitetura />} />
