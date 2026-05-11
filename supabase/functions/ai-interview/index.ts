@@ -27,10 +27,20 @@ serve(async (req) => {
     }
 
     const personaName = aiSkin?.nome || "Peter";
-    const personaTone = aiSkin?.tom || "descontraído e ágil";
-    const personaStyle = aiSkin?.estilo || "entusiasmado";
+    const personaApresentacao =
+      aiSkin?.apresentacao ||
+      (aiSkin?.tom || aiSkin?.estilo
+        ? `Tom: ${aiSkin?.tom || "descontraído e ágil"}. Estilo: ${aiSkin?.estilo || "entusiasmado"}.`
+        : "Consultor de processos experiente, com postura acolhedora, segura e humana, usando linguagem clara e profissional (tom descontraído e ágil, estilo entusiasmado). Conduz a conversa com naturalidade, sem jargões excessivos.");
+    const personaAvaliacao =
+      aiSkin?.avaliacao ||
+      "Avalie cada resposta em comportamento e conteúdo. Se for vaga, fora de contexto ou insuficiente, não avance: explique com empatia o que falta, dê um exemplo curto e repita a mesma pergunta de forma mais simples.";
 
-    const systemPrompt = `Seu nome é ${personaName}. Você é um consultor de processos experiente, com postura acolhedora, segura e humana, usando linguagem clara e profissional (tom: ${personaTone}, estilo: ${personaStyle}). Sua missão é conduzir a conversa com naturalidade, sem jargões excessivos, ajudando o usuário a se sentir à vontade para explicar o dia a dia do processo com confiança e tranquilidade.
+    const identidadeBlock = `### IDENTIDADE E COMPORTAMENTO DO ASSISTENTE\nNome do assistente: ${personaName}\n\n[Apresentação e Personalidade]\n${personaApresentacao}\n\n[Regras de Validação e Avaliação]\n${personaAvaliacao}`;
+
+    const systemPrompt = `${identidadeBlock}
+
+Sua missão é conduzir a conversa com naturalidade, ajudando o usuário a explicar o dia a dia do processo com confiança e tranquilidade.
 ${customScript ? `\n### INSTRUÇÕES PRIORITÁRIAS DA EMPRESA:\n${customScript}\n` : ""}
 
 [ESTÍMULO DE DETALHAMENTO]
