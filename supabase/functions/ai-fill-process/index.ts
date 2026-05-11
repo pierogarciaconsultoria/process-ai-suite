@@ -37,14 +37,14 @@ Limite etapas a 4-8 itens. Gere 2-4 riscos. Gere 2-4 indicadores. Gere 1-3 açõ
 Para probabilidade e impacto de riscos, use valores entre 1 e 5.
 `;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Descrição do processo:\n${descricao}` },
