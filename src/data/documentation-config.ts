@@ -29,6 +29,13 @@ export const DOCUMENT_TYPES = [
   "Documento avulso gerado por IA",
 ] as const;
 
+export const PROCEDURE_CATEGORIES = [
+  "Procedimento Operacional",
+  "Instrução de Trabalho",
+  "Norma Interna",
+  "Outro",
+] as const;
+
 export const DOCUMENT_TONES = [
   "Técnico",
   "Executivo",
@@ -49,6 +56,7 @@ export const DOCUMENT_DETAIL_LEVELS = [
 export const DOCUMENT_STATUSES = [
   "Rascunho",
   "Em revisão",
+  "Em aprovação",
   "Aprovado",
   "Publicado",
   "Obsoleto",
@@ -65,10 +73,12 @@ export const DOCUMENT_ORIGINS = [
 
 export type DocumentationTabId = typeof DOCUMENTATION_TABS[number]["id"];
 export type DocumentType = typeof DOCUMENT_TYPES[number];
+export type ProcedureCategory = typeof PROCEDURE_CATEGORIES[number];
 export type DocumentTone = typeof DOCUMENT_TONES[number];
 export type DocumentDetailLevel = typeof DOCUMENT_DETAIL_LEVELS[number];
 export type DocumentStatus = typeof DOCUMENT_STATUSES[number];
 export type DocumentOrigin = typeof DOCUMENT_ORIGINS[number];
+export type DocumentSourceMode = "linked_process" | "independent";
 
 export type SectionSourceType =
   | "formulario"
@@ -205,21 +215,63 @@ export interface DocumentPreviewData {
   generationMetadata: Record<string, unknown>;
 }
 
+export interface DocumentRevisionEntry {
+  revision: string;
+  revisedBy: string;
+  revisedAt: string;
+  reason: string;
+  previousStatus: DocumentStatus;
+}
+
+export interface DocumentApprovalEntry {
+  decision: "Aprovado" | "Reprovado";
+  responsibleName: string;
+  responsibleRole: string;
+  decidedAt: string;
+  comment: string;
+}
+
+export interface DocumentDistributionEntry {
+  recipient: string;
+  distributedAt: string;
+  distributedBy: string;
+}
+
 export interface GeneratedDocumentRecord extends DocumentPreviewData {
   id: string;
+  code: string;
+  sourceMode: DocumentSourceMode;
   companyId: string | null;
   processId: string | null;
   processMappingId: string | null;
+  processName: string;
+  processLink: string | null;
+  processStatusAtGeneration: string;
+  linkedMapRevision: string;
+  linkedMapApprovedAt: string;
+  mapVersionLabel: string;
+  area: string;
   templateId: string;
   documentOrigin: DocumentOrigin;
   documentType: DocumentType;
+  procedureCategory: ProcedureCategory;
+  documentOwner: string;
   status: DocumentStatus;
   version: string;
+  revision: string;
+  revisionNumber: number;
+  approverName: string;
+  approverRole: string;
+  distributedTo: string[];
+  updatedAt: string;
   createdBy: string;
   createdAt: string;
   descriptionInput?: string;
   aiModel?: string;
   aiPromptUsed?: string;
+  revisionHistory: DocumentRevisionEntry[];
+  approvalHistory: DocumentApprovalEntry[];
+  distributionHistory: DocumentDistributionEntry[];
 }
 
 export interface ManualDescriptionInput {
@@ -556,7 +608,8 @@ export function loadGeneratedDocuments(companyId: string | null): GeneratedDocum
   const saved = localStorage.getItem(storageKeyForGeneratedDocuments(companyId));
   if (!saved) return [];
   try {
-    return JSON.parse(saved) as GeneratedDocumentRecord[];
+    const parsed = JSON.parse(saved) as Partial<GeneratedDocumentRecord>[];
+    return normalizeGeneratedDocuments(parsed);
   } catch {
     return [];
   }
@@ -564,6 +617,86 @@ export function loadGeneratedDocuments(companyId: string | null): GeneratedDocum
 
 export function saveGeneratedDocuments(companyId: string | null, docs: GeneratedDocumentRecord[]) {
   localStorage.setItem(storageKeyForGeneratedDocuments(companyId), JSON.stringify(docs));
+}
+
+export function formatRevision(revisionNumber: number) {
+  return `Rev.${String(revisionNumber).padStart(2, "0")}`;
+}
+
+export function nextDocumentCode(existingDocs: Array<Pick<GeneratedDocumentRecord, "code">>) {
+  const max = existingDocs.reduce((acc, doc) => {
+    const match = /IT-(\d+)/.exec(doc.code || "");
+    if (!match) return acc;
+    return Math.max(acc, Number(match[1]));
+  }, 0);
+  return `IT-${String(max + 1).padStart(3, "0")}`;
+}
+
+function normalizeGeneratedDocuments(parsed: Partial<GeneratedDocumentRecord>[]): GeneratedDocumentRecord[] {
+  const ordered = [...parsed].sort((a, b) => {
+    const aTime = new Date(a.createdAt || 0).getTime();
+    const bTime = new Date(b.createdAt || 0).getTime();
+    return aTime - bTime;
+  });
+
+  const result: GeneratedDocumentRecord[] = [];
+
+  for (const doc of ordered) {
+    const createdAt = doc.createdAt || new Date().toISOString();
+    const revisionNumber = typeof doc.revisionNumber === "number"
+      ? doc.revisionNumber
+      : (() => {
+          const match = /Rev\.(\d+)/.exec(doc.revision || "");
+          return match ? Number(match[1]) : 0;
+        })();
+    const code = doc.code || nextDocumentCode(result);
+    result.push({
+      id: doc.id || crypto.randomUUID(),
+      code,
+      sourceMode: doc.sourceMode || (doc.processId ? "linked_process" : "independent"),
+      companyId: doc.companyId ?? null,
+      processId: doc.processId ?? null,
+      processMappingId: doc.processMappingId ?? null,
+      processName: doc.processName || "Processo não informado",
+      processLink: doc.processLink || (doc.processId ? `/processos/${doc.processId}` : null),
+      processStatusAtGeneration: doc.processStatusAtGeneration || (doc.processId ? "Mapeado" : ""),
+      linkedMapRevision: doc.linkedMapRevision || "",
+      linkedMapApprovedAt: doc.linkedMapApprovedAt || "",
+      mapVersionLabel: doc.mapVersionLabel || "",
+      area: doc.area || "",
+      templateId: doc.templateId || "",
+      documentOrigin: doc.documentOrigin || "mapped_process",
+      documentType: doc.documentType || "Procedimento Operacional Padrão",
+      procedureCategory: doc.procedureCategory || "Procedimento Operacional",
+      documentOwner: doc.documentOwner || "",
+      title: doc.title || "Documento sem título",
+      contentMarkdown: doc.contentMarkdown || "",
+      contentText: doc.contentText || "",
+      summary: doc.summary || "",
+      pointsOfAttention: Array.isArray(doc.pointsOfAttention) ? doc.pointsOfAttention : [],
+      suggestedRisks: Array.isArray(doc.suggestedRisks) ? doc.suggestedRisks : [],
+      suggestedIndicators: Array.isArray(doc.suggestedIndicators) ? doc.suggestedIndicators : [],
+      generationMetadata: doc.generationMetadata || {},
+      status: doc.status || "Rascunho",
+      version: doc.version || "1.0",
+      revision: doc.revision || formatRevision(revisionNumber),
+      revisionNumber,
+      approverName: doc.approverName || "",
+      approverRole: doc.approverRole || "",
+      distributedTo: Array.isArray(doc.distributedTo) ? doc.distributedTo : [],
+      updatedAt: doc.updatedAt || createdAt,
+      createdBy: doc.createdBy || "local-user",
+      createdAt,
+      descriptionInput: doc.descriptionInput,
+      aiModel: doc.aiModel,
+      aiPromptUsed: doc.aiPromptUsed,
+      revisionHistory: Array.isArray(doc.revisionHistory) ? doc.revisionHistory : [],
+      approvalHistory: Array.isArray(doc.approvalHistory) ? doc.approvalHistory : [],
+      distributionHistory: Array.isArray(doc.distributionHistory) ? doc.distributionHistory : [],
+    });
+  }
+
+  return result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
 export function buildMappedProcessPayload(processId: string) {
@@ -583,6 +716,8 @@ export function buildMappedProcessPayload(processId: string) {
       status: process.status,
       criticidade: process.criticidade,
       dataCriacao: process.data_criacao,
+      mapaRevisao: process.mapa_revisao ?? "",
+      mapaAprovadoEm: process.mapa_aprovado_em ?? "",
       objetivo: form?.objetivo ?? "",
       clientePrincipal: form?.clienteProcesso ?? "",
       areasEnvolvidas: form?.areasEnvolvidas ?? "",

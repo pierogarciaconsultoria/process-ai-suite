@@ -8,23 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Eye, Pencil } from "lucide-react";
-type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado";
-type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
-type Processo = {
-  id: string;
-  nome: string;
-  area: string;
-  responsavel: string;
-  status: Status;
-  criticidade: Criticidade;
-  data_criacao: string;
-};
+import { processos as processosMock, type Processo, type Status } from "@/data/mock-processos";
 
 const statusColors: Record<string, string> = {
   Novo: "bg-muted text-muted-foreground",
   Mapeado: "bg-info text-info-foreground",
   "Em Análise": "bg-warning text-warning-foreground",
   Documentado: "bg-success text-success-foreground",
+  Aprovado: "bg-primary text-primary-foreground",
 };
 
 const criticidadeColors: Record<string, string> = {
@@ -41,7 +32,7 @@ const Processos = () => {
   const [statusFilter, setStatusFilter] = useState<Status | "all" | "">("");
   const navigate = useNavigate();
 
-  const [lista] = useState<Processo[]>([]);
+  const [lista] = useState<Processo[]>(processosMock);
   const areas = useMemo(
     () => Array.from(new Set(lista.map((p) => p.area).filter((a) => a && a.trim().length > 0))),
     [lista],
@@ -140,6 +131,7 @@ const Processos = () => {
                     <SelectItem value="Mapeado">Mapeado</SelectItem>
                     <SelectItem value="Em Análise">Em Análise</SelectItem>
                     <SelectItem value="Documentado">Documentado</SelectItem>
+                    <SelectItem value="Aprovado">Aprovado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

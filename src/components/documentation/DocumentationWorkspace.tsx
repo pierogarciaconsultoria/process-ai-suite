@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Copy,
   FileCog,
-  FilePlus2,
   FileSearch,
   Files,
   Lock,
@@ -54,8 +53,10 @@ import {
   DOCUMENT_STATUSES,
   DOCUMENT_TONES,
   DOCUMENT_TYPES,
+  formatRevision,
   loadDocumentationState,
   loadGeneratedDocuments,
+  nextDocumentCode,
   saveDocumentationState,
   saveGeneratedDocuments,
   type DocumentationState,
@@ -683,12 +684,17 @@ export default function DocumentationWorkspace() {
   const handleSaveGeneratedDocument = async () => {
     if (!activeTemplate || !preview) return;
     setIsPersistingDoc(true);
+    const now = new Date().toISOString();
+    const documentCode = nextDocumentCode(generatedDocs);
 
     const documentRecord: GeneratedDocumentRecord = {
       id: crypto.randomUUID(),
+      code: documentCode,
       companyId: companyContext.companyId,
       processId: documentOrigin === "mapped_process" ? selectedProcessId : null,
       processMappingId: null,
+      processName: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.nome || "Processo mapeado" : manualDescription.title || "Documento avulso",
+      area: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.area || "" : manualDescription.area,
       templateId: activeTemplate.id,
       documentOrigin,
       documentType: documentOrigin === "manual_description" ? manualDescription.documentType : activeTemplate.documentType,
@@ -703,13 +709,23 @@ export default function DocumentationWorkspace() {
       generationMetadata: {
         ...preview.generationMetadata,
         templateName: activeTemplate.name,
+        code: documentCode,
       },
       status: activeTemplate.approvalVersioning.requireApproval ? "Em revisão" : "Rascunho",
       version: "1.0",
+      revision: formatRevision(0),
+      revisionNumber: 0,
+      approverName: "",
+      approverRole: "",
+      distributedTo: [],
+      updatedAt: now,
       createdBy: companyContext.userId,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       aiModel: String(preview.generationMetadata.ai_model || "ai-generate-document"),
       aiPromptUsed: activeTemplate.promptConfig.systemPrompt,
+      revisionHistory: [],
+      approvalHistory: [],
+      distributionHistory: [],
     };
 
     const nextDocs = [documentRecord, ...generatedDocs];
@@ -779,9 +795,6 @@ export default function DocumentationWorkspace() {
           <Button variant="outline" onClick={handleSaveConfiguration} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" /> Salvar configuração
           </Button>
-          <Button onClick={() => setIsNewDocumentOpen(true)}>
-            <FilePlus2 className="mr-2 h-4 w-4" /> Novo Documento
-          </Button>
         </div>
       </div>
 
@@ -792,9 +805,9 @@ export default function DocumentationWorkspace() {
           description="Templates disponíveis para geração e parametrização."
         />
         <StatCard
-          title="Documentos gerados"
-          value={String(generatedDocs.length)}
-          description="Prévias e documentos salvos neste ambiente da empresa."
+          title="Variáveis dinâmicas"
+          value={String(activeTemplate.variables.length)}
+          description="Placeholders e campos prontos para reaproveitamento em múltiplos templates."
         />
         <StatCard
           title="Seções indexáveis"
@@ -1292,35 +1305,6 @@ export default function DocumentationWorkspace() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Documentos recentes</CardTitle>
-          <CardDescription>Prévias salvas localmente e prontas para migração total ao Supabase.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {generatedDocs.length === 0 ? (
-            <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-              Nenhum documento gerado ainda. Use o botão Novo Documento para testar os fluxos por processo mapeado ou descrição livre.
-            </div>
-          ) : generatedDocs.slice(0, 6).map((doc) => (
-            <div key={doc.id} className="rounded-xl border p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="font-medium">{doc.title}</div>
-                  <div className="text-sm text-muted-foreground">{doc.documentType}</div>
-                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{doc.summary}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge>{doc.status}</Badge>
-                  <Badge variant="outline">{doc.documentOrigin}</Badge>
-                  <Badge variant="outline">v{doc.version}</Badge>
-                </div>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
 
       <Dialog open={isNewDocumentOpen} onOpenChange={setIsNewDocumentOpen}>
         <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">

@@ -1,4 +1,4 @@
-export type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado";
+export type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado" | "Aprovado";
 export type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
 
 export interface Processo {
@@ -9,6 +9,8 @@ export interface Processo {
   status: Status;
   criticidade: Criticidade;
   data_criacao: string;
+  mapa_revisao?: string;
+  mapa_aprovado_em?: string;
 }
 
 export interface DiagnosticoItem {
@@ -37,12 +39,12 @@ export interface ProcessoDetalhado extends Processo {
 }
 
 export const processos: Processo[] = [
-  { id: "1", nome: "Gestão de Vendas", area: "Comercial", responsavel: "Ana Silva", status: "Mapeado", criticidade: "Alta", data_criacao: "2024-03-01" },
-  { id: "2", nome: "Onboarding de Clientes", area: "Operações", responsavel: "Carlos Souza", status: "Em Análise", criticidade: "Média", data_criacao: "2024-03-05" },
-  { id: "3", nome: "Fechamento Contábil", area: "Financeiro", responsavel: "Maria Oliveira", status: "Documentado", criticidade: "Crítica", data_criacao: "2024-03-10" },
+  { id: "1", nome: "Gestão de Vendas", area: "Comercial", responsavel: "Ana Silva", status: "Aprovado", criticidade: "Alta", data_criacao: "2024-03-01", mapa_revisao: "Rev.00", mapa_aprovado_em: "2026-05-10" },
+  { id: "2", nome: "Onboarding de Clientes", area: "Operações", responsavel: "Carlos Souza", status: "Em Análise", criticidade: "Média", data_criacao: "2024-03-05", mapa_revisao: "Rev.00" },
+  { id: "3", nome: "Fechamento Contábil", area: "Financeiro", responsavel: "Maria Oliveira", status: "Aprovado", criticidade: "Crítica", data_criacao: "2024-03-10", mapa_revisao: "Rev.01", mapa_aprovado_em: "2026-05-18" },
   { id: "4", nome: "Recrutamento e Seleção", area: "RH", responsavel: "Pedro Santos", status: "Novo", criticidade: "Baixa", data_criacao: "2024-03-12" },
   { id: "5", nome: "Atendimento ao Cliente", area: "Suporte", responsavel: "Julia Mendes", status: "Em Análise", criticidade: "Média", data_criacao: "2024-03-14" },
-  { id: "6", nome: "Logística de Entrega", area: "Logística", responsavel: "Rafael Lima", status: "Mapeado", criticidade: "Alta", data_criacao: "2024-03-15" },
+  { id: "6", nome: "Logística de Entrega", area: "Logística", responsavel: "Rafael Lima", status: "Aprovado", criticidade: "Alta", data_criacao: "2024-03-15", mapa_revisao: "Rev.00", mapa_aprovado_em: "2026-04-28" },
   { id: "7", nome: "Faturamento", area: "Financeiro", responsavel: "Paula Ferreira", status: "Documentado", criticidade: "Média", data_criacao: "2024-03-16" },
   { id: "8", nome: "Gestão de Contratos", area: "Jurídico", responsavel: "Bruno Almeida", status: "Novo", criticidade: "Baixa", data_criacao: "2024-03-17" },
 ];
