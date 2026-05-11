@@ -20,16 +20,13 @@ serve(async (req) => {
       );
     }
 
-    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
-    const isOpenAI = AI_MODEL.startsWith("openai/");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!OPENAI_API_KEY && !LOVABLE_API_KEY) {
+    if (!OPENAI_API_KEY) {
       return new Response(
         JSON.stringify({
           error:
-            "Nenhuma chave de IA configurada (OPENAI_API_KEY ou LOVABLE_API_KEY). Configure as variáveis de ambiente para gerar o resumo.",
+            "Nenhuma chave de IA configurada (OPENAI_API_KEY). Configure as variáveis de ambiente para gerar o resumo.",
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
