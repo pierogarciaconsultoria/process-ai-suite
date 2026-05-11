@@ -109,20 +109,15 @@ Você deve responder SEMPRE em JSON com as chaves:
 - ai_prompt_used`;
 
     const response = await fetch(
-      isOpenAI && OPENAI_API_KEY
-        ? "https://api.openai.com/v1/chat/completions"
-        : "https://ai.gateway.lovable.dev/v1/chat/completions",
+      "https://api.openai.com/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization:
-            isOpenAI && OPENAI_API_KEY
-              ? `Bearer ${OPENAI_API_KEY}`
-              : `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
+          model: "gpt-4o",
           messages: [
             { role: "system", content: systemPrompt },
             {
