@@ -44,24 +44,21 @@ Formato: responda em texto simples, com listas curtas quando necessário.`;
 
     const messages = [{ role: "system", content: systemPrompt }, ...history];
 
-    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
-    const isOpenAI = AI_MODEL.startsWith("openai/");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!OPENAI_API_KEY && !LOVABLE_API_KEY) {
+    if (!OPENAI_API_KEY) {
       const content = fallbackLocal || "Certo. Em que posso ajudar dentro da plataforma?";
       return new Response(JSON.stringify({ answer: content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const response = await fetch(isOpenAI && OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: isOpenAI && OPENAI_API_KEY ? `Bearer ${OPENAI_API_KEY}` : `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
+        model: "gpt-4o",
         messages,
       }),
     });
