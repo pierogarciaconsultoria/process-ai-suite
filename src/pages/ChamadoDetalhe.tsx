@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveAccessibleCompanyId } from "@/lib/active-company";
 interface Chamado {
   id: string;
   user_id: string;
@@ -60,14 +61,20 @@ const ChamadoDetalhe = () => {
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user;
       if (!user) return;
-      const { data: m } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
-      const mRows = (m as { empresa_id: string }[]) || [];
-      if (mRows[0]?.empresa_id) setEmpresaId(mRows[0].empresa_id);
-      const { data: c } = await supabase.from("chamados").select("*").eq("id", id).single();
+      const activeCompanyId = await resolveAccessibleCompanyId(user.id);
+      if (!activeCompanyId) return;
+      setEmpresaId(activeCompanyId);
+      const { data: c } = await supabase
+        .from("chamados")
+        .select("*")
+        .eq("empresa_id", activeCompanyId)
+        .eq("id", id)
+        .single();
       setChamado((c as Chamado) || null);
       const { data: msgs } = await supabase
         .from("chamado_mensagens")
         .select("*")
+        .eq("empresa_id", activeCompanyId)
         .eq("chamado_id", id)
         .order("created_at", { ascending: true });
       setMensagens(((msgs as Mensagem[]) || []).slice(-500));

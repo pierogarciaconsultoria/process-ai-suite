@@ -11,6 +11,7 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useAiConfig } from "@/hooks/useAiConfig";
+import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import {
   type ProcessoFormData,
   type Classificacao,
@@ -110,12 +111,7 @@ export default function EntrevistaProcesso() {
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id ?? null;
-      let empresaId: string | null = null;
-      const { data: membros } = await supabase.from("membros").select("empresa_id").limit(1);
-      const memRows = membros as { empresa_id: string }[] | null;
-      if (Array.isArray(memRows) && memRows.length > 0) {
-        empresaId = memRows[0].empresa_id ?? null;
-      }
+      const empresaId = await resolveAccessibleCompanyId(userId);
       const row = {
         user_id: userId,
         empresa_id: empresaId,

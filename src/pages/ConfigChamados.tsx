@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveAccessibleCompanyId } from "@/lib/active-company";
 interface Chamado {
   id: string;
   user_id: string;
@@ -55,14 +56,18 @@ const ConfigChamados = () => {
         const { data: userRes } = await supabase.auth.getUser();
         const user = userRes?.user;
         if (!user) throw new Error("Não autenticado");
-        const { data: m } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id).limit(1);
-        const mRows = (m as { empresa_id: string }[]) || [];
-        if (mRows[0]?.empresa_id) setEmpresaId(mRows[0].empresa_id);
-        const { data: rows } = await supabase
-          .from("chamados")
-          .select("id, titulo, descricao, anexo_url, status, created_at, updated_at, user_id, empresa_id, tipo")
-          .order("created_at", { ascending: false });
-        setChamados(((rows as Chamado[]) || []).slice(0, 100));
+        const activeCompanyId = await resolveAccessibleCompanyId(user.id);
+        if (activeCompanyId) {
+          setEmpresaId(activeCompanyId);
+          const { data: rows } = await supabase
+            .from("chamados")
+            .select("id, titulo, descricao, anexo_url, status, created_at, updated_at, user_id, empresa_id, tipo")
+            .eq("empresa_id", activeCompanyId)
+            .order("created_at", { ascending: false });
+          setChamados(((rows as Chamado[]) || []).slice(0, 100));
+        } else {
+          setChamados([]);
+        }
       } finally {
         setCarregando(false);
       }

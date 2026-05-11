@@ -1,3 +1,17 @@
+create or replace function public.user_empresa_ids()
+returns setof uuid
+language sql
+stable
+as $$
+  select e.id
+  from public.empresas e
+  where e.owner_id = auth.uid()
+  union
+  select m.empresa_id
+  from public.membros m
+  where m.user_id = auth.uid()
+$$;
+
 create table if not exists public.ai_configurations (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references public.empresas(id) on delete cascade,

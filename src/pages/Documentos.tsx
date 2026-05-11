@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, TablesInsert } from "@/integrations/supabase/types";
+import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { processos } from "@/data/mock-processos";
 import {
   buildMappedProcessPayload,
@@ -261,10 +262,11 @@ export default function Documentos() {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user?.id) nextContext.userId = userData.user.id;
 
-        if (!nextContext.companyId && userData.user?.id) {
-          const { data: membros } = await supabase.from("membros").select("empresa_id").eq("user_id", userData.user.id).limit(1);
-          const rows = (membros as { empresa_id: string }[] | null) || [];
-          if (rows[0]?.empresa_id) nextContext.companyId = rows[0].empresa_id;
+        if (userData.user?.id) {
+          const resolvedCompanyId = await resolveAccessibleCompanyId(userData.user.id, nextContext.companyId);
+          if (resolvedCompanyId) {
+            nextContext.companyId = resolvedCompanyId;
+          }
         }
       } catch {
         // fallback local

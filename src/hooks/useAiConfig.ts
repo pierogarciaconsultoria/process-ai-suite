@@ -2,28 +2,46 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AI_CONFIG_DEFAULTS, type AiConfigType } from "@/data/ai-config-defaults";
 
+async function validateAccessibleCompanyId(companyId: string) {
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error) return null;
+  return data?.id ?? null;
+}
+
 async function resolveActiveCompanyId(userId: string | null) {
   const localCompanyId = window.localStorage.getItem("process:activeEmpresaId");
-  if (localCompanyId) return localCompanyId;
+  if (localCompanyId) {
+    const accessibleCompanyId = await validateAccessibleCompanyId(localCompanyId);
+    if (accessibleCompanyId) return accessibleCompanyId;
+    window.localStorage.removeItem("process:activeEmpresaId");
+  }
   if (!userId) return null;
-
-  const { data: membros } = await supabase
-    .from("membros")
-    .select("empresa_id")
-    .eq("user_id", userId)
-    .limit(1);
-
-  const memberRows = (membros as { empresa_id: string }[] | null) || [];
-  if (memberRows[0]?.empresa_id) return memberRows[0].empresa_id;
 
   const { data: empresas } = await supabase
     .from("empresas")
-    .select("id")
+    .select("id, created_at")
     .eq("owner_id", userId)
+    .order("created_at", { ascending: true })
     .limit(1);
 
-  const ownerRows = (empresas as { id: string }[] | null) || [];
-  return ownerRows[0]?.id ?? null;
+  const ownerRows = (empresas as { id: string; created_at: string }[] | null) || [];
+  if (ownerRows[0]?.id) return ownerRows[0].id;
+
+  const { data: membros } = await supabase
+    .from("membros")
+    .select("empresa_id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  const memberRows = (membros as { empresa_id: string; created_at: string }[] | null) || [];
+  if (memberRows[0]?.empresa_id) return memberRows[0].empresa_id;
+  return null;
 }
 
 export function useAiConfig(configType: AiConfigType) {
