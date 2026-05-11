@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,30 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
-
-const DEFAULT_SCRIPT = `Você é um entrevistador de processos com tom humano e didático.
-Siga estas regras principais e adapte-se caso o usuário especifique novas prioridades:
-- Faça perguntas curtas e diretas
-- Progrida fase a fase
-- Estimule sempre o máximo de detalhes objetivos sobre cada resposta (quem faz, o que faz, quando, onde, ferramentas, documentos, exceções).
-
-Seja sempre educado.`;
+import { buildAiSkinPayload, DEFAULT_ROUTE_SCRIPT } from "@/data/ai-config-defaults";
+import { useAiConfig } from "@/hooks/useAiConfig";
 
 const ConfigRoteiroEntrevista = () => {
-  const [roteiro, setRoteiro] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const { content, setContent, saveConfig, isLoading, isSaving } = useAiConfig("route_script");
+  const skinIdentityConfig = useAiConfig("skin_identity");
+  const skinValidationConfig = useAiConfig("skin_validation");
   const [isImporting, setIsImporting] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const savedScript = localStorage.getItem("process:routeScript");
-    if (savedScript) {
-      setRoteiro(savedScript);
-    } else {
-      setRoteiro(DEFAULT_SCRIPT);
-    }
-  }, []);
 
   const extractFromPdf = async (file: File): Promise<string> => {
     const pdfjs = await import("pdfjs-dist");
@@ -95,7 +81,7 @@ const ConfigRoteiroEntrevista = () => {
         });
         return;
       }
-      setRoteiro((prev) => {
+      setContent((prev) => {
         if (!prev.trim()) return snippet;
         return `${prev.trim()}\n\n${snippet}`;
       });
@@ -115,31 +101,28 @@ const ConfigRoteiroEntrevista = () => {
     }
   };
 
-  const handleSave = () => {
-    setIsSaving(true);
-    try {
-      localStorage.setItem("process:routeScript", roteiro);
+  const handleSave = async () => {
+    const ok = await saveConfig(content);
+    if (ok) {
       toast({
         title: "Roteiro atualizado",
-        description: "O roteiro da entrevista com a IA foi salvo e será utilizado nos próximos mapeamentos.",
+        description: "O roteiro da entrevista com a IA foi salvo no Supabase.",
       });
-    } catch (e) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o roteiro.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
+      return;
     }
+    toast({
+      title: "Erro",
+      description: "Não foi possível salvar o roteiro.",
+      variant: "destructive",
+    });
   };
 
   const handleReset = () => {
-    setRoteiro(DEFAULT_SCRIPT);
+    setContent(DEFAULT_ROUTE_SCRIPT);
   };
 
   const handleReview = async () => {
-    if (!roteiro.trim()) {
+    if (!content.trim()) {
       toast({
         title: "Roteiro vazio",
         description: "Preencha o roteiro antes de pedir revisão com IA.",
@@ -149,10 +132,9 @@ const ConfigRoteiroEntrevista = () => {
     }
     setIsReviewing(true);
     try {
-      const skinRaw = localStorage.getItem("process:aiSkin");
-      const skin = skinRaw ? JSON.parse(skinRaw) : null;
+      const skin = buildAiSkinPayload(skinIdentityConfig.content, skinValidationConfig.content);
       const { data, error } = await supabase.functions.invoke("ai-review-config", {
-        body: { roteiro, skin },
+        body: { roteiro: content, skin },
       });
       if (error) throw error;
       if (data?.error) {
@@ -164,7 +146,7 @@ const ConfigRoteiroEntrevista = () => {
         return;
       }
       if (data?.roteiroSugerido && typeof data.roteiroSugerido === "string") {
-        setRoteiro(data.roteiroSugerido);
+        setContent(data.roteiroSugerido);
       }
       toast({
         title: "Roteiro revisado",
@@ -217,19 +199,19 @@ const ConfigRoteiroEntrevista = () => {
               <Textarea
                 className="min-h-[300px]"
                 placeholder="Digite as instruções..."
-                value={roteiro}
-                onChange={(e) => setRoteiro(e.target.value)}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
               />
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4">
-            <Button onClick={handleSave} disabled={isSaving || isReviewing}>
+            <Button onClick={() => void handleSave()} disabled={isSaving || isReviewing || isLoading}>
               {isSaving ? "Salvando..." : "Salvar Configuração"}
             </Button>
-            <Button variant="outline" onClick={handleReset} disabled={isImporting || isReviewing}>
+            <Button variant="outline" onClick={handleReset} disabled={isImporting || isReviewing || isLoading}>
               Restaurar Padrão
             </Button>
-            <Button variant="outline" onClick={handleReview} disabled={isReviewing || isSaving || isImporting}>
+            <Button variant="outline" onClick={() => void handleReview()} disabled={isReviewing || isSaving || isImporting || isLoading}>
               {isReviewing ? "Revisando com IA..." : "Pedir sugestão com IA"}
             </Button>
           </div>

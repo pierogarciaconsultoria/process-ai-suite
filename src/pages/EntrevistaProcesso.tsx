@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+import { useAiConfig } from "@/hooks/useAiConfig";
 import {
   type ProcessoFormData,
   type Classificacao,
@@ -48,6 +49,7 @@ export default function EntrevistaProcesso() {
   const isMountedRef = useRef(true);
   const [stage, setStage] = useState<InterviewStage>("askUserName");
   const [participantName, setParticipantName] = useState("");
+  const routeScriptConfig = useAiConfig("route_script");
 
   const steps = [
     "Novo processo",
@@ -366,14 +368,11 @@ export default function EntrevistaProcesso() {
       setStage("aiFlow");
       setLoading(true);
       try {
-        const customScript = localStorage.getItem("process:routeScript");
-        const aiSkin = localStorage.getItem("process:aiSkin");
         const { data, error } = await supabase.functions.invoke("ai-interview", {
           body: {
             history: [...messages, userMsg],
             current: form,
-            customScript: customScript || null,
-            aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+            company_id: routeScriptConfig.companyId,
           },
         });
         const hasErrorField = (d: unknown): d is { error: string } =>
@@ -413,14 +412,11 @@ export default function EntrevistaProcesso() {
     setInput("");
     setLoading(true);
     try {
-      const customScript = localStorage.getItem("process:routeScript");
-      const aiSkin = localStorage.getItem("process:aiSkin");
       const { data, error } = await supabase.functions.invoke("ai-interview", {
         body: {
           history: [...messages, userMsg],
           current: form,
-          customScript: customScript || null,
-          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+          company_id: routeScriptConfig.companyId,
         },
       });
       const hasErrorField = (d: unknown): d is { error: string } =>
@@ -666,14 +662,11 @@ export default function EntrevistaProcesso() {
         content: `Extraí o seguinte conteúdo do arquivo anexado. Analise e use para preencher o formulário do processo, propondo objetivo, entradas, etapas, decisões e saídas quando possível:\n\n${snippet}`,
       };
       setMessages((m) => [...m, userMsg]);
-      const customScript = localStorage.getItem("process:routeScript");
-      const aiSkin = localStorage.getItem("process:aiSkin");
       const { data, error } = await supabase.functions.invoke("ai-interview", {
         body: {
           history: [...messages, userMsg],
           current: form,
-          customScript: customScript || null,
-          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+          company_id: routeScriptConfig.companyId,
         },
       });
       const hasErrorField = (d: unknown): d is { error: string } =>

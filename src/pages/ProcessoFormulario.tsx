@@ -15,6 +15,7 @@ import {
   ClipboardList, Search, Map, BarChart3, ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAiConfig } from "@/hooks/useAiConfig";
 import { supabase } from "@/integrations/supabase/client";
 import {
   type ProcessoFormData,
@@ -31,6 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import BPMNCanvas from "@/components/BPMNCanvas";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
+import { buildAiSkinPayload } from "@/data/ai-config-defaults";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
@@ -147,6 +149,9 @@ const ProcessoFormulario = () => {
   const location = useLocation();
   const { toast } = useToast();
   const isEditing = !!id;
+  const routeScriptConfig = useAiConfig("route_script");
+  const skinIdentityConfig = useAiConfig("skin_identity");
+  const skinValidationConfig = useAiConfig("skin_validation");
 
   const [activeTab, setActiveTab] = useState("identificacao");
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
@@ -292,13 +297,13 @@ const ProcessoFormulario = () => {
     }
     setIsFillingAI(true);
     try {
-      const customScript = localStorage.getItem("process:routeScript");
-      const aiSkin = localStorage.getItem("process:aiSkin");
+      const customScript = routeScriptConfig.content || null;
+      const aiSkin = buildAiSkinPayload(skinIdentityConfig.content, skinValidationConfig.content);
       const { data, error } = await supabase.functions.invoke("ai-fill-process", { 
         body: { 
           descricao: descricaoIA,
-          customScript: customScript || null,
-          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+          customScript,
+          aiSkin,
         } 
       });
       if (error) throw error;
@@ -336,13 +341,13 @@ const ProcessoFormulario = () => {
     if (isDiagnosing) return;
     setIsDiagnosing(true);
     try {
-      const customScript = localStorage.getItem("process:routeScript");
-      const aiSkin = localStorage.getItem("process:aiSkin");
+      const customScript = routeScriptConfig.content || null;
+      const aiSkin = buildAiSkinPayload(skinIdentityConfig.content, skinValidationConfig.content);
       const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { 
         body: { 
           processoData: form,
-          customScript: customScript || null,
-          aiSkin: aiSkin ? JSON.parse(aiSkin) : null,
+          customScript,
+          aiSkin,
         } 
       });
       if (error) throw error;

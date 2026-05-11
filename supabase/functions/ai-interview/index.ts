@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,42 +7,102 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const authHeader = req.headers.get("Authorization") ?? "";
     const body = await req.json();
     const history = body?.history ?? [];
     const current = body?.current ?? {};
-    const customScript = body?.customScript;
-    const aiSkin = body?.aiSkin;
+    const companyId = body?.company_id ?? null;
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurado" }), {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return new Response(JSON.stringify({ error: "Supabase não configurado para buscar configurações da IA" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const DEFAULT_ROUTE_SCRIPT = `Você é um entrevistador de processos com tom humano e didático.
+Siga estas regras principais e adapte-se caso o usuário especifique novas prioridades:
+- Faça perguntas curtas e diretas
+- Progrida fase a fase
+- Estimule sempre o máximo de detalhes objetivos sobre cada resposta (quem faz, o que faz, quando, onde, ferramentas, documentos, exceções).
+
+Seja sempre educado.`;
+
+    const DEFAULT_AI_SKIN = {
+      nome: "Peter",
+      tom: "descontraído e ágil",
+      estilo: "entusiasmado",
+    };
+
+    const DEFAULT_VALIDATION_RULES = `Regras de validação do assistente:
+- Não inventar dados críticos
+- Pedir esclarecimento quando a resposta estiver vaga
+- Manter tom profissional e acolhedor
+- Não avançar para o próximo tema sem informação suficiente
+- Sinalizar quando houver lacunas para validação humana`;
+
+    let customScript = DEFAULT_ROUTE_SCRIPT;
+    let aiSkin = { ...DEFAULT_AI_SKIN, regrasValidacao: DEFAULT_VALIDATION_RULES };
+
+    if (companyId) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: configs } = await supabase
+        .from("ai_configurations")
+        .select("config_type, content")
+        .eq("company_id", companyId)
+        .in("config_type", ["route_script", "skin_identity", "skin_validation"]);
+
+      const typedConfigs = (configs || []) as Array<{ config_type: string; content: string }>;
+      const routeScriptConfig = typedConfigs.find((item) => item.config_type === "route_script")?.content;
+      const skinIdentityRaw = typedConfigs.find((item) => item.config_type === "skin_identity")?.content;
+      const skinValidation = typedConfigs.find((item) => item.config_type === "skin_validation")?.content;
+
+      customScript = routeScriptConfig || DEFAULT_ROUTE_SCRIPT;
+
+      if (skinIdentityRaw) {
+        try {
+          const parsedSkin = JSON.parse(skinIdentityRaw);
+          aiSkin = {
+            nome: parsedSkin?.nome || DEFAULT_AI_SKIN.nome,
+            tom: parsedSkin?.tom || DEFAULT_AI_SKIN.tom,
+            estilo: parsedSkin?.estilo || DEFAULT_AI_SKIN.estilo,
+            regrasValidacao: skinValidation || DEFAULT_VALIDATION_RULES,
+          };
+        } catch {
+          aiSkin = { ...DEFAULT_AI_SKIN, regrasValidacao: skinValidation || DEFAULT_VALIDATION_RULES };
+        }
+      } else {
+        aiSkin = { ...DEFAULT_AI_SKIN, regrasValidacao: skinValidation || DEFAULT_VALIDATION_RULES };
+      }
+    }
+
     const personaName = aiSkin?.nome || "Peter";
-    const personaApresentacao =
-      aiSkin?.apresentacao ||
-      (aiSkin?.tom || aiSkin?.estilo
-        ? `Tom: ${aiSkin?.tom || "descontraído e ágil"}. Estilo: ${aiSkin?.estilo || "entusiasmado"}.`
-        : "Consultor de processos experiente, com postura acolhedora, segura e humana, usando linguagem clara e profissional (tom descontraído e ágil, estilo entusiasmado). Conduz a conversa com naturalidade, sem jargões excessivos.");
-    const personaAvaliacao =
-      aiSkin?.avaliacao ||
-      "Avalie cada resposta em comportamento e conteúdo. Se for vaga, fora de contexto ou insuficiente, não avance: explique com empatia o que falta, dê um exemplo curto e repita a mesma pergunta de forma mais simples.";
+    const personaTone = aiSkin?.tom || "descontraído e ágil";
+    const personaStyle = aiSkin?.estilo || "entusiasmado";
+    const validationRules = aiSkin?.regrasValidacao || DEFAULT_VALIDATION_RULES;
 
-    const identidadeBlock = `### IDENTIDADE E COMPORTAMENTO DO ASSISTENTE\nNome do assistente: ${personaName}\n\n[Apresentação e Personalidade]\n${personaApresentacao}\n\n[Regras de Validação e Avaliação]\n${personaAvaliacao}`;
-
-    const systemPrompt = `${identidadeBlock}
-
-Sua missão é conduzir a conversa com naturalidade, ajudando o usuário a explicar o dia a dia do processo com confiança e tranquilidade.
+    const systemPrompt = `Seu nome é ${personaName}. Você é um consultor de processos experiente, com postura acolhedora, segura e humana, usando linguagem clara e profissional (tom: ${personaTone}, estilo: ${personaStyle}). Sua missão é conduzir a conversa com naturalidade, sem jargões excessivos, ajudando o usuário a se sentir à vontade para explicar o dia a dia do processo com confiança e tranquilidade.
 ${customScript ? `\n### INSTRUÇÕES PRIORITÁRIAS DA EMPRESA:\n${customScript}\n` : ""}
+${validationRules ? `\n### REGRAS DE VALIDAÇÃO DA EMPRESA:\n${validationRules}\n` : ""}
 
 [ESTÍMULO DE DETALHAMENTO]
 Em cada pergunta, estimule o usuário a descrever o máximo de detalhes concretos possíveis sobre aquele ponto específico do processo: quem faz, o que faz, quando, onde, com quais sistemas/documentos, exceções, volumes e exemplos práticos. Se a resposta vier muito curta ou genérica, peça educadamente mais detalhes, de forma objetiva e humana, SEM mudar de assunto nem avançar para o próximo campo.
@@ -148,16 +209,20 @@ Orientações de preenchimento:
       ...history,
     ];
 
+    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
+    const isOpenAI = AI_MODEL.startsWith("openai/");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+
     const response = await fetch(
-      "https://api.openai.com/v1/chat/completions",
+      isOpenAI && OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: isOpenAI && OPENAI_API_KEY ? `Bearer ${OPENAI_API_KEY}` : `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
           messages,
           response_format: { type: "json_object" },
         }),
