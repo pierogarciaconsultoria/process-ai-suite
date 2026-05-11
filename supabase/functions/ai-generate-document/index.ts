@@ -56,7 +56,7 @@ serve(async (req) => {
       manualDescription,
     };
 
-    if (!OPENAI_API_KEY && !LOVABLE_API_KEY) {
+    if (!OPENAI_API_KEY) {
       const contentMarkdown = buildFallbackMarkdown(
         template.name ?? "Documento gerado",
         sections,
