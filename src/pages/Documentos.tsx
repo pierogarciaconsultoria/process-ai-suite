@@ -17,7 +17,6 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { processos } from "@/data/mock-processos";
 import {
   buildMappedProcessPayload,
-  DOCUMENT_STATUSES,
   formatRevision,
   loadDocumentationState,
   loadGeneratedDocuments,
@@ -53,6 +52,14 @@ type IndependentDraft = {
   procedureCategory: ProcedureCategory;
 };
 
+const OPERATIONAL_DOCUMENT_STATUSES = [
+  "Rascunho",
+  "Em revisão",
+  "Em aprovação",
+  "Publicado",
+  "Obsoleto",
+] as const;
+
 function normalizeText(value: string) {
   return value.trim() || "Não informado.";
 }
@@ -79,6 +86,16 @@ function parseRevision(label: string) {
 function formatDatePtBr(value: string) {
   if (!value) return "Não informado";
   return new Date(value).toLocaleDateString("pt-BR");
+}
+
+function canEditDocument(doc: GeneratedDocumentRecord) {
+  return doc.status === "Rascunho" || doc.status === "Em revisão";
+}
+
+function originLabel(doc: GeneratedDocumentRecord) {
+  return doc.sourceMode === "linked_process"
+    ? `🔗 ${doc.processName || "Processo vinculado"}`
+    : "📄 Independente";
 }
 
 function buildMapVersionLabel(processId: string) {
@@ -281,7 +298,7 @@ export default function Documentos() {
       setState(nextState);
       setDocuments(nextDocuments);
       setSelectedTemplateId(defaultTemplate?.id || "");
-      setSelectedProcessId(processos.find((processo) => processo.status !== "Novo")?.id || processos[0]?.id || "");
+      setSelectedProcessId(processos.find((processo) => processo.status === "Aprovado")?.id || processos.find((processo) => processo.status !== "Novo")?.id || processos[0]?.id || "");
       setReviewedBy(nextContext.userId);
       setApprovalName(nextContext.userId);
       setDistributedBy(nextContext.userId);
@@ -374,6 +391,14 @@ export default function Documentos() {
     if (parseRevision(currentProcess.mapa_revisao) <= parseRevision(viewingDoc.linkedMapRevision)) return null;
     return currentProcess.mapa_revisao;
   }, [viewingDoc]);
+
+  const getNewerApprovedRevision = (doc: GeneratedDocumentRecord) => {
+    if (doc.sourceMode !== "linked_process" || !doc.processId) return null;
+    const currentProcess = processos.find((item) => item.id === doc.processId);
+    if (!currentProcess || currentProcess.status !== "Aprovado" || !currentProcess.mapa_revisao) return null;
+    if (parseRevision(currentProcess.mapa_revisao) <= parseRevision(doc.linkedMapRevision)) return null;
+    return currentProcess.mapa_revisao;
+  };
 
   const handleGeneratePreview = async () => {
     if (!activeTemplate) {
@@ -639,11 +664,22 @@ export default function Documentos() {
     }
 
     const reviewPayload = reviewSourceMode === "linked_process" ? buildMappedProcessPayload(reviewProcessId) : null;
+    const now = new Date().toISOString();
+    const reviewedByName = reviewedBy || companyContext.userId;
 
-    updateDocument(reviewingDoc.id, (doc) => {
+    const nextDocs = documents.flatMap((doc) => {
+      if (doc.id !== reviewingDoc.id) return [doc];
+
       const nextRevisionNumber = doc.revisionNumber + 1;
-      return {
+      const nextRevision = formatRevision(nextRevisionNumber);
+      const obsoleteDoc: GeneratedDocumentRecord = {
         ...doc,
+        status: "Obsoleto",
+        updatedAt: now,
+      };
+      const nextDoc: GeneratedDocumentRecord = {
+        ...doc,
+        id: crypto.randomUUID(),
         sourceMode: reviewSourceMode,
         processId: reviewSourceMode === "linked_process" ? reviewProcessId : null,
         processName: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.nome : "",
@@ -658,23 +694,30 @@ export default function Documentos() {
         title: reviewSourceMode === "linked_process" && reviewPayload ? `Procedimento - ${reviewPayload.process.nome}` : reviewIndependentDraft.title,
         documentOrigin: reviewSourceMode === "linked_process" ? "mapped_process" : "manual_description",
         revisionNumber: nextRevisionNumber,
-        revision: formatRevision(nextRevisionNumber),
+        revision: nextRevision,
         status: "Em revisão",
         approverName: "",
         approverRole: "",
-        updatedAt: new Date().toISOString(),
+        distributedTo: [],
+        updatedAt: now,
+        createdAt: now,
         revisionHistory: [
           {
             revision: doc.revision,
-            revisedBy: reviewedBy || companyContext.userId,
-            revisedAt: new Date().toISOString(),
+            revisedBy: reviewedByName,
+            revisedAt: now,
             reason: reviewReason,
             previousStatus: "Obsoleto",
           },
           ...doc.revisionHistory,
         ],
+        approvalHistory: [],
+        distributionHistory: [],
       };
+      return [nextDoc, obsoleteDoc];
     });
+
+    persistDocuments(nextDocs);
 
     setReviewingDoc(null);
     setReviewReason("");
@@ -752,6 +795,8 @@ export default function Documentos() {
           recipient,
           distributedAt: new Date().toISOString(),
           distributedBy: distributedBy || companyContext.userId,
+          revision: doc.revision,
+          version: doc.version,
         })),
         ...doc.distributionHistory,
       ],
@@ -819,7 +864,7 @@ export default function Documentos() {
             <Badge variant="outline">Sem configurações de template nesta tela</Badge>
           </div>
         </div>
-        <Button onClick={() => setIsNewDocumentOpen(true)} disabled={!activeTemplate || availableProcesses.length === 0}>
+        <Button onClick={() => setIsNewDocumentOpen(true)} disabled={!activeTemplate}>
           <FilePlus2 className="mr-2 h-4 w-4" /> Novo Documento
         </Button>
       </div>
@@ -858,7 +903,7 @@ export default function Documentos() {
               <SelectTrigger><SelectValue placeholder="Todos os status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {DOCUMENT_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                {OPERATIONAL_DOCUMENT_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -905,7 +950,7 @@ export default function Documentos() {
               <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
               <p className="text-lg font-medium">Nenhum procedimento gerado ainda.</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Nenhum procedimento gerado ainda. Acesse um processo mapeado e clique em Gerar Procedimento.
+                Nenhum procedimento gerado ainda. Acesse um processo mapeado e clique em Gerar Procedimento, ou crie um procedimento independente.
               </p>
             </div>
           ) : (
@@ -930,9 +975,18 @@ export default function Documentos() {
                   {filteredDocuments.map((doc) => (
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium">{doc.code}</TableCell>
-                      <TableCell>{doc.title}</TableCell>
-                      <TableCell>{doc.processName ? <Link className="text-primary hover:underline" to={doc.processLink || "#"}>{doc.processName}</Link> : "-"}</TableCell>
-                      <TableCell>{doc.sourceMode === "linked_process" ? `🔗 Processo vinculado: ${doc.processName}` : "📄 Independente"}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div>{doc.title}</div>
+                          {getNewerApprovedRevision(doc) ? (
+                            <div className="text-xs text-amber-700">
+                              ⚠ Processo vinculado com versão mais recente: {getNewerApprovedRevision(doc)}
+                            </div>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>{doc.processName ? <Link className="text-primary hover:underline" to={doc.processLink || "#"}>{doc.processName}</Link> : "Independente"}</TableCell>
+                      <TableCell>{originLabel(doc)}</TableCell>
                       <TableCell>{doc.revision}</TableCell>
                       <TableCell><Badge variant={statusBadgeVariant(doc.status)}>{doc.status}</Badge></TableCell>
                       <TableCell>{[doc.approverName, doc.approverRole].filter(Boolean).join(" / ") || "-"}</TableCell>
@@ -944,10 +998,10 @@ export default function Documentos() {
                           <Button size="sm" variant="outline" onClick={() => setViewingDoc(doc)}>
                             <Eye className="mr-2 h-4 w-4" /> Visualizar
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditingDoc({ ...doc })}>
+                          <Button size="sm" variant="outline" disabled={!canEditDocument(doc)} onClick={() => setEditingDoc({ ...doc })}>
                             <FileText className="mr-2 h-4 w-4" /> Editar
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => {
+                          <Button size="sm" variant="outline" disabled={doc.status === "Obsoleto"} onClick={() => {
                             setReviewingDoc(doc);
                             setReviewSourceMode(doc.sourceMode);
                             setReviewProcessId(doc.processId || approvedProcesses[0]?.id || "");
@@ -987,7 +1041,7 @@ export default function Documentos() {
         <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Novo Documento</DialogTitle>
-            <DialogDescription>Escolha entre procedimento vinculado a processo ou procedimento independente.</DialogDescription>
+            <DialogDescription>Escolha entre procedimento vinculado a processo ou procedimento independente. O template ativo vem exclusivamente de Configurações → Documentação do Processo.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-4">
@@ -1009,16 +1063,10 @@ export default function Documentos() {
                   <p className="mt-2 text-sm text-muted-foreground">Cria um procedimento sem vínculo com processo mapeado.</p>
                 </button>
               </div>
-              <div className="space-y-2">
-                <Label>Template ativo</Label>
-                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o template" /></SelectTrigger>
-                  <SelectContent>
-                    {activeTemplates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+                <div className="font-medium text-foreground">Template ativo da geração</div>
+                <div className="mt-2 text-muted-foreground">{activeTemplate?.name || "Nenhum template ativo configurado"}</div>
+                <div className="mt-1 text-muted-foreground">Essa definição é controlada apenas em Configurações → Documentação do Processo.</div>
               </div>
               {sourceMode === "linked_process" ? (
                 <div className="space-y-4">
@@ -1084,7 +1132,7 @@ export default function Documentos() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button onClick={handleGeneratePreview} disabled={isGenerating || !activeTemplate || !selectedProcessId}>
+                  <Button onClick={handleGeneratePreview} disabled={isGenerating || !activeTemplate || (sourceMode === "linked_process" && !selectedProcessId)}>
                     <FilePlus2 className="mr-2 h-4 w-4" /> {isGenerating ? "Gerando..." : "Gerar Procedimento"}
                   </Button>
                   <div className="space-y-2">
@@ -1176,7 +1224,7 @@ export default function Documentos() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Editar documento</DialogTitle>
-            <DialogDescription>Atualize a versão corrente sem alterar a revisão.</DialogDescription>
+            <DialogDescription>Disponível apenas para documentos em Rascunho ou Em revisão.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

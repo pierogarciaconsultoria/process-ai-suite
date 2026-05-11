@@ -235,6 +235,8 @@ export interface DocumentDistributionEntry {
   recipient: string;
   distributedAt: string;
   distributedBy: string;
+  revision: string;
+  version: string;
 }
 
 export interface GeneratedDocumentRecord extends DocumentPreviewData {
@@ -404,6 +406,20 @@ function createStandardSections(documentType: DocumentType): DocumentSection[] {
           "Evidências",
           "Histórico de revisão",
         ]
+      : documentType === "Instrução de Trabalho"
+        ? [
+            "Objetivo",
+            "Processo",
+            "Norma ISO 9001",
+            "Documentos complementares",
+            "Definições",
+            "Recursos",
+            "Riscos e contingência",
+            "Descrição das atividades",
+            "Responsabilidades",
+            "Anexos",
+            "Controle de informação documentada",
+          ]
       : [
           "Objetivo",
           "Aplicação",
@@ -541,13 +557,13 @@ function createTemplate(
 export function createDefaultDocumentationState(companyId: string | null, createdBy: string): DocumentationState {
   const templates = [
     createTemplate(
-      "POP Padrão da Empresa",
-      "Procedimento Operacional Padrão",
+      "IT-XXX - Instrução de Trabalho",
+      "Instrução de Trabalho",
       true,
       true,
       createdBy,
       companyId,
-      "Modelo base para procedimentos operacionais padronizados da empresa.",
+      "Template operacional padrão da empresa para instruções de trabalho e procedimentos controlados.",
     ),
     createTemplate(
       "Relatório Executivo de Processo",
