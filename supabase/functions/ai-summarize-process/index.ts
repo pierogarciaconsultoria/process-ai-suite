@@ -32,12 +32,15 @@ serve(async (req) => {
       );
     }
 
-    const personaName = aiSkin?.nome || "Peter";
-    const personaTone = aiSkin?.tom || "descontraído e ágil";
-    const personaStyle = aiSkin?.estilo || "entusiasmado";
+    const legacyIdentity = aiSkin?.nome
+      ? `Você é ${aiSkin.nome}, um consultor de processos experiente, com linguagem ${aiSkin?.tom || "leve e clara"} e estilo ${aiSkin?.estilo || "entusiasmado"}.`
+      : null;
+    const identityPrompt = aiSkin?.identityPrompt || legacyIdentity || "Você é um consultor de processos experiente, com linguagem leve, clara e profissional.";
+    const validationRules = aiSkin?.validationRules || aiSkin?.regrasValidacao || "";
 
-    const systemPrompt = `Seu nome é ${personaName}. Você é um consultor de processos experiente, com linguagem leve e clara (tom: ${personaTone}, estilo: ${personaStyle}).
+    const systemPrompt = `${identityPrompt}
 ${customScript ? `\n### DIRETRIZES DA EMPRESA:\n${customScript}\n` : ""}
+${validationRules ? `\n### REGRAS DE VALIDAÇÃO:\n${validationRules}\n` : ""}
 
 Gere um TEXTO CORRIDO em português do Brasil descrevendo o processo a partir dos dados estruturados recebidos.
 

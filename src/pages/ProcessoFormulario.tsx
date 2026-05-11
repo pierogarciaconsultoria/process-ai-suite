@@ -32,7 +32,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import BPMNCanvas from "@/components/BPMNCanvas";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
-import { buildAiSkinPayload } from "@/data/ai-config-defaults";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
@@ -150,8 +149,7 @@ const ProcessoFormulario = () => {
   const { toast } = useToast();
   const isEditing = !!id;
   const routeScriptConfig = useAiConfig("route_script");
-  const skinIdentityConfig = useAiConfig("skin_identity");
-  const skinValidationConfig = useAiConfig("skin_validation");
+  const companyId = routeScriptConfig.companyId;
 
   const [activeTab, setActiveTab] = useState("identificacao");
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
@@ -297,13 +295,10 @@ const ProcessoFormulario = () => {
     }
     setIsFillingAI(true);
     try {
-      const customScript = routeScriptConfig.content || null;
-      const aiSkin = buildAiSkinPayload(skinIdentityConfig.content, skinValidationConfig.content);
       const { data, error } = await supabase.functions.invoke("ai-fill-process", { 
         body: { 
           descricao: descricaoIA,
-          customScript,
-          aiSkin,
+          company_id: companyId,
         } 
       });
       if (error) throw error;
@@ -341,13 +336,10 @@ const ProcessoFormulario = () => {
     if (isDiagnosing) return;
     setIsDiagnosing(true);
     try {
-      const customScript = routeScriptConfig.content || null;
-      const aiSkin = buildAiSkinPayload(skinIdentityConfig.content, skinValidationConfig.content);
       const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { 
         body: { 
           processoData: form,
-          customScript,
-          aiSkin,
+          company_id: companyId,
         } 
       });
       if (error) throw error;
@@ -360,7 +352,7 @@ const ProcessoFormulario = () => {
     } finally {
       setIsDiagnosing(false);
     }
-  }, [form, navigate, toast]);
+  }, [companyId, form, isDiagnosing, navigate, toast]);
 
   const handleSave = () => {
     toast({ title: "Mapeamento concluido", description: "Escolha o proximo passo para continuar o trabalho com este processo." });

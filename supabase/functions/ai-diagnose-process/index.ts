@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -167,13 +168,16 @@ const toolSchema = {
   },
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { processoData, customScript, aiSkin } = await req.json();
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const body = await req.json();
+    const processoData = body?.processoData;
+    const companyId = body?.company_id ?? null;
     if (!processoData) {
       return new Response(
         JSON.stringify({ error: "Dados do processo são obrigatórios." }),
@@ -181,15 +185,90 @@ serve(async (req) => {
       );
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!LOVABLE_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const personaName = aiSkin?.nome || "Especialista Sênior";
-    const personaTone = aiSkin?.tom || "humano e didático";
-    const personaStyle = aiSkin?.estilo || "profissional";
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Supabase não configurado para buscar configurações da IA" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const systemPrompt = `Seu nome é ${personaName}. Você é um Especialista Sênior em Gestão de Processos, BPM e Sistemas de Gestão (ISO 9001) com tom de voz ${personaTone} e estilo ${personaStyle}.
+    const DEFAULT_ROUTE_SCRIPT = `Você é um entrevistador de processos com tom humano e didático.
+Siga estas regras principais e adapte-se caso o usuário especifique novas prioridades:
+- Faça perguntas curtas e diretas
+- Progrida fase a fase
+- Estimule sempre o máximo de detalhes objetivos sobre cada resposta (quem faz, o que faz, quando, onde, ferramentas, documentos, exceções).
+
+Seja sempre educado.`;
+
+    const DEFAULT_AI_SKIN = `Você é Peter, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
+Sua persona deve transmitir segurança, clareza e proximidade humana. Fale em português do Brasil, com linguagem consultiva, acolhedora e objetiva.
+Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias, estruturar informações e transformar descrições soltas em entendimento prático do processo.
+Seu comportamento deve equilibrar empatia com foco: seja cordial, leve e didático, mas sempre conduza a conversa com direção, evitando dispersão e respostas genéricas.
+Quando necessário, incentive exemplos concretos, detalhe operacional e contexto de negócio, sem parecer robótico nem burocrático.`;
+
+    const DEFAULT_VALIDATION_RULES = `Regras de validação do assistente:
+- Não inventar dados críticos
+- Pedir esclarecimento quando a resposta estiver vaga
+- Manter tom profissional e acolhedor
+- Não avançar para o próximo tema sem informação suficiente
+- Sinalizar quando houver lacunas para validação humana`;
+
+    let customScript = DEFAULT_ROUTE_SCRIPT;
+    let identityPrompt = DEFAULT_AI_SKIN;
+    let validationRules = DEFAULT_VALIDATION_RULES;
+
+    if (companyId) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: configs } = await supabase
+        .from("ai_configurations")
+        .select("config_type, content")
+        .eq("company_id", companyId)
+        .in("config_type", ["route_script", "skin_identity", "skin_validation"]);
+
+      const typedConfigs = (configs || []) as Array<{ config_type: string; content: string }>;
+      const routeScriptConfig = typedConfigs.find((item) => item.config_type === "route_script")?.content;
+      const skinIdentityRaw = typedConfigs.find((item) => item.config_type === "skin_identity")?.content;
+      const skinValidation = typedConfigs.find((item) => item.config_type === "skin_validation")?.content;
+
+      customScript = routeScriptConfig || DEFAULT_ROUTE_SCRIPT;
+      validationRules = skinValidation || DEFAULT_VALIDATION_RULES;
+
+      if (skinIdentityRaw) {
+        try {
+          const parsedSkin = JSON.parse(skinIdentityRaw);
+          if (parsedSkin && typeof parsedSkin === "object" && ("nome" in parsedSkin || "tom" in parsedSkin || "estilo" in parsedSkin)) {
+            const nome = typeof parsedSkin.nome === "string" ? parsedSkin.nome : "Peter";
+            const tom = typeof parsedSkin.tom === "string" ? parsedSkin.tom : "consultivo, humano e didático";
+            const estilo = typeof parsedSkin.estilo === "string" ? parsedSkin.estilo : "profissional e acolhedor";
+            identityPrompt = `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
+Sua comunicação deve seguir um tom ${tom}, com estilo ${estilo}.
+Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias e estruturar o entendimento do processo com clareza.
+Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos concretos e descrições úteis para tomada de decisão.`;
+          } else {
+            identityPrompt = skinIdentityRaw;
+          }
+        } catch {
+          identityPrompt = skinIdentityRaw;
+        }
+      }
+    }
+
+    const systemPrompt = `${identityPrompt}
 ${customScript ? `\n### DIRETRIZES DA EMPRESA:\n${customScript}\n` : ""}
+${validationRules ? `\n### REGRAS DE VALIDAÇÃO:\n${validationRules}\n` : ""}
 
 Você atua como o motor inteligente de um sistema de diagnóstico e transformação de processos. Receba os dados preenchidos pelo usuário e gere um diagnóstico completo organizado em 6 FASES:
 
@@ -249,14 +328,14 @@ Seja direto, executivo e orientado à melhoria. Sem enrolação. Sempre gere ins
 
     const userContent = `Dados completos do processo para diagnóstico:\n\n${JSON.stringify(processoData, null, 2)}`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },

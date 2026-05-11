@@ -31,7 +31,7 @@ serve(async (req) => {
     }
 
     const systemPrompt = `Você é especialista em design de prompts e personas para assistentes de IA em produtos SaaS de processos (BPM, mapeamento, diagnóstico).
-Seu papel é analisar e sugerir melhorias no Roteiro IA (system prompt) e na Skin (nome, tom e estilo) de um assistente que conduz entrevistas de mapeamento de processos em português do Brasil.
+Seu papel é analisar e sugerir melhorias no Roteiro IA (system prompt) e na Skin em texto livre de um assistente que conduz entrevistas de mapeamento de processos em português do Brasil.
 
 Regras:
 - Mantenha o português brasileiro, com tom leve, humano e profissional.
@@ -42,7 +42,7 @@ Regras:
 Responda SEMPRE em JSON com as chaves:
 - "comentarios": string com feedback geral e pontos fortes/fracos.
 - "roteiroSugerido": string com o texto sugerido para o Roteiro IA (pronto para colar na tela de configuração).
-- "skinSugerida": objeto { "nome": string, "tom": string, "estilo": string } sugerido para a Skin.`;
+- "skinSugerida": string com a persona completa sugerida para o Skin Bloco 1, em texto livre pronto para colar.`;
 
     const userPayload = {
       roteiro,
@@ -126,4 +126,3 @@ Responda SEMPRE em JSON com as chaves:
     );
   }
 });
-

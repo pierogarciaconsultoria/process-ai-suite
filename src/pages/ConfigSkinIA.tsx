@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { buildAiSkinPayload, DEFAULT_SKIN_IDENTITY, DEFAULT_SKIN_VALIDATION, parseSkinIdentity } from "@/data/ai-config-defaults";
+import { buildAiSkinPayload, DEFAULT_SKIN_IDENTITY, DEFAULT_SKIN_VALIDATION, normalizeSkinIdentity } from "@/data/ai-config-defaults";
 import { useAiConfig } from "@/hooks/useAiConfig";
 
 const ConfigSkinIA = () => {
@@ -20,7 +18,7 @@ const ConfigSkinIA = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    setSkin(parseSkinIdentity(identityConfig.content));
+    setSkin(normalizeSkinIdentity(identityConfig.content));
   }, [identityConfig.content]);
 
   useEffect(() => {
@@ -32,7 +30,7 @@ const ConfigSkinIA = () => {
 
   const handleSave = async () => {
     const [savedIdentity, savedValidation] = await Promise.all([
-      identityConfig.saveConfig(JSON.stringify(skin)),
+      identityConfig.saveConfig(skin),
       validationConfig.saveConfig(validationRules),
     ]);
     if (savedIdentity && savedValidation) {
@@ -54,7 +52,7 @@ const ConfigSkinIA = () => {
     try {
       const roteiro = routeScriptConfig.content || "";
       const { data, error } = await supabase.functions.invoke("ai-review-config", {
-        body: { roteiro, skin: buildAiSkinPayload(JSON.stringify(skin), validationRules) },
+        body: { roteiro, skin: buildAiSkinPayload(skin, validationRules) },
       });
       if (error) throw error;
       if (data?.error) {
@@ -65,8 +63,8 @@ const ConfigSkinIA = () => {
         });
         return;
       }
-      if (data?.skinSugerida && typeof data.skinSugerida === "object") {
-        setSkin(parseSkinIdentity(JSON.stringify(data.skinSugerida)));
+      if (typeof data?.skinSugerida === "string" && data.skinSugerida.trim()) {
+        setSkin(data.skinSugerida);
       }
       toast({
         title: "Skin revisada",
@@ -96,50 +94,18 @@ const ConfigSkinIA = () => {
           <CardTitle>Skin Bloco 1: Identidade do Assistente</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Descreva em texto livre a persona completa do Peter: papel, postura, tom, estilo, objetivo e forma de conduzir a conversa.
+          </p>
           <div className="space-y-2">
-            <Label htmlFor="nome">Nome do Assistente</Label>
-            <Input
-              id="nome"
-              value={skin.nome}
-              onChange={(e) => setSkin({ ...skin, nome: e.target.value })}
-              placeholder="Ex: Iara, Mentor de Processos..."
+            <Label htmlFor="skin-identidade">Persona completa</Label>
+            <Textarea
+              id="skin-identidade"
+              className="min-h-[260px]"
+              value={skin}
+              onChange={(e) => setSkin(e.target.value)}
+              placeholder="Descreva a identidade completa do assistente Peter..."
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tom">Tom de Voz</Label>
-            <Select 
-              value={skin.tom} 
-              onValueChange={(val) => setSkin({ ...skin, tom: val })}
-            >
-              <SelectTrigger id="tom">
-                <SelectValue placeholder="Selecione o tom" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="humano e didático">Humano e Didático</SelectItem>
-                <SelectItem value="formal e técnico">Formal e Técnico</SelectItem>
-                <SelectItem value="descontraído e ágil">Descontraído e Ágil</SelectItem>
-                <SelectItem value="estritamente executivo">Estritamente Executivo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="estilo">Estilo de Linguagem</Label>
-            <Select 
-              value={skin.estilo} 
-              onValueChange={(val) => setSkin({ ...skin, estilo: val })}
-            >
-              <SelectTrigger id="estilo">
-                <SelectValue placeholder="Selecione o estilo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="profissional">Profissional</SelectItem>
-                <SelectItem value="minimalista">Minimalista (Direto ao ponto)</SelectItem>
-                <SelectItem value="entusiasmado">Entusiasmado (Motivador)</SelectItem>
-                <SelectItem value="crítico">Crítico (Questionador)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="flex items-center gap-2 mt-6">

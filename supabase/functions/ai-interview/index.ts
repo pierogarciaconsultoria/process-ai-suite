@@ -44,11 +44,11 @@ Siga estas regras principais e adapte-se caso o usuário especifique novas prior
 
 Seja sempre educado.`;
 
-    const DEFAULT_AI_SKIN = {
-      nome: "Peter",
-      tom: "descontraído e ágil",
-      estilo: "entusiasmado",
-    };
+    const DEFAULT_AI_SKIN = `Você é Peter, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
+Sua persona deve transmitir segurança, clareza e proximidade humana. Fale em português do Brasil, com linguagem consultiva, acolhedora e objetiva.
+Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias, estruturar informações e transformar descrições soltas em entendimento prático do processo.
+Seu comportamento deve equilibrar empatia com foco: seja cordial, leve e didático, mas sempre conduza a conversa com direção, evitando dispersão e respostas genéricas.
+Quando necessário, incentive exemplos concretos, detalhe operacional e contexto de negócio, sem parecer robótico nem burocrático.`;
 
     const DEFAULT_VALIDATION_RULES = `Regras de validação do assistente:
 - Não inventar dados críticos
@@ -58,7 +58,8 @@ Seja sempre educado.`;
 - Sinalizar quando houver lacunas para validação humana`;
 
     let customScript = DEFAULT_ROUTE_SCRIPT;
-    let aiSkin = { ...DEFAULT_AI_SKIN, regrasValidacao: DEFAULT_VALIDATION_RULES };
+    let skinIdentityPrompt = DEFAULT_AI_SKIN;
+    let validationRules = DEFAULT_VALIDATION_RULES;
 
     if (companyId) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -77,30 +78,29 @@ Seja sempre educado.`;
       const skinValidation = typedConfigs.find((item) => item.config_type === "skin_validation")?.content;
 
       customScript = routeScriptConfig || DEFAULT_ROUTE_SCRIPT;
+      validationRules = skinValidation || DEFAULT_VALIDATION_RULES;
 
       if (skinIdentityRaw) {
         try {
           const parsedSkin = JSON.parse(skinIdentityRaw);
-          aiSkin = {
-            nome: parsedSkin?.nome || DEFAULT_AI_SKIN.nome,
-            tom: parsedSkin?.tom || DEFAULT_AI_SKIN.tom,
-            estilo: parsedSkin?.estilo || DEFAULT_AI_SKIN.estilo,
-            regrasValidacao: skinValidation || DEFAULT_VALIDATION_RULES,
-          };
+          if (parsedSkin && typeof parsedSkin === "object" && ("nome" in parsedSkin || "tom" in parsedSkin || "estilo" in parsedSkin)) {
+            const nome = typeof parsedSkin.nome === "string" ? parsedSkin.nome : "Peter";
+            const tom = typeof parsedSkin.tom === "string" ? parsedSkin.tom : "consultivo, humano e didático";
+            const estilo = typeof parsedSkin.estilo === "string" ? parsedSkin.estilo : "profissional e acolhedor";
+            skinIdentityPrompt = `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
+Sua comunicação deve seguir um tom ${tom}, com estilo ${estilo}.
+Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias e estruturar o entendimento do processo com clareza.
+Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos concretos e descrições úteis para tomada de decisão.`;
+          } else {
+            skinIdentityPrompt = skinIdentityRaw;
+          }
         } catch {
-          aiSkin = { ...DEFAULT_AI_SKIN, regrasValidacao: skinValidation || DEFAULT_VALIDATION_RULES };
+          skinIdentityPrompt = skinIdentityRaw;
         }
-      } else {
-        aiSkin = { ...DEFAULT_AI_SKIN, regrasValidacao: skinValidation || DEFAULT_VALIDATION_RULES };
       }
     }
 
-    const personaName = aiSkin?.nome || "Peter";
-    const personaTone = aiSkin?.tom || "descontraído e ágil";
-    const personaStyle = aiSkin?.estilo || "entusiasmado";
-    const validationRules = aiSkin?.regrasValidacao || DEFAULT_VALIDATION_RULES;
-
-    const systemPrompt = `Seu nome é ${personaName}. Você é um consultor de processos experiente, com postura acolhedora, segura e humana, usando linguagem clara e profissional (tom: ${personaTone}, estilo: ${personaStyle}). Sua missão é conduzir a conversa com naturalidade, sem jargões excessivos, ajudando o usuário a se sentir à vontade para explicar o dia a dia do processo com confiança e tranquilidade.
+    const systemPrompt = `${skinIdentityPrompt}
 ${customScript ? `\n### INSTRUÇÕES PRIORITÁRIAS DA EMPRESA:\n${customScript}\n` : ""}
 ${validationRules ? `\n### REGRAS DE VALIDAÇÃO DA EMPRESA:\n${validationRules}\n` : ""}
 
