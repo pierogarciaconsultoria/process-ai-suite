@@ -3,30 +3,42 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const DEFAULT_SKIN = {
+type AiSkin = {
+  nome: string;
+  apresentacao: string;
+  avaliacao: string;
+};
+
+const DEFAULT_SKIN: AiSkin = {
   nome: "Peter",
-  tom: "descontraído e ágil",
-  estilo: "entusiasmado"
+  apresentacao:
+    "Sou Peter, um consultor de processos experiente, com postura acolhedora, segura e humana. Uso linguagem clara e profissional, com tom descontraído e ágil e estilo entusiasmado. Conduzo a conversa com naturalidade, sem jargões excessivos, ajudando o usuário a se sentir à vontade para explicar o dia a dia do processo com confiança e tranquilidade.",
+  avaliacao:
+    "Antes de avançar, avalio cada resposta em dois eixos: comportamento (sem ofensas, deboche ou gírias inadequadas) e conteúdo (resolve de forma clara e profissional o campo pendente). Se a resposta for vaga, genérica, fora de contexto ou insuficiente, NÃO avanço: explico com empatia o que falta, dou um exemplo curto do tipo de resposta esperada e repito a mesma pergunta de forma mais simples. Estimulo o usuário a detalhar quem faz, o que faz, quando, onde, com quais sistemas/documentos, exceções, volumes e exemplos práticos. Nunca invento dados nem assumo informações não fornecidas.",
 };
 
 const ConfigSkinIA = () => {
-  const [skin, setSkin] = useState(DEFAULT_SKIN);
+  const [skin, setSkin] = useState<AiSkin>(DEFAULT_SKIN);
   const [isSaving, setIsSaving] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const savedSkin = localStorage.getItem("process:aiSkin");
-    if (savedSkin) {
-      try {
-        setSkin(JSON.parse(savedSkin));
-      } catch (e) {
-        setSkin(DEFAULT_SKIN);
-      }
+    const saved = localStorage.getItem("process:aiSkin");
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      setSkin({
+        nome: parsed.nome || DEFAULT_SKIN.nome,
+        apresentacao: parsed.apresentacao || DEFAULT_SKIN.apresentacao,
+        avaliacao: parsed.avaliacao || DEFAULT_SKIN.avaliacao,
+      });
+    } catch {
+      setSkin(DEFAULT_SKIN);
     }
   }, []);
 
@@ -34,16 +46,9 @@ const ConfigSkinIA = () => {
     setIsSaving(true);
     try {
       localStorage.setItem("process:aiSkin", JSON.stringify(skin));
-      toast({
-        title: "Skin atualizada",
-        description: "A personalidade da IA foi salva com sucesso.",
-      });
-    } catch (e) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar a skin.",
-        variant: "destructive",
-      });
+      toast({ title: "Skin atualizada", description: "A personalidade da IA foi salva com sucesso." });
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível salvar a skin.", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -58,16 +63,18 @@ const ConfigSkinIA = () => {
       });
       if (error) throw error;
       if (data?.error) {
-        toast({
-          title: "Falha na revisão",
-          description: data.error as string,
-          variant: "destructive",
-        });
+        toast({ title: "Falha na revisão", description: data.error as string, variant: "destructive" });
         return;
       }
       if (data?.skinSugerida && typeof data.skinSugerida === "object") {
-        setSkin(data.skinSugerida);
-        localStorage.setItem("process:aiSkin", JSON.stringify(data.skinSugerida));
+        const s = data.skinSugerida;
+        const next: AiSkin = {
+          nome: s.nome || skin.nome,
+          apresentacao: s.apresentacao || skin.apresentacao,
+          avaliacao: s.avaliacao || skin.avaliacao,
+        };
+        setSkin(next);
+        localStorage.setItem("process:aiSkin", JSON.stringify(next));
       }
       toast({
         title: "Skin revisada",
@@ -75,21 +82,17 @@ const ConfigSkinIA = () => {
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Erro ao revisar com IA.";
-      toast({
-        title: "Falha na revisão",
-        description: message,
-        variant: "destructive",
-      });
+      toast({ title: "Falha na revisão", description: message, variant: "destructive" });
     } finally {
       setIsReviewing(false);
     }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-2xl">
+    <div className="space-y-6 animate-fade-in max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Skin da IA</h1>
-        <p className="text-muted-foreground">Personalize a identidade do seu assistente virtual.</p>
+        <p className="text-muted-foreground">Personalize a identidade e o comportamento do seu assistente virtual.</p>
       </div>
 
       <Card>
@@ -108,42 +111,35 @@ const ConfigSkinIA = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tom">Tom de Voz</Label>
-            <Select 
-              value={skin.tom} 
-              onValueChange={(val) => setSkin({ ...skin, tom: val })}
-            >
-              <SelectTrigger id="tom">
-                <SelectValue placeholder="Selecione o tom" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="humano e didático">Humano e Didático</SelectItem>
-                <SelectItem value="formal e técnico">Formal e Técnico</SelectItem>
-                <SelectItem value="descontraído e ágil">Descontraído e Ágil</SelectItem>
-                <SelectItem value="estritamente executivo">Estritamente Executivo</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="apresentacao">Apresentação e Personalidade</Label>
+            <Textarea
+              id="apresentacao"
+              value={skin.apresentacao}
+              onChange={(e) => setSkin({ ...skin, apresentacao: e.target.value })}
+              placeholder="Descreva quem é o assistente, seu tom, estilo de comunicação e como ele se apresenta ao usuário."
+              className="min-h-[180px]"
+            />
           </div>
+        </CardContent>
+      </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Comportamento de Avaliação</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="estilo">Estilo de Linguagem</Label>
-            <Select 
-              value={skin.estilo} 
-              onValueChange={(val) => setSkin({ ...skin, estilo: val })}
-            >
-              <SelectTrigger id="estilo">
-                <SelectValue placeholder="Selecione o estilo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="profissional">Profissional</SelectItem>
-                <SelectItem value="minimalista">Minimalista (Direto ao ponto)</SelectItem>
-                <SelectItem value="entusiasmado">Entusiasmado (Motivador)</SelectItem>
-                <SelectItem value="crítico">Crítico (Questionador)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="avaliacao">Regras de Validação e Avaliação</Label>
+            <Textarea
+              id="avaliacao"
+              value={skin.avaliacao}
+              onChange={(e) => setSkin({ ...skin, avaliacao: e.target.value })}
+              placeholder="Defina como o assistente avalia as respostas antes de avançar. Inclua critérios por campo, exemplos de aprofundamento e regras gerais."
+              className="min-h-[220px]"
+            />
           </div>
 
-          <div className="flex items-center gap-2 mt-6">
+          <div className="flex flex-wrap items-center gap-2 pt-2">
             <Button onClick={handleSave} disabled={isSaving || isReviewing}>
               {isSaving ? "Salvando..." : "Salvar Configuração"}
             </Button>
