@@ -16,16 +16,13 @@ serve(async (req) => {
     const roteiro: string = body?.roteiro || "";
     const skin = body?.skin || null;
 
-    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
-    const isOpenAI = AI_MODEL.startsWith("openai/");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!OPENAI_API_KEY && !LOVABLE_API_KEY) {
+    if (!OPENAI_API_KEY) {
       return new Response(
         JSON.stringify({
           comentarios:
-            "A IA de revisão não está configurada (sem OPENAI_API_KEY ou LOVABLE_API_KEY). Ajuste as variáveis de ambiente para usar esta função.",
+            "A IA de revisão não está configurada (sem OPENAI_API_KEY). Ajuste as variáveis de ambiente para usar esta função.",
           roteiroSugerido: roteiro,
           skinSugerida: skin,
         }),
