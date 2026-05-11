@@ -45,10 +45,7 @@ serve(async (req) => {
       );
     }
 
-    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
-    const isOpenAI = AI_MODEL.startsWith("openai/");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     const contextPayload = {
       template,
@@ -59,7 +56,7 @@ serve(async (req) => {
       manualDescription,
     };
 
-    if (!OPENAI_API_KEY && !LOVABLE_API_KEY) {
+    if (!OPENAI_API_KEY) {
       const contentMarkdown = buildFallbackMarkdown(
         template.name ?? "Documento gerado",
         sections,
@@ -72,7 +69,7 @@ serve(async (req) => {
           content_markdown: contentMarkdown,
           content_text: contentMarkdown.replace(/[#*`>-]/g, "").trim(),
           executive_summary: "Documento gerado em modo fallback, sem chamada externa de IA.",
-          attention_points: ["Configurar OPENAI_API_KEY ou LOVABLE_API_KEY para geração avançada."],
+          attention_points: ["Configurar OPENAI_API_KEY para geração avançada."],
           suggested_risks: [],
           suggested_indicators: [],
           generation_metadata: {
@@ -112,20 +109,15 @@ Você deve responder SEMPRE em JSON com as chaves:
 - ai_prompt_used`;
 
     const response = await fetch(
-      isOpenAI && OPENAI_API_KEY
-        ? "https://api.openai.com/v1/chat/completions"
-        : "https://ai.gateway.lovable.dev/v1/chat/completions",
+      "https://api.openai.com/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization:
-            isOpenAI && OPENAI_API_KEY
-              ? `Bearer ${OPENAI_API_KEY}`
-              : `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
+          model: "gpt-4o",
           messages: [
             { role: "system", content: systemPrompt },
             {
