@@ -69,7 +69,7 @@ serve(async (req) => {
           content_markdown: contentMarkdown,
           content_text: contentMarkdown.replace(/[#*`>-]/g, "").trim(),
           executive_summary: "Documento gerado em modo fallback, sem chamada externa de IA.",
-          attention_points: ["Configurar OPENAI_API_KEY ou LOVABLE_API_KEY para geração avançada."],
+          attention_points: ["Configurar OPENAI_API_KEY para geração avançada."],
           suggested_risks: [],
           suggested_indicators: [],
           generation_metadata: {
