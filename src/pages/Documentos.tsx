@@ -12,19 +12,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json, TablesInsert } from "@/integrations/supabase/types";
+import type { Json, Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { processos } from "@/data/mock-processos";
 import {
   buildMappedProcessPayload,
   formatRevision,
   loadDocumentationState,
-  loadGeneratedDocuments,
-  nextDocumentCode,
   PROCEDURE_CATEGORIES,
-  saveGeneratedDocuments,
   type DocumentationState,
+  type DocumentApprovalEntry,
+  type DocumentDistributionEntry,
   type DocumentPreviewData,
+  type DocumentRevisionEntry,
   type DocumentTemplate,
   type GeneratedDocumentRecord,
   type ProcedureCategory,
@@ -34,12 +34,14 @@ type CompanyContext = {
   companyId: string | null;
   companyName: string;
   userId: string;
+  isAuthenticated: boolean;
 };
 
 const DEFAULT_COMPANY_CONTEXT: CompanyContext = {
   companyId: null,
   companyName: "Empresa local",
   userId: "local-user",
+  isAuthenticated: false,
 };
 
 type SourceMode = "linked_process" | "independent";
@@ -60,8 +62,73 @@ const OPERATIONAL_DOCUMENT_STATUSES = [
   "Obsoleto",
 ] as const;
 
+type DbGeneratedDocument = Tables<"generated_documents">;
+
 function normalizeText(value: string) {
   return value.trim() || "Não informado.";
+}
+
+function parseJsonArray<T>(value: Json | null | undefined): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function mapDocumentRow(row: DbGeneratedDocument): GeneratedDocumentRecord {
+  const metadata = typeof row.generation_metadata === "object" && row.generation_metadata
+    ? row.generation_metadata as Record<string, unknown>
+    : {};
+  const process = processos.find((item) => item.id === row.process_id);
+  const processName = row.process_name || process?.nome || String(metadata.processName || "");
+  const linkedMapRevision = row.linked_map_revision || String(metadata.linkedMapRevision || "");
+  const linkedMapApprovedAt = row.linked_map_approved_at || String(metadata.linkedMapApprovedAt || "");
+  const revision = row.revision || (row.version?.startsWith("Rev.") ? row.version : "Rev.00");
+  const distributionHistory = parseJsonArray<DocumentDistributionEntry>(row.distribution_history);
+
+  return {
+    id: row.id,
+    code: row.code || "IT-000",
+    sourceMode: (row.source_mode === "linked_process" ? "linked_process" : "independent"),
+    companyId: row.company_id,
+    processId: row.process_id,
+    processMappingId: row.process_mapping_id,
+    processName,
+    processLink: row.process_id ? `/processos/${row.process_id}` : null,
+    processStatusAtGeneration: process?.status || String(metadata.processStatusAtGeneration || ""),
+    linkedMapRevision,
+    linkedMapApprovedAt,
+    mapVersionLabel: row.map_version_label || String(metadata.mapVersionLabel || ""),
+    area: row.area || process?.area || String(metadata.area || ""),
+    templateId: row.template_id,
+    documentOrigin: row.document_origin as GeneratedDocumentRecord["documentOrigin"],
+    documentType: row.document_type as GeneratedDocumentRecord["documentType"],
+    procedureCategory: (row.procedure_category as ProcedureCategory) || "Procedimento Operacional",
+    documentOwner: row.document_owner || process?.responsavel || String(metadata.documentOwner || ""),
+    title: row.title,
+    contentMarkdown: row.content_markdown,
+    contentText: row.content_text || row.content_markdown.replace(/[#>*`-]/g, "").trim(),
+    summary: String(metadata.summary || ""),
+    pointsOfAttention: parseJsonArray<string>(metadata.pointsOfAttention as Json | undefined),
+    suggestedRisks: parseJsonArray<string>(metadata.suggestedRisks as Json | undefined),
+    suggestedIndicators: parseJsonArray<string>(metadata.suggestedIndicators as Json | undefined),
+    generationMetadata: metadata,
+    status: row.status as GeneratedDocumentRecord["status"],
+    version: row.version,
+    revision,
+    revisionNumber: row.revision_number,
+    approverName: row.approver_name || "",
+    approverRole: row.approver_role || "",
+    distributedTo: row.distribution_list?.length > 0
+      ? row.distribution_list
+      : Array.from(new Set(distributionHistory.map((item) => item.recipient).filter(Boolean))),
+    updatedAt: row.updated_at,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    descriptionInput: row.description_input || undefined,
+    aiModel: row.ai_model || undefined,
+    aiPromptUsed: row.ai_prompt_used || undefined,
+    revisionHistory: parseJsonArray<DocumentRevisionEntry>(row.review_history),
+    approvalHistory: parseJsonArray<DocumentApprovalEntry>(row.approval_history),
+    distributionHistory,
+  };
 }
 
 function markdownToHtml(markdown: string) {
@@ -267,19 +334,57 @@ export default function Documentos() {
   const [distributionRecipients, setDistributionRecipients] = useState("");
   const [distributedBy, setDistributedBy] = useState("");
 
+  const refreshDocuments = async (companyId: string | null) => {
+    if (!companyId) {
+      setDocuments([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("generated_documents")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+    setDocuments((data || []).map(mapDocumentRow));
+  };
+
+  const persistDocumentVersion = async (
+    companyId: string,
+    userId: string,
+    documentId: string,
+    versionLabel: string,
+    contentMarkdown: string,
+    changeSummary: string | null,
+  ) => {
+    const payload: TablesInsert<"generated_document_versions"> = {
+      company_id: companyId,
+      document_id: documentId,
+      version: versionLabel,
+      content_markdown: contentMarkdown,
+      content_text: contentMarkdown.replace(/[#>*`-]/g, "").trim(),
+      change_summary: changeSummary,
+      created_by: userId,
+    };
+
+    await supabase.from("generated_document_versions").insert(payload);
+  };
+
   useEffect(() => {
     const loadPage = async () => {
       const nextContext: CompanyContext = {
         companyId: window.localStorage.getItem("process:activeEmpresaId"),
         companyName: window.localStorage.getItem("process:activeEmpresaNome") || "Empresa local",
         userId: "local-user",
+        isAuthenticated: false,
       };
 
       try {
         const { data: userData } = await supabase.auth.getUser();
-        if (userData.user?.id) nextContext.userId = userData.user.id;
-
         if (userData.user?.id) {
+          nextContext.userId = userData.user.id;
+          nextContext.isAuthenticated = true;
           const resolvedCompanyId = await resolveAccessibleCompanyId(userData.user.id, nextContext.companyId);
           if (resolvedCompanyId) {
             nextContext.companyId = resolvedCompanyId;
@@ -290,23 +395,33 @@ export default function Documentos() {
       }
 
       const nextState = loadDocumentationState(nextContext.companyId, nextContext.userId);
-      const nextDocuments = loadGeneratedDocuments(nextContext.companyId);
       const activeTemplates = nextState.templates.filter((template) => template.isActive);
       const defaultTemplate = activeTemplates.find((template) => template.id === nextState.generationSettings.defaultTemplateId) || activeTemplates[0];
 
       setCompanyContext(nextContext);
       setState(nextState);
-      setDocuments(nextDocuments);
       setSelectedTemplateId(defaultTemplate?.id || "");
       setSelectedProcessId(processos.find((processo) => processo.status === "Aprovado")?.id || processos.find((processo) => processo.status !== "Novo")?.id || processos[0]?.id || "");
       setReviewedBy(nextContext.userId);
       setApprovalName(nextContext.userId);
       setDistributedBy(nextContext.userId);
-      setIsLoaded(true);
+
+      try {
+        await refreshDocuments(nextContext.companyId);
+      } catch {
+        setDocuments([]);
+        toast({
+          title: "Falha ao carregar documentos",
+          description: "Não foi possível carregar a listagem operacional da empresa ativa.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoaded(true);
+      }
     };
 
     void loadPage();
-  }, []);
+  }, [toast]);
 
   const activeTemplates = useMemo(
     () => state?.templates.filter((template) => template.isActive) ?? [],
@@ -355,11 +470,6 @@ export default function Documentos() {
       .map((doc) => `${doc.approverName}${doc.approverRole}`))),
     [documents],
   );
-
-  const persistDocuments = (nextDocs: GeneratedDocumentRecord[]) => {
-    setDocuments(nextDocs);
-    saveGeneratedDocuments(companyContext.companyId, nextDocs);
-  };
 
   const selectedProcess = useMemo(
     () => processos.find((processo) => processo.id === selectedProcessId) || null,
@@ -511,131 +621,155 @@ export default function Documentos() {
     if (!activeTemplate || !preview) return;
     if (sourceMode === "linked_process" && !selectedProcessId) return;
     if (sourceMode === "linked_process" && !shouldProceedWithoutApprovedMap(selectedProcessId)) return;
+    if (!companyContext.companyId || !companyContext.isAuthenticated) {
+      toast({
+        title: "Empresa não identificada",
+        description: "É necessário estar autenticado e com uma empresa ativa para salvar o procedimento.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const mappedProcessData = sourceMode === "linked_process" ? buildMappedProcessPayload(selectedProcessId) : null;
     if (sourceMode === "linked_process" && !mappedProcessData) return;
 
     setIsPersisting(true);
-    const now = new Date().toISOString();
-    const documentCode = nextDocumentCode(documents);
-    const processLink = sourceMode === "linked_process" && mappedProcessData ? `/processos/${mappedProcessData.process.id}` : null;
-    const documentRecord: GeneratedDocumentRecord = {
-      id: crypto.randomUUID(),
-      code: documentCode,
-      sourceMode,
-      companyId: companyContext.companyId,
-      processId: sourceMode === "linked_process" ? selectedProcessId : null,
-      processMappingId: null,
-      processName: sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.nome : "",
-      processLink,
-      processStatusAtGeneration: sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.status : "",
-      linkedMapRevision: sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.normalized.mapaRevisao || "Rev.00" : "",
-      linkedMapApprovedAt: sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.normalized.mapaAprovadoEm || "" : "",
-      mapVersionLabel: sourceMode === "linked_process" ? buildMapVersionLabel(selectedProcessId) : "",
-      area: sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.area : independentDraft.area,
-      templateId: activeTemplate.id,
-      documentOrigin: sourceMode === "linked_process" ? "mapped_process" : "manual_description",
-      documentType: activeTemplate.documentType,
-      procedureCategory: sourceMode === "linked_process" ? "Procedimento Operacional" : independentDraft.procedureCategory,
-      documentOwner: sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.responsavel : independentDraft.owner,
-      title: previewTitle || (sourceMode === "linked_process" && mappedProcessData ? `Procedimento - ${mappedProcessData.process.nome}` : independentDraft.title),
-      contentMarkdown: previewMarkdown,
-      contentText: previewMarkdown.replace(/[#>*`-]/g, "").trim(),
-      summary: preview.summary,
-      pointsOfAttention: preview.pointsOfAttention,
-      suggestedRisks: preview.suggestedRisks,
-      suggestedIndicators: preview.suggestedIndicators,
-      generationMetadata: {
-        ...preview.generationMetadata,
-        templateName: activeTemplate.name,
-        code: documentCode,
-      },
-      status: activeTemplate.approvalVersioning.requireApproval ? "Em revisão" : "Rascunho",
-      version: "1.0",
-      revision: formatRevision(0),
-      revisionNumber: 0,
-      approverName: "",
-      approverRole: "",
-      distributedTo: [],
-      updatedAt: now,
-      createdBy: companyContext.userId,
-      createdAt: now,
-      aiModel: String(preview.generationMetadata.ai_model || "ai-generate-document"),
-      aiPromptUsed: activeTemplate.promptConfig.systemPrompt,
-      revisionHistory: [],
-      approvalHistory: [],
-      distributionHistory: [],
-    };
+    try {
+      const revision = formatRevision(0);
+      const documentOrigin = sourceMode === "linked_process" ? "mapped_process" : "manual_description";
+      const processName = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.nome : "";
+      const area = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.area : independentDraft.area;
+      const documentOwner = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.responsavel : independentDraft.owner;
+      const processStatus = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.status : "";
+      const linkedMapRevision = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.normalized.mapaRevisao || "Rev.00" : "";
+      const linkedMapApprovedAt = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.normalized.mapaAprovadoEm || null : null;
+      const mapVersionLabel = sourceMode === "linked_process" ? buildMapVersionLabel(selectedProcessId) : "";
+      const title = previewTitle || (sourceMode === "linked_process" && mappedProcessData ? `Procedimento - ${mappedProcessData.process.nome}` : independentDraft.title);
 
-    const nextDocs = [documentRecord, ...documents];
-    persistDocuments(nextDocs);
+      const insertPayload: TablesInsert<"generated_documents"> = {
+        company_id: companyContext.companyId,
+        process_id: sourceMode === "linked_process" ? selectedProcessId : null,
+        process_mapping_id: null,
+        process_name: processName,
+        source_mode: sourceMode,
+        area,
+        document_owner: documentOwner,
+        procedure_category: sourceMode === "linked_process" ? "Procedimento Operacional" : independentDraft.procedureCategory,
+        template_id: activeTemplate.id,
+        document_origin: documentOrigin,
+        document_type: activeTemplate.documentType,
+        title,
+        description_input: sourceMode === "independent" ? independentDraft.title : null,
+        content_text: previewMarkdown.replace(/[#>*`-]/g, "").trim(),
+        content_markdown: previewMarkdown,
+        status: "Rascunho",
+        version: revision,
+        revision,
+        revision_number: 0,
+        approver_name: "",
+        approver_role: "",
+        distribution_list: [],
+        approval_history: [],
+        review_history: [],
+        distribution_history: [],
+        linked_map_revision: linkedMapRevision || null,
+        linked_map_approved_at: linkedMapApprovedAt,
+        map_version_label: mapVersionLabel || null,
+        ai_model: String(preview.generationMetadata.ai_model || "ai-generate-document"),
+        ai_prompt_used: activeTemplate.promptConfig.systemPrompt,
+        generation_metadata: {
+          ...preview.generationMetadata,
+          summary: preview.summary,
+          pointsOfAttention: preview.pointsOfAttention,
+          suggestedRisks: preview.suggestedRisks,
+          suggestedIndicators: preview.suggestedIndicators,
+          templateName: activeTemplate.name,
+          processStatusAtGeneration: processStatus,
+          processName,
+          area,
+          documentOwner,
+          procedureCategory: sourceMode === "linked_process" ? "Procedimento Operacional" : independentDraft.procedureCategory,
+          linkedMapRevision,
+          linkedMapApprovedAt,
+          mapVersionLabel,
+        } as Json,
+        created_by: companyContext.userId,
+      };
 
-    if (companyContext.companyId && companyContext.userId !== "local-user") {
-      try {
-        const insertPayload: TablesInsert<"generated_documents"> = {
-          company_id: companyContext.companyId,
-      process_id: documentRecord.processId,
-          process_mapping_id: null,
-          template_id: activeTemplate.id,
-          document_origin: documentRecord.documentOrigin,
-          document_type: documentRecord.documentType,
-          title: documentRecord.title,
-          description_input: null,
-          content_text: documentRecord.contentText,
-          content_markdown: documentRecord.contentMarkdown,
-          status: documentRecord.status,
-          version: documentRecord.version,
-          ai_model: documentRecord.aiModel,
-          ai_prompt_used: documentRecord.aiPromptUsed,
-          generation_metadata: {
-            ...documentRecord.generationMetadata,
-            code: documentRecord.code,
-            revision: documentRecord.revision,
-            processName: documentRecord.processName,
-          } as Json,
-          created_by: companyContext.userId,
-        };
-        await supabase.from("generated_documents").insert(insertPayload);
-      } catch {
-        // persistência local já realizada
-      }
+      const { data: insertedDocument, error: insertError } = await supabase
+        .from("generated_documents")
+        .insert(insertPayload)
+        .select("*")
+        .single();
+
+      if (insertError || !insertedDocument) throw insertError || new Error("Falha ao criar documento.");
+
+      await persistDocumentVersion(
+        companyContext.companyId,
+        companyContext.userId,
+        insertedDocument.id,
+        revision,
+        previewMarkdown,
+        "Versão inicial do procedimento.",
+      );
+
+      await refreshDocuments(companyContext.companyId);
+
+      setIsNewDocumentOpen(false);
+      setPreview(null);
+      setPreviewTitle("");
+      setPreviewMarkdown("");
+      setSourceMode("linked_process");
+      setIndependentDraft({
+        title: "",
+        area: "",
+        owner: "",
+        procedureCategory: "Procedimento Operacional",
+      });
+      toast({ title: "Documento criado", description: "O procedimento foi salvo na listagem operacional da empresa." });
+    } catch {
+      toast({
+        title: "Falha ao salvar",
+        description: "Não foi possível persistir o procedimento no Supabase.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPersisting(false);
     }
-
-    setIsPersisting(false);
-    setIsNewDocumentOpen(false);
-    setPreview(null);
-    setPreviewTitle("");
-    setPreviewMarkdown("");
-    setSourceMode("linked_process");
-    setIndependentDraft({
-      title: "",
-      area: "",
-      owner: "",
-      procedureCategory: "Procedimento Operacional",
-    });
-    toast({ title: "Documento criado", description: "O procedimento entrou na lista operacional para revisão e aprovação." });
   };
 
-  const updateDocument = (documentId: string, updater: (doc: GeneratedDocumentRecord) => GeneratedDocumentRecord) => {
-    const nextDocs = documents.map((doc) => doc.id === documentId ? updater(doc) : doc);
-    persistDocuments(nextDocs);
+  const handleSaveEdit = async () => {
+    if (!editingDoc || !companyContext.companyId) return;
+    try {
+      const updatePayload: TablesUpdate<"generated_documents"> = {
+        title: editingDoc.title,
+        content_markdown: editingDoc.contentMarkdown,
+        content_text: editingDoc.contentMarkdown.replace(/[#>*`-]/g, "").trim(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from("generated_documents")
+        .update(updatePayload)
+        .eq("id", editingDoc.id)
+        .eq("company_id", companyContext.companyId);
+
+      if (error) throw error;
+
+      await refreshDocuments(companyContext.companyId);
+      setEditingDoc(null);
+      toast({ title: "Documento atualizado", description: "As alterações foram salvas na versão atual." });
+    } catch {
+      toast({
+        title: "Falha ao editar",
+        description: "Não foi possível atualizar o documento selecionado.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSaveEdit = () => {
-    if (!editingDoc) return;
-    updateDocument(editingDoc.id, (doc) => ({
-      ...doc,
-      title: editingDoc.title,
-      contentMarkdown: editingDoc.contentMarkdown,
-      contentText: editingDoc.contentMarkdown.replace(/[#>*`-]/g, "").trim(),
-      updatedAt: new Date().toISOString(),
-    }));
-    setEditingDoc(null);
-    toast({ title: "Documento atualizado", description: "As alterações foram salvas na versão atual." });
-  };
-
-  const handleReview = () => {
-    if (!reviewingDoc || !reviewReason.trim()) {
+  const handleReview = async () => {
+    if (!reviewingDoc || !reviewReason.trim() || !companyContext.companyId) {
       toast({
         title: "Motivo obrigatório",
         description: "Informe o motivo da revisão para criar a nova versão.",
@@ -666,67 +800,114 @@ export default function Documentos() {
     const reviewPayload = reviewSourceMode === "linked_process" ? buildMappedProcessPayload(reviewProcessId) : null;
     const now = new Date().toISOString();
     const reviewedByName = reviewedBy || companyContext.userId;
+    const reviewEntry: DocumentRevisionEntry = {
+      revision: reviewingDoc.revision,
+      revisedBy: reviewedByName,
+      revisedAt: now,
+      reason: reviewReason,
+      previousStatus: reviewingDoc.status,
+    };
 
-    const nextDocs = documents.flatMap((doc) => {
-      if (doc.id !== reviewingDoc.id) return [doc];
-
-      const nextRevisionNumber = doc.revisionNumber + 1;
+    try {
+      const nextRevisionNumber = reviewingDoc.revisionNumber + 1;
       const nextRevision = formatRevision(nextRevisionNumber);
-      const obsoleteDoc: GeneratedDocumentRecord = {
-        ...doc,
+      const processName = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.nome : "";
+      const area = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.area : reviewIndependentDraft.area;
+      const documentOwner = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.responsavel : reviewIndependentDraft.owner;
+      const linkedMapRevision = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.normalized.mapaRevisao || "Rev.00" : "";
+      const linkedMapApprovedAt = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.normalized.mapaAprovadoEm || null : null;
+      const mapVersionLabel = reviewSourceMode === "linked_process" ? buildMapVersionLabel(reviewProcessId) : "";
+
+      const obsoletePayload: TablesUpdate<"generated_documents"> = {
         status: "Obsoleto",
-        updatedAt: now,
+        updated_at: now,
       };
-      const nextDoc: GeneratedDocumentRecord = {
-        ...doc,
-        id: crypto.randomUUID(),
-        sourceMode: reviewSourceMode,
-        processId: reviewSourceMode === "linked_process" ? reviewProcessId : null,
-        processName: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.nome : "",
-        processLink: reviewSourceMode === "linked_process" && reviewPayload ? `/processos/${reviewPayload.process.id}` : null,
-        processStatusAtGeneration: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.status : "",
-        linkedMapRevision: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.normalized.mapaRevisao || "Rev.00" : "",
-        linkedMapApprovedAt: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.normalized.mapaAprovadoEm || "" : "",
-        mapVersionLabel: reviewSourceMode === "linked_process" ? buildMapVersionLabel(reviewProcessId) : "",
-        area: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.area : reviewIndependentDraft.area,
-        procedureCategory: reviewSourceMode === "linked_process" ? "Procedimento Operacional" : reviewIndependentDraft.procedureCategory,
-        documentOwner: reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.responsavel : reviewIndependentDraft.owner,
+      const { error: obsoleteError } = await supabase
+        .from("generated_documents")
+        .update(obsoletePayload)
+        .eq("id", reviewingDoc.id)
+        .eq("company_id", companyContext.companyId);
+
+      if (obsoleteError) throw obsoleteError;
+
+      const newDocumentPayload: TablesInsert<"generated_documents"> = {
+        company_id: companyContext.companyId,
+        code: reviewingDoc.code,
+        process_id: reviewSourceMode === "linked_process" ? reviewProcessId : null,
+        process_mapping_id: null,
+        process_name: processName,
+        source_mode: reviewSourceMode,
+        area,
+        document_owner: documentOwner,
+        procedure_category: reviewSourceMode === "linked_process" ? "Procedimento Operacional" : reviewIndependentDraft.procedureCategory,
+        template_id: reviewingDoc.templateId,
+        document_origin: reviewSourceMode === "linked_process" ? "mapped_process" : "manual_description",
+        document_type: reviewingDoc.documentType,
         title: reviewSourceMode === "linked_process" && reviewPayload ? `Procedimento - ${reviewPayload.process.nome}` : reviewIndependentDraft.title,
-        documentOrigin: reviewSourceMode === "linked_process" ? "mapped_process" : "manual_description",
-        revisionNumber: nextRevisionNumber,
-        revision: nextRevision,
+        description_input: reviewSourceMode === "independent" ? reviewIndependentDraft.title : reviewingDoc.descriptionInput ?? null,
+        content_text: reviewingDoc.contentMarkdown.replace(/[#>*`-]/g, "").trim(),
+        content_markdown: reviewingDoc.contentMarkdown,
         status: "Em revisão",
-        approverName: "",
-        approverRole: "",
-        distributedTo: [],
-        updatedAt: now,
-        createdAt: now,
-        revisionHistory: [
-          {
-            revision: doc.revision,
-            revisedBy: reviewedByName,
-            revisedAt: now,
-            reason: reviewReason,
-            previousStatus: "Obsoleto",
-          },
-          ...doc.revisionHistory,
-        ],
-        approvalHistory: [],
-        distributionHistory: [],
+        version: nextRevision,
+        revision: nextRevision,
+        revision_number: nextRevisionNumber,
+        approver_name: "",
+        approver_role: "",
+        distribution_list: [],
+        approval_history: [],
+        review_history: [reviewEntry] as unknown as Json,
+        distribution_history: [],
+        linked_map_revision: linkedMapRevision || null,
+        linked_map_approved_at: linkedMapApprovedAt,
+        map_version_label: mapVersionLabel || null,
+        ai_model: reviewingDoc.aiModel ?? null,
+        ai_prompt_used: reviewingDoc.aiPromptUsed ?? null,
+        generation_metadata: {
+          ...reviewingDoc.generationMetadata,
+          processName,
+          area,
+          documentOwner,
+          linkedMapRevision,
+          linkedMapApprovedAt,
+          mapVersionLabel,
+        } as Json,
+        created_by: companyContext.userId,
       };
-      return [nextDoc, obsoleteDoc];
-    });
 
-    persistDocuments(nextDocs);
+      const { data: insertedReview, error: insertError } = await supabase
+        .from("generated_documents")
+        .insert(newDocumentPayload)
+        .select("*")
+        .single();
 
-    setReviewingDoc(null);
-    setReviewReason("");
-    setReviewProcessId("");
-    toast({ title: "Nova revisão criada", description: "A versão anterior foi registrada no histórico e a aprovação foi reiniciada." });
+      if (insertError || !insertedReview) throw insertError || new Error("Falha ao criar revisão.");
+
+      await persistDocumentVersion(
+        companyContext.companyId,
+        companyContext.userId,
+        insertedReview.id,
+        nextRevision,
+        reviewingDoc.contentMarkdown,
+        reviewReason,
+      );
+
+      await refreshDocuments(companyContext.companyId);
+
+      setReviewingDoc(null);
+      setReviewReason("");
+      setReviewProcessId("");
+      toast({ title: "Nova revisão criada", description: "A revisão anterior foi marcada como obsoleta e o fluxo de aprovação foi reiniciado." });
+    } catch {
+      toast({
+        title: "Falha ao revisar",
+        description: "Não foi possível criar a nova revisão do procedimento.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleApproval = () => {
-    if (!approvalDoc || !approvalName.trim()) {
+  const handleApproval = async () => {
+    if (!approvalDoc || !approvalName.trim() || !companyContext.companyId) {
       toast({
         title: "Responsável obrigatório",
         description: "Informe quem está aprovando, reprovando ou encaminhando o documento.",
@@ -735,44 +916,64 @@ export default function Documentos() {
       return;
     }
 
-    updateDocument(approvalDoc.id, (doc) => {
+    try {
+      const now = new Date().toISOString();
       const status = approvalDecision === "submit"
         ? "Em aprovação"
         : approvalDecision === "approve"
           ? "Publicado"
           : "Em revisão";
 
-      return {
-        ...doc,
-        status,
-        approverName: approvalName,
-        approverRole: approvalRole,
-        updatedAt: new Date().toISOString(),
-        approvalHistory: approvalDecision === "submit"
-          ? doc.approvalHistory
-          : [
-              {
-                decision: approvalDecision === "approve" ? "Aprovado" : "Reprovado",
-                responsibleName: approvalName,
-                responsibleRole: approvalRole,
-                decidedAt: new Date().toISOString(),
-                comment: approvalComment,
-              },
-              ...doc.approvalHistory,
-            ],
-      };
-    });
+      const nextApprovalHistory = approvalDecision === "submit"
+        ? approvalDoc.approvalHistory
+        : [
+            {
+              decision: approvalDecision === "approve" ? "Aprovado" : "Reprovado",
+              responsibleName: approvalName,
+              responsibleRole: approvalRole,
+              decidedAt: now,
+              comment: approvalComment,
+            },
+            ...approvalDoc.approvalHistory,
+          ];
 
-    setApprovalDoc(null);
-    setApprovalComment("");
-    toast({
-      title: approvalDecision === "approve" ? "Documento publicado" : approvalDecision === "reject" ? "Documento reprovado" : "Documento enviado para aprovação",
-      description: "O status operacional foi atualizado com rastreabilidade.",
-    });
+      const updatePayload: TablesUpdate<"generated_documents"> = {
+        status,
+        approver_name: approvalName,
+        approver_role: approvalRole,
+        approval_history: nextApprovalHistory,
+        approved_at: approvalDecision === "approve" ? now : null,
+        approved_by: approvalDecision === "approve" ? companyContext.userId : null,
+        published_at: approvalDecision === "approve" ? now : null,
+        updated_at: now,
+      };
+
+      const { error } = await supabase
+        .from("generated_documents")
+        .update(updatePayload)
+        .eq("id", approvalDoc.id)
+        .eq("company_id", companyContext.companyId);
+
+      if (error) throw error;
+
+      await refreshDocuments(companyContext.companyId);
+      setApprovalDoc(null);
+      setApprovalComment("");
+      toast({
+        title: approvalDecision === "approve" ? "Documento publicado" : approvalDecision === "reject" ? "Documento reprovado" : "Documento enviado para aprovação",
+        description: "O status operacional foi atualizado com rastreabilidade.",
+      });
+    } catch {
+      toast({
+        title: "Falha na aprovação",
+        description: "Não foi possível atualizar o status do documento.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDistribution = () => {
-    if (!distributionDoc || !distributionRecipients.trim()) {
+  const handleDistribution = async () => {
+    if (!distributionDoc || !distributionRecipients.trim() || !companyContext.companyId) {
       toast({
         title: "Distribuição obrigatória",
         description: "Informe ao menos uma área ou pessoa para registrar a distribuição.",
@@ -786,25 +987,44 @@ export default function Documentos() {
       .map((item) => item.trim())
       .filter(Boolean);
 
-    updateDocument(distributionDoc.id, (doc) => ({
-      ...doc,
-      distributedTo: Array.from(new Set([...doc.distributedTo, ...recipients])),
-      updatedAt: new Date().toISOString(),
-      distributionHistory: [
+    try {
+      const distributedAt = new Date().toISOString();
+      const nextDistributionHistory: DocumentDistributionEntry[] = [
         ...recipients.map((recipient) => ({
           recipient,
-          distributedAt: new Date().toISOString(),
+          distributedAt,
           distributedBy: distributedBy || companyContext.userId,
-          revision: doc.revision,
-          version: doc.version,
+          revision: distributionDoc.revision,
+          version: distributionDoc.version,
         })),
-        ...doc.distributionHistory,
-      ],
-    }));
+        ...distributionDoc.distributionHistory,
+      ];
 
-    setDistributionDoc(null);
-    setDistributionRecipients("");
-    toast({ title: "Distribuição registrada", description: "Os destinatários ficaram vinculados ao documento com data e responsável." });
+      const updatePayload: TablesUpdate<"generated_documents"> = {
+        distribution_list: Array.from(new Set([...distributionDoc.distributedTo, ...recipients])),
+        distribution_history: nextDistributionHistory as unknown as Json,
+        updated_at: distributedAt,
+      };
+
+      const { error } = await supabase
+        .from("generated_documents")
+        .update(updatePayload)
+        .eq("id", distributionDoc.id)
+        .eq("company_id", companyContext.companyId);
+
+      if (error) throw error;
+
+      await refreshDocuments(companyContext.companyId);
+      setDistributionDoc(null);
+      setDistributionRecipients("");
+      toast({ title: "Distribuição registrada", description: "Os destinatários ficaram vinculados ao documento com data e responsável." });
+    } catch {
+      toast({
+        title: "Falha na distribuição",
+        description: "Não foi possível registrar a distribuição do documento.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExportWord = (doc: GeneratedDocumentRecord) => {

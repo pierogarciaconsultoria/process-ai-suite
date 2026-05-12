@@ -682,20 +682,37 @@ export type Database = {
           ai_prompt_used: string | null
           approved_at: string | null
           approved_by: string | null
+          approver_name: string | null
+          approver_role: string | null
+          approval_history: Json
           archived_at: string | null
+          area: string | null
+          code: string | null
           company_id: string
           content_markdown: string
           content_text: string | null
           created_at: string
           created_by: string
           description_input: string | null
+          distribution_history: Json
+          distribution_list: string[]
           document_origin: string
+          document_owner: string | null
           document_type: string
           generation_metadata: Json
           id: string
+          linked_map_approved_at: string | null
+          linked_map_revision: string | null
+          map_version_label: string | null
           process_id: string | null
           process_mapping_id: string | null
+          process_name: string | null
+          procedure_category: string | null
           published_at: string | null
+          review_history: Json
+          revision: string
+          revision_number: number
+          source_mode: string
           status: string
           template_id: string
           title: string
@@ -707,20 +724,37 @@ export type Database = {
           ai_prompt_used?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approver_name?: string | null
+          approver_role?: string | null
+          approval_history?: Json
           archived_at?: string | null
+          area?: string | null
+          code?: string | null
           company_id: string
           content_markdown: string
           content_text?: string | null
           created_at?: string
           created_by: string
           description_input?: string | null
+          distribution_history?: Json
+          distribution_list?: string[]
           document_origin: string
+          document_owner?: string | null
           document_type: string
           generation_metadata?: Json
           id?: string
+          linked_map_approved_at?: string | null
+          linked_map_revision?: string | null
+          map_version_label?: string | null
           process_id?: string | null
           process_mapping_id?: string | null
+          process_name?: string | null
+          procedure_category?: string | null
           published_at?: string | null
+          review_history?: Json
+          revision?: string
+          revision_number?: number
+          source_mode?: string
           status?: string
           template_id: string
           title: string
@@ -732,20 +766,37 @@ export type Database = {
           ai_prompt_used?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approver_name?: string | null
+          approver_role?: string | null
+          approval_history?: Json
           archived_at?: string | null
+          area?: string | null
+          code?: string | null
           company_id?: string
           content_markdown?: string
           content_text?: string | null
           created_at?: string
           created_by?: string
           description_input?: string | null
+          distribution_history?: Json
+          distribution_list?: string[]
           document_origin?: string
+          document_owner?: string | null
           document_type?: string
           generation_metadata?: Json
           id?: string
+          linked_map_approved_at?: string | null
+          linked_map_revision?: string | null
+          map_version_label?: string | null
           process_id?: string | null
           process_mapping_id?: string | null
+          process_name?: string | null
+          procedure_category?: string | null
           published_at?: string | null
+          review_history?: Json
+          revision?: string
+          revision_number?: number
+          source_mode?: string
           status?: string
           template_id?: string
           title?: string

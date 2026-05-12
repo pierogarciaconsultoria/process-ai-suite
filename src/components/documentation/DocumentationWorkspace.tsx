@@ -84,6 +84,15 @@ const DEFAULT_COMPANY_CONTEXT: CompanyContext = {
   userId: "local-user",
 };
 
+function buildMapVersionLabel(processId: string) {
+  const payload = buildMappedProcessPayload(processId);
+  if (!payload) return "";
+  const approvedAt = payload.normalized.mapaAprovadoEm;
+  const revision = payload.normalized.mapaRevisao || "Rev.00";
+  if (!approvedAt) return "Mapa sem aprovação formal registrada";
+  return `Mapa aprovado em ${new Date(approvedAt).toLocaleDateString("pt-BR")} — ${revision}`;
+}
+
 const ORIGIN_OPTIONS: { id: DocumentOrigin | "uploaded_document"; title: string; description: string; disabled?: boolean }[] = [
   {
     id: "mapped_process",
@@ -687,14 +696,24 @@ export default function DocumentationWorkspace() {
     const documentRecord: GeneratedDocumentRecord = {
       id: crypto.randomUUID(),
       code: documentCode,
+      sourceMode: documentOrigin === "mapped_process" ? "linked_process" : "independent",
       companyId: companyContext.companyId,
       processId: documentOrigin === "mapped_process" ? selectedProcessId : null,
       processMappingId: null,
       processName: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.nome || "Processo mapeado" : manualDescription.title || "Documento avulso",
+      processLink: documentOrigin === "mapped_process" ? `/processos/${selectedProcessId}` : null,
+      processStatusAtGeneration: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.status || "" : "",
+      linkedMapRevision: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaRevisao || "Rev.00" : "",
+      linkedMapApprovedAt: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaAprovadoEm || "" : "",
+      mapVersionLabel: documentOrigin === "mapped_process" ? buildMapVersionLabel(selectedProcessId) : "",
       area: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.area || "" : manualDescription.area,
       templateId: activeTemplate.id,
       documentOrigin,
       documentType: documentOrigin === "manual_description" ? manualDescription.documentType : activeTemplate.documentType,
+      procedureCategory: documentOrigin === "mapped_process" ? "Procedimento Operacional" : "Outro",
+      documentOwner: documentOrigin === "mapped_process"
+        ? mappedProcessPayload?.process.responsavel || ""
+        : manualDescription.stakeholders,
       title: previewTitle,
       descriptionInput: documentOrigin === "manual_description" ? manualDescription.generalDescription : undefined,
       contentMarkdown: previewMarkdown,
@@ -734,8 +753,16 @@ export default function DocumentationWorkspace() {
       try {
         const insertPayload: TablesInsert<"generated_documents"> = {
           company_id: companyContext.companyId,
+          code: documentRecord.code,
           process_id: documentRecord.processId,
           process_mapping_id: null,
+          process_name: documentRecord.processName,
+          source_mode: documentOrigin === "mapped_process" ? "linked_process" : "independent",
+          area: documentRecord.area,
+          document_owner: documentOrigin === "mapped_process"
+            ? mappedProcessPayload?.process.responsavel || ""
+            : manualDescription.stakeholders,
+          procedure_category: documentOrigin === "mapped_process" ? "Procedimento Operacional" : "Outro",
           template_id: activeTemplate.id,
           document_origin: documentOrigin,
           document_type: documentRecord.documentType,
@@ -744,10 +771,35 @@ export default function DocumentationWorkspace() {
           content_text: documentRecord.contentText,
           content_markdown: documentRecord.contentMarkdown,
           status: documentRecord.status,
-          version: documentRecord.version,
+          version: documentRecord.revision,
+          revision: documentRecord.revision,
+          revision_number: documentRecord.revisionNumber,
+          approver_name: documentRecord.approverName,
+          approver_role: documentRecord.approverRole,
+          distribution_list: documentRecord.distributedTo,
+          approval_history: documentRecord.approvalHistory as unknown as Json,
+          review_history: documentRecord.revisionHistory as unknown as Json,
+          distribution_history: documentRecord.distributionHistory as unknown as Json,
+          linked_map_revision: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaRevisao || "Rev.00" : null,
+          linked_map_approved_at: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaAprovadoEm || null : null,
+          map_version_label: documentOrigin === "mapped_process" ? buildMapVersionLabel(selectedProcessId) : null,
           ai_model: documentRecord.aiModel,
           ai_prompt_used: documentRecord.aiPromptUsed,
-          generation_metadata: documentRecord.generationMetadata as Json,
+          generation_metadata: {
+            ...documentRecord.generationMetadata,
+            summary: documentRecord.summary,
+            pointsOfAttention: documentRecord.pointsOfAttention,
+            suggestedRisks: documentRecord.suggestedRisks,
+            suggestedIndicators: documentRecord.suggestedIndicators,
+            processName: documentRecord.processName,
+            area: documentRecord.area,
+            documentOwner: documentOrigin === "mapped_process"
+              ? mappedProcessPayload?.process.responsavel || ""
+              : manualDescription.stakeholders,
+            linkedMapRevision: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaRevisao || "Rev.00" : "",
+            linkedMapApprovedAt: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaAprovadoEm || "" : "",
+            mapVersionLabel: documentOrigin === "mapped_process" ? buildMapVersionLabel(selectedProcessId) : "",
+          } as Json,
           created_by: companyContext.userId,
         };
 
