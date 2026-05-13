@@ -1,3 +1,8 @@
+/**
+ * @deprecated Arquivo legado de mocks do módulo de processos.
+ * Não usar em novas implementações do módulo `Processos`.
+ * A fonte oficial do módulo agora é a tabela `public.processos` no Supabase.
+ */
 export type Status = "Novo" | "Mapeado" | "Em Análise" | "Documentado" | "Aprovado";
 export type Criticidade = "Baixa" | "Média" | "Alta" | "Crítica";
 

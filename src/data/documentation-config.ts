@@ -1,4 +1,11 @@
-import { processos, processosDetalhados, processosFormMock } from "@/data/mock-processos";
+import type { Json } from "@/integrations/supabase/types";
+import type { DiagnosticoResult, ProcessoFormData } from "@/data/processo-form-types";
+import {
+  mapProcessRowToForm,
+  mapProcessRowToListItem,
+  type ProcessoListItem,
+  type ProcessoRow,
+} from "@/lib/processos";
 
 export const DOCUMENTATION_STORAGE_PREFIX = "process:documentation";
 export const GENERATED_DOCUMENTS_STORAGE_PREFIX = "process:generated-documents";
@@ -295,6 +302,40 @@ export interface ManualDescriptionInput {
   additionalNotes: string;
 }
 
+export interface MappedProcessDetailedData {
+  descricao: string;
+  indicadores: ProcessoFormData["indicadores"];
+  melhorias: NonNullable<DiagnosticoResult["fase4"]>["melhorias"];
+}
+
+export interface MappedProcessPayload {
+  process: ProcessoListItem;
+  detailed: MappedProcessDetailedData;
+  form: ProcessoFormData;
+  normalized: {
+    nomeProcesso: string;
+    area: string;
+    donoProcesso: string;
+    status: ProcessoListItem["status"];
+    criticidade: ProcessoListItem["criticidade"];
+    dataCriacao: string;
+    mapaRevisao: string;
+    mapaAprovadoEm: string;
+    objetivo: string;
+    clientePrincipal: string;
+    areasEnvolvidas: string;
+    entradas: string;
+    etapas: ProcessoFormData["etapas"];
+    decisoes: string;
+    saidas: string;
+    problemasTexto: string;
+    riscos: ProcessoFormData["riscos"];
+    indicadores: ProcessoFormData["indicadores"];
+    melhorias: MappedProcessDetailedData["melhorias"];
+    descricao: string;
+  };
+}
+
 const DEFAULT_SYSTEM_PROMPT = `Você é um consultor sênior especialista em gestão de processos, BPM, padronização operacional, ISO 9001 e melhoria contínua.
 
 Sua função é elaborar um documento de processo claro, profissional e aplicável à realidade da empresa.
@@ -393,6 +434,10 @@ const STANDARD_VARIABLES: Omit<DocumentVariable, "id">[] = [
 
 function uuid() {
   return crypto.randomUUID();
+}
+
+function parseJsonObject<T extends object>(value: Json | null | undefined, fallback: T): T {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as T) : fallback;
 }
 
 function createStandardSections(documentType: DocumentType): DocumentSection[] {
@@ -715,11 +760,30 @@ function normalizeGeneratedDocuments(parsed: Partial<GeneratedDocumentRecord>[])
   return result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
-export function buildMappedProcessPayload(processId: string) {
-  const process = processos.find((item) => item.id === processId);
-  if (!process) return null;
-  const detailed = processosDetalhados[processId];
-  const form = processosFormMock[processId];
+export function buildMappedProcessPayload(processRow: ProcessoRow | null | undefined): MappedProcessPayload | null {
+  if (!processRow) return null;
+
+  const process = mapProcessRowToListItem(processRow);
+  const form = mapProcessRowToForm(processRow);
+  const diagnostico = parseJsonObject<Partial<DiagnosticoResult>>(processRow.diagnostico, {});
+  const indicadores = form.indicadores.length > 0
+    ? form.indicadores
+    : Array.isArray(diagnostico.fase6?.indicadores)
+      ? diagnostico.fase6.indicadores
+      : [];
+  const melhorias = Array.isArray(diagnostico.fase4?.melhorias) ? diagnostico.fase4.melhorias : [];
+  const descricao = diagnostico.fase1?.descricaoPontaAPonta || processRow.objetivo || "";
+  const entradas = form.entradas
+    .map((item) => [item.entrada, item.fornecedor ? `Fornecedor: ${item.fornecedor}` : ""].filter(Boolean).join(" | "))
+    .join("\n");
+  const saidas = form.saidas
+    .map((item) => [item.saida, item.cliente ? `Cliente: ${item.cliente}` : ""].filter(Boolean).join(" | "))
+    .join("\n");
+  const detailed: MappedProcessDetailedData = {
+    descricao,
+    indicadores,
+    melhorias,
+  };
 
   return {
     process,
@@ -734,18 +798,18 @@ export function buildMappedProcessPayload(processId: string) {
       dataCriacao: process.data_criacao,
       mapaRevisao: process.mapa_revisao ?? "",
       mapaAprovadoEm: process.mapa_aprovado_em ?? "",
-      objetivo: form?.objetivo ?? "",
-      clientePrincipal: form?.clienteProcesso ?? "",
-      areasEnvolvidas: form?.areasEnvolvidas ?? "",
-      entradas: form?.entradas ?? "",
-      etapas: form?.etapas ?? [],
-      decisoes: form?.decisoes ?? "",
-      saidas: form?.saidas ?? "",
-      problemasTexto: form?.problemasTexto ?? "",
-      riscos: form?.riscos ?? [],
-      indicadores: detailed?.indicadores ?? [],
-      melhorias: detailed?.melhorias ?? [],
-      descricao: detailed?.descricao ?? "",
+      objetivo: form.objetivo ?? "",
+      clientePrincipal: form.clienteProcesso ?? "",
+      areasEnvolvidas: form.areasEnvolvidas ?? "",
+      entradas,
+      etapas: form.etapas ?? [],
+      decisoes: form.decisoes ?? "",
+      saidas,
+      problemasTexto: form.problemasTexto ?? "",
+      riscos: form.riscos ?? [],
+      indicadores,
+      melhorias,
+      descricao,
     },
   };
 }

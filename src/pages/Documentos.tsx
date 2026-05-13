@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
-import { processos } from "@/data/mock-processos";
+import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
 import {
   buildMappedProcessPayload,
   formatRevision,
@@ -23,6 +23,7 @@ import {
   type DocumentationState,
   type DocumentApprovalEntry,
   type DocumentDistributionEntry,
+  type MappedProcessPayload,
   type DocumentPreviewData,
   type DocumentRevisionEntry,
   type DocumentTemplate,
@@ -62,6 +63,8 @@ const OPERATIONAL_DOCUMENT_STATUSES = [
   "Obsoleto",
 ] as const;
 
+const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo aprovado encontrado. Aprove um processo antes de vincular.";
+
 type DbGeneratedDocument = Tables<"generated_documents">;
 
 function normalizeText(value: string) {
@@ -76,8 +79,7 @@ function mapDocumentRow(row: DbGeneratedDocument): GeneratedDocumentRecord {
   const metadata = typeof row.generation_metadata === "object" && row.generation_metadata
     ? row.generation_metadata as Record<string, unknown>
     : {};
-  const process = processos.find((item) => item.id === row.process_id);
-  const processName = row.process_name || process?.nome || String(metadata.processName || "");
+  const processName = row.process_name || String(metadata.processName || "");
   const linkedMapRevision = row.linked_map_revision || String(metadata.linkedMapRevision || "");
   const linkedMapApprovedAt = row.linked_map_approved_at || String(metadata.linkedMapApprovedAt || "");
   const revision = row.revision || (row.version?.startsWith("Rev.") ? row.version : "Rev.00");
@@ -92,16 +94,16 @@ function mapDocumentRow(row: DbGeneratedDocument): GeneratedDocumentRecord {
     processMappingId: row.process_mapping_id,
     processName,
     processLink: row.process_id ? `/processos/${row.process_id}` : null,
-    processStatusAtGeneration: process?.status || String(metadata.processStatusAtGeneration || ""),
+    processStatusAtGeneration: String(metadata.processStatusAtGeneration || ""),
     linkedMapRevision,
     linkedMapApprovedAt,
     mapVersionLabel: row.map_version_label || String(metadata.mapVersionLabel || ""),
-    area: row.area || process?.area || String(metadata.area || ""),
+    area: row.area || String(metadata.area || ""),
     templateId: row.template_id,
     documentOrigin: row.document_origin as GeneratedDocumentRecord["documentOrigin"],
     documentType: row.document_type as GeneratedDocumentRecord["documentType"],
     procedureCategory: (row.procedure_category as ProcedureCategory) || "Procedimento Operacional",
-    documentOwner: row.document_owner || process?.responsavel || String(metadata.documentOwner || ""),
+    documentOwner: row.document_owner || String(metadata.documentOwner || ""),
     title: row.title,
     contentMarkdown: row.content_markdown,
     contentText: row.content_text || row.content_markdown.replace(/[#>*`-]/g, "").trim(),
@@ -165,8 +167,7 @@ function originLabel(doc: GeneratedDocumentRecord) {
     : "📄 Independente";
 }
 
-function buildMapVersionLabel(processId: string) {
-  const payload = buildMappedProcessPayload(processId);
+function buildMapVersionLabel(payload: MappedProcessPayload | null) {
   if (!payload) return "";
   const approvedAt = payload.normalized.mapaAprovadoEm;
   const revision = payload.normalized.mapaRevisao || "Rev.00";
@@ -174,8 +175,7 @@ function buildMapVersionLabel(processId: string) {
   return `Mapa aprovado em ${formatDatePtBr(approvedAt)} — ${revision}`;
 }
 
-function buildLinkedFallbackPreview(template: DocumentTemplate, processId: string): DocumentPreviewData {
-  const payload = buildMappedProcessPayload(processId);
+function buildLinkedFallbackPreview(template: DocumentTemplate, payload: MappedProcessPayload | null): DocumentPreviewData {
   const normalized = payload?.normalized;
   const process = payload?.process;
   const sections = template.sections
@@ -192,7 +192,7 @@ function buildLinkedFallbackPreview(template: DocumentTemplate, processId: strin
     else if (key.includes("saídas") || key.includes("saidas")) content = normalizeText(String(normalized?.saidas ?? ""));
     else if (key.includes("etapas")) {
       content = Array.isArray(normalized?.etapas) && normalized.etapas.length > 0
-        ? normalized.etapas.map((step, index) => `${index + 1}. ${step.atividade} | Responsável: ${step.responsavel || "Não informado"} | Sistema: ${step.sistema || "Não informado"}`).join("\n")
+        ? normalized.etapas.map((step, index) => `${index + 1}. ${step.atividade} | Responsável: ${step.responsavel || "Não informado"} | Sistema: ${step.ferramentaDocumento || "Não informado"}`).join("\n")
         : "Não informado.";
     } else if (key.includes("riscos")) {
       content = Array.isArray(normalized?.riscos) && normalized.riscos.length > 0
@@ -230,7 +230,7 @@ function buildLinkedFallbackPreview(template: DocumentTemplate, processId: strin
     suggestedIndicators: [],
     generationMetadata: {
       mode: "frontend-fallback",
-      processId,
+      processId: process?.id || null,
       generatedAt: new Date().toISOString(),
     },
   };
@@ -290,6 +290,7 @@ export default function Documentos() {
   const [companyContext, setCompanyContext] = useState<CompanyContext>(DEFAULT_COMPANY_CONTEXT);
   const [state, setState] = useState<DocumentationState | null>(null);
   const [documents, setDocuments] = useState<GeneratedDocumentRecord[]>([]);
+  const [processRows, setProcessRows] = useState<ProcessoRow[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [selectedProcessId, setSelectedProcessId] = useState("");
   const [sourceMode, setSourceMode] = useState<SourceMode>("linked_process");
@@ -350,6 +351,22 @@ export default function Documentos() {
     setDocuments((data || []).map(mapDocumentRow));
   };
 
+  const refreshProcesses = async (companyId: string | null) => {
+    if (!companyId) {
+      setProcessRows([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("processos")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("updated_at", { ascending: false });
+
+    if (error) throw error;
+    setProcessRows(data || []);
+  };
+
   const persistDocumentVersion = async (
     companyId: string,
     userId: string,
@@ -401,18 +418,21 @@ export default function Documentos() {
       setCompanyContext(nextContext);
       setState(nextState);
       setSelectedTemplateId(defaultTemplate?.id || "");
-      setSelectedProcessId(processos.find((processo) => processo.status === "Aprovado")?.id || processos.find((processo) => processo.status !== "Novo")?.id || processos[0]?.id || "");
       setReviewedBy(nextContext.userId);
       setApprovalName(nextContext.userId);
       setDistributedBy(nextContext.userId);
 
       try {
-        await refreshDocuments(nextContext.companyId);
+        await Promise.all([
+          refreshProcesses(nextContext.companyId),
+          refreshDocuments(nextContext.companyId),
+        ]);
       } catch {
+        setProcessRows([]);
         setDocuments([]);
         toast({
-          title: "Falha ao carregar documentos",
-          description: "Não foi possível carregar a listagem operacional da empresa ativa.",
+          title: "Falha ao carregar dados",
+          description: "Não foi possível carregar processos e documentos da empresa ativa.",
           variant: "destructive",
         });
       } finally {
@@ -434,8 +454,8 @@ export default function Documentos() {
   );
 
   const availableProcesses = useMemo(
-    () => processos.filter((processo) => processo.status !== "Novo"),
-    [],
+    () => processRows.map(mapProcessRowToListItem),
+    [processRows],
   );
 
   const approvedProcesses = useMemo(
@@ -471,15 +491,61 @@ export default function Documentos() {
     [documents],
   );
 
+  const selectedProcessRow = useMemo(
+    () => processRows.find((processo) => processo.id === selectedProcessId) || null,
+    [processRows, selectedProcessId],
+  );
+
   const selectedProcess = useMemo(
-    () => processos.find((processo) => processo.id === selectedProcessId) || null,
-    [selectedProcessId],
+    () => availableProcesses.find((processo) => processo.id === selectedProcessId) || null,
+    [availableProcesses, selectedProcessId],
+  );
+
+  const selectedReviewProcessRow = useMemo(
+    () => processRows.find((processo) => processo.id === reviewProcessId) || null,
+    [processRows, reviewProcessId],
   );
 
   const selectedReviewProcess = useMemo(
-    () => processos.find((processo) => processo.id === reviewProcessId) || null,
-    [reviewProcessId],
+    () => approvedProcesses.find((processo) => processo.id === reviewProcessId) || null,
+    [approvedProcesses, reviewProcessId],
   );
+
+  const selectedProcessPayload = useMemo(
+    () => buildMappedProcessPayload(selectedProcessRow),
+    [selectedProcessRow],
+  );
+
+  const selectedReviewProcessPayload = useMemo(
+    () => buildMappedProcessPayload(selectedReviewProcessRow),
+    [selectedReviewProcessRow],
+  );
+
+  useEffect(() => {
+    if (approvedProcesses.length === 0) {
+      if (selectedProcessId) setSelectedProcessId("");
+      return;
+    }
+
+    const hasCurrentSelection = approvedProcesses.some((processo) => processo.id === selectedProcessId);
+    if (!hasCurrentSelection) {
+      setSelectedProcessId(approvedProcesses[0].id);
+    }
+  }, [approvedProcesses, selectedProcessId]);
+
+  useEffect(() => {
+    if (!reviewingDoc || reviewSourceMode !== "linked_process") return;
+
+    if (approvedProcesses.length === 0) {
+      if (reviewProcessId) setReviewProcessId("");
+      return;
+    }
+
+    const hasCurrentSelection = approvedProcesses.some((processo) => processo.id === reviewProcessId);
+    if (!hasCurrentSelection) {
+      setReviewProcessId(approvedProcesses[0].id);
+    }
+  }, [approvedProcesses, reviewProcessId, reviewingDoc, reviewSourceMode]);
 
   useEffect(() => {
     if (!selectedProcess) return;
@@ -488,23 +554,17 @@ export default function Documentos() {
     }
   }, [selectedProcess, sourceMode]);
 
-  const shouldProceedWithoutApprovedMap = (processId: string) => {
-    const process = processos.find((item) => item.id === processId);
-    if (!process || process.status === "Aprovado") return true;
-    return window.confirm("Este processo ainda não possui mapa aprovado. Deseja continuar assim mesmo?");
-  };
-
   const newerApprovedRevision = useMemo(() => {
     if (!viewingDoc || viewingDoc.sourceMode !== "linked_process" || !viewingDoc.processId) return null;
-    const currentProcess = processos.find((item) => item.id === viewingDoc.processId);
+    const currentProcess = processRows.find((item) => item.id === viewingDoc.processId);
     if (!currentProcess || currentProcess.status !== "Aprovado" || !currentProcess.mapa_revisao) return null;
     if (parseRevision(currentProcess.mapa_revisao) <= parseRevision(viewingDoc.linkedMapRevision)) return null;
     return currentProcess.mapa_revisao;
-  }, [viewingDoc]);
+  }, [processRows, viewingDoc]);
 
   const getNewerApprovedRevision = (doc: GeneratedDocumentRecord) => {
     if (doc.sourceMode !== "linked_process" || !doc.processId) return null;
-    const currentProcess = processos.find((item) => item.id === doc.processId);
+    const currentProcess = processRows.find((item) => item.id === doc.processId);
     if (!currentProcess || currentProcess.status !== "Aprovado" || !currentProcess.mapa_revisao) return null;
     if (parseRevision(currentProcess.mapa_revisao) <= parseRevision(doc.linkedMapRevision)) return null;
     return currentProcess.mapa_revisao;
@@ -515,6 +575,15 @@ export default function Documentos() {
       toast({
         title: "Dados incompletos",
         description: "Selecione o template ativo antes de gerar o procedimento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
+      toast({
+        title: "Nenhum processo aprovado",
+        description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
       return;
@@ -540,11 +609,7 @@ export default function Documentos() {
       }
     }
 
-    if (sourceMode === "linked_process" && !shouldProceedWithoutApprovedMap(selectedProcessId)) {
-      return;
-    }
-
-    const mappedProcessData = sourceMode === "linked_process" ? buildMappedProcessPayload(selectedProcessId) : null;
+    const mappedProcessData = sourceMode === "linked_process" ? selectedProcessPayload : null;
     if (sourceMode === "linked_process" && !mappedProcessData) {
       toast({
         title: "Processo não encontrado",
@@ -603,7 +668,7 @@ export default function Documentos() {
       toast({ title: "Prévia gerada", description: "Revise o procedimento antes de salvar." });
     } catch {
       const fallback = sourceMode === "linked_process"
-        ? buildLinkedFallbackPreview(activeTemplate, selectedProcessId)
+        ? buildLinkedFallbackPreview(activeTemplate, selectedProcessPayload)
         : buildIndependentFallbackPreview(activeTemplate, independentDraft);
       setPreview(fallback);
       setPreviewTitle(fallback.title);
@@ -619,8 +684,15 @@ export default function Documentos() {
 
   const handleSaveDocument = async () => {
     if (!activeTemplate || !preview) return;
+    if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
+      toast({
+        title: "Nenhum processo aprovado",
+        description: NO_APPROVED_PROCESSES_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     if (sourceMode === "linked_process" && !selectedProcessId) return;
-    if (sourceMode === "linked_process" && !shouldProceedWithoutApprovedMap(selectedProcessId)) return;
     if (!companyContext.companyId || !companyContext.isAuthenticated) {
       toast({
         title: "Empresa não identificada",
@@ -630,7 +702,7 @@ export default function Documentos() {
       return;
     }
 
-    const mappedProcessData = sourceMode === "linked_process" ? buildMappedProcessPayload(selectedProcessId) : null;
+    const mappedProcessData = sourceMode === "linked_process" ? selectedProcessPayload : null;
     if (sourceMode === "linked_process" && !mappedProcessData) return;
 
     setIsPersisting(true);
@@ -643,7 +715,7 @@ export default function Documentos() {
       const processStatus = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.status : "";
       const linkedMapRevision = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.normalized.mapaRevisao || "Rev.00" : "";
       const linkedMapApprovedAt = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.normalized.mapaAprovadoEm || null : null;
-      const mapVersionLabel = sourceMode === "linked_process" ? buildMapVersionLabel(selectedProcessId) : "";
+      const mapVersionLabel = sourceMode === "linked_process" ? buildMapVersionLabel(mappedProcessData) : "";
       const title = previewTitle || (sourceMode === "linked_process" && mappedProcessData ? `Procedimento - ${mappedProcessData.process.nome}` : independentDraft.title);
 
       const insertPayload: TablesInsert<"generated_documents"> = {
@@ -778,6 +850,15 @@ export default function Documentos() {
       return;
     }
 
+    if (reviewSourceMode === "linked_process" && approvedProcesses.length === 0) {
+      toast({
+        title: "Nenhum processo aprovado",
+        description: NO_APPROVED_PROCESSES_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (reviewSourceMode === "linked_process" && !reviewProcessId) {
       toast({
         title: "Processo obrigatório",
@@ -787,7 +868,6 @@ export default function Documentos() {
       return;
     }
 
-    if (reviewSourceMode === "linked_process" && !shouldProceedWithoutApprovedMap(reviewProcessId)) return;
     if (reviewSourceMode === "independent" && (!reviewIndependentDraft.title.trim() || !reviewIndependentDraft.area.trim() || !reviewIndependentDraft.owner.trim())) {
       toast({
         title: "Campos obrigatórios",
@@ -797,7 +877,7 @@ export default function Documentos() {
       return;
     }
 
-    const reviewPayload = reviewSourceMode === "linked_process" ? buildMappedProcessPayload(reviewProcessId) : null;
+    const reviewPayload = reviewSourceMode === "linked_process" ? selectedReviewProcessPayload : null;
     const now = new Date().toISOString();
     const reviewedByName = reviewedBy || companyContext.userId;
     const reviewEntry: DocumentRevisionEntry = {
@@ -816,7 +896,7 @@ export default function Documentos() {
       const documentOwner = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.process.responsavel : reviewIndependentDraft.owner;
       const linkedMapRevision = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.normalized.mapaRevisao || "Rev.00" : "";
       const linkedMapApprovedAt = reviewSourceMode === "linked_process" && reviewPayload ? reviewPayload.normalized.mapaAprovadoEm || null : null;
-      const mapVersionLabel = reviewSourceMode === "linked_process" ? buildMapVersionLabel(reviewProcessId) : "";
+      const mapVersionLabel = reviewSourceMode === "linked_process" ? buildMapVersionLabel(reviewPayload) : "";
 
       const obsoletePayload: TablesUpdate<"generated_documents"> = {
         status: "Obsoleto",
@@ -1224,7 +1304,11 @@ export default function Documentos() {
                           <Button size="sm" variant="outline" disabled={doc.status === "Obsoleto"} onClick={() => {
                             setReviewingDoc(doc);
                             setReviewSourceMode(doc.sourceMode);
-                            setReviewProcessId(doc.processId || approvedProcesses[0]?.id || "");
+                            setReviewProcessId(
+                              doc.processId && approvedProcesses.some((processo) => processo.id === doc.processId)
+                                ? doc.processId
+                                : approvedProcesses[0]?.id || "",
+                            );
                             setReviewIndependentDraft({
                               title: doc.title,
                               area: doc.area,
@@ -1290,32 +1374,33 @@ export default function Documentos() {
               </div>
               {sourceMode === "linked_process" ? (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Processo mapeado</Label>
-                    <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
-                      <SelectContent>
-                        {availableProcesses.map((processo) => (
-                          <SelectItem key={processo.id} value={processo.id}>
-                            {processo.nome} {processo.status === "Aprovado" ? "• Aprovado" : `• ${processo.status}`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {selectedProcess ? (
+                  {approvedProcesses.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                      {NO_APPROVED_PROCESSES_MESSAGE}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Processo mapeado</Label>
+                      <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
+                        <SelectContent>
+                          {approvedProcesses.map((processo) => (
+                            <SelectItem key={processo.id} value={processo.id}>
+                              {processo.nome} • Aprovado
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {selectedProcess && approvedProcesses.length > 0 ? (
                     <div className="rounded-xl border p-4 text-sm">
                       <div className="font-medium text-foreground">{selectedProcess.nome}</div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
                         <div>Área responsável: {selectedProcess.area}</div>
                         <div>Responsável / Dono do processo: {selectedProcess.responsavel}</div>
-                        <div>Versão do mapa utilizada: {buildMapVersionLabel(selectedProcess.id)}</div>
+                        <div>Versão do mapa utilizada: {buildMapVersionLabel(selectedProcessPayload)}</div>
                       </div>
-                      {selectedProcess.status !== "Aprovado" ? (
-                        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-700">
-                          Este processo ainda não possui mapa aprovado. Deseja continuar assim mesmo?
-                        </div>
-                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1493,21 +1578,22 @@ export default function Documentos() {
             {reviewSourceMode === "linked_process" ? (
               <div className="space-y-2">
                 <Label>Processo vinculado</Label>
-                <Select value={reviewProcessId} onValueChange={setReviewProcessId}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
-                  <SelectContent>
-                    {availableProcesses.map((processo) => (
-                      <SelectItem key={processo.id} value={processo.id}>
-                        {processo.nome} {processo.status === "Aprovado" ? "• Aprovado" : `• ${processo.status}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedReviewProcess && selectedReviewProcess.status !== "Aprovado" ? (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700">
-                    Este processo ainda não possui mapa aprovado. Deseja continuar assim mesmo?
+                {approvedProcesses.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                    {NO_APPROVED_PROCESSES_MESSAGE}
                   </div>
-                ) : null}
+                ) : (
+                  <Select value={reviewProcessId} onValueChange={setReviewProcessId}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
+                    <SelectContent>
+                      {approvedProcesses.map((processo) => (
+                        <SelectItem key={processo.id} value={processo.id}>
+                          {processo.nome} • Aprovado
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             ) : (
               <div className="grid gap-4">

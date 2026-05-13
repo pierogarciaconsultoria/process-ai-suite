@@ -45,7 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, TablesInsert } from "@/integrations/supabase/types";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
-import { processos } from "@/data/mock-processos";
+import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
 import {
   buildMappedProcessPayload,
   createEmptyManualDescription,
@@ -66,11 +66,13 @@ import {
   type DocumentSection,
   type DocumentTemplate,
   type GeneratedDocumentRecord,
+  type MappedProcessPayload,
   type ManualDescriptionInput,
 } from "@/data/documentation-config";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 const LEGACY_TEMPLATE_KEY = "process:docTemplate";
+const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo aprovado encontrado. Aprove um processo antes de vincular.";
 
 type CompanyContext = {
   companyId: string | null;
@@ -84,8 +86,7 @@ const DEFAULT_COMPANY_CONTEXT: CompanyContext = {
   userId: "local-user",
 };
 
-function buildMapVersionLabel(processId: string) {
-  const payload = buildMappedProcessPayload(processId);
+function buildMapVersionLabel(payload: MappedProcessPayload | null) {
   if (!payload) return "";
   const approvedAt = payload.normalized.mapaAprovadoEm;
   const revision = payload.normalized.mapaRevisao || "Rev.00";
@@ -277,6 +278,7 @@ export default function DocumentationWorkspace() {
   const { toast } = useToast();
   const [companyContext, setCompanyContext] = useState<CompanyContext>(DEFAULT_COMPANY_CONTEXT);
   const [state, setState] = useState<DocumentationState | null>(null);
+  const [processRows, setProcessRows] = useState<ProcessoRow[]>([]);
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocumentRecord[]>([]);
   const [activeTab, setActiveTab] = useState("modelos");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -285,7 +287,7 @@ export default function DocumentationWorkspace() {
   const [isImporting, setIsImporting] = useState(false);
   const [isNewDocumentOpen, setIsNewDocumentOpen] = useState(false);
   const [documentOrigin, setDocumentOrigin] = useState<DocumentOrigin>("mapped_process");
-  const [selectedProcessId, setSelectedProcessId] = useState<string>(processos[0]?.id ?? "");
+  const [selectedProcessId, setSelectedProcessId] = useState<string>("");
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [manualDescription, setManualDescription] = useState<ManualDescriptionInput>(createEmptyManualDescription(""));
   const [preview, setPreview] = useState<DocumentPreviewData | null>(null);
@@ -331,6 +333,28 @@ export default function DocumentationWorkspace() {
         persistedState.templates[0].referenceContent = legacyTemplate;
       }
 
+      try {
+        if (nextContext.companyId) {
+          const { data, error } = await supabase
+            .from("processos")
+            .select("*")
+            .eq("company_id", nextContext.companyId)
+            .order("updated_at", { ascending: false });
+
+          if (error) throw error;
+          setProcessRows(data || []);
+        } else {
+          setProcessRows([]);
+        }
+      } catch {
+        setProcessRows([]);
+        toast({
+          title: "Falha ao carregar processos",
+          description: "Nao foi possivel carregar os processos da empresa ativa para vinculo documental.",
+          variant: "destructive",
+        });
+      }
+
       setCompanyContext(nextContext);
       setState(persistedState);
       setSelectedTemplateId(persistedState.generationSettings.defaultTemplateId);
@@ -359,7 +383,37 @@ export default function DocumentationWorkspace() {
     }
   }, [activeTemplate]);
 
-  const mappedProcessPayload = useMemo(() => buildMappedProcessPayload(selectedProcessId), [selectedProcessId]);
+  const approvedProcessRows = useMemo(
+    () => processRows.filter((processo) => processo.status === "Aprovado"),
+    [processRows],
+  );
+
+  const approvedProcesses = useMemo(
+    () => approvedProcessRows.map(mapProcessRowToListItem),
+    [approvedProcessRows],
+  );
+
+  const selectedProcessRow = useMemo(
+    () => approvedProcessRows.find((processo) => processo.id === selectedProcessId) || null,
+    [approvedProcessRows, selectedProcessId],
+  );
+
+  const mappedProcessPayload = useMemo(
+    () => buildMappedProcessPayload(selectedProcessRow),
+    [selectedProcessRow],
+  );
+
+  useEffect(() => {
+    if (approvedProcesses.length === 0) {
+      if (selectedProcessId) setSelectedProcessId("");
+      return;
+    }
+
+    const hasCurrentSelection = approvedProcesses.some((processo) => processo.id === selectedProcessId);
+    if (!hasCurrentSelection) {
+      setSelectedProcessId(approvedProcesses[0].id);
+    }
+  }, [approvedProcesses, selectedProcessId]);
 
   const persistState = (nextState: DocumentationState) => {
     setState(nextState);
@@ -627,10 +681,18 @@ export default function DocumentationWorkspace() {
 
   const handleGeneratePreview = async () => {
     if (!activeTemplate) return;
+    if (documentOrigin === "mapped_process" && approvedProcesses.length === 0) {
+      toast({
+        title: "Nenhum processo aprovado",
+        description: NO_APPROVED_PROCESSES_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     if (documentOrigin === "mapped_process" && !mappedProcessPayload) {
       toast({
         title: "Processo não encontrado",
-        description: "Selecione um processo válido para gerar o documento estruturado.",
+        description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
       return;
@@ -689,6 +751,14 @@ export default function DocumentationWorkspace() {
 
   const handleSaveGeneratedDocument = async () => {
     if (!activeTemplate || !preview) return;
+    if (documentOrigin === "mapped_process" && !mappedProcessPayload) {
+      toast({
+        title: "Nenhum processo aprovado",
+        description: NO_APPROVED_PROCESSES_MESSAGE,
+        variant: "destructive",
+      });
+      return;
+    }
     setIsPersistingDoc(true);
     const now = new Date().toISOString();
     const documentCode = nextDocumentCode(generatedDocs);
@@ -705,7 +775,7 @@ export default function DocumentationWorkspace() {
       processStatusAtGeneration: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.status || "" : "",
       linkedMapRevision: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaRevisao || "Rev.00" : "",
       linkedMapApprovedAt: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaAprovadoEm || "" : "",
-      mapVersionLabel: documentOrigin === "mapped_process" ? buildMapVersionLabel(selectedProcessId) : "",
+      mapVersionLabel: documentOrigin === "mapped_process" ? buildMapVersionLabel(mappedProcessPayload) : "",
       area: documentOrigin === "mapped_process" ? mappedProcessPayload?.process.area || "" : manualDescription.area,
       templateId: activeTemplate.id,
       documentOrigin,
@@ -782,7 +852,7 @@ export default function DocumentationWorkspace() {
           distribution_history: documentRecord.distributionHistory as unknown as Json,
           linked_map_revision: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaRevisao || "Rev.00" : null,
           linked_map_approved_at: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaAprovadoEm || null : null,
-          map_version_label: documentOrigin === "mapped_process" ? buildMapVersionLabel(selectedProcessId) : null,
+          map_version_label: documentOrigin === "mapped_process" ? buildMapVersionLabel(mappedProcessPayload) : null,
           ai_model: documentRecord.aiModel,
           ai_prompt_used: documentRecord.aiPromptUsed,
           generation_metadata: {
@@ -798,7 +868,7 @@ export default function DocumentationWorkspace() {
               : manualDescription.stakeholders,
             linkedMapRevision: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaRevisao || "Rev.00" : "",
             linkedMapApprovedAt: documentOrigin === "mapped_process" ? mappedProcessPayload?.normalized.mapaAprovadoEm || "" : "",
-            mapVersionLabel: documentOrigin === "mapped_process" ? buildMapVersionLabel(selectedProcessId) : "",
+            mapVersionLabel: documentOrigin === "mapped_process" ? buildMapVersionLabel(mappedProcessPayload) : "",
           } as Json,
           created_by: companyContext.userId,
         };
@@ -1402,14 +1472,20 @@ export default function DocumentationWorkspace() {
                       {documentOrigin === "mapped_process" ? (
                         <div className="space-y-2">
                           <Label>Processo mapeado</Label>
-                          <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {processos.map((processo) => (
-                                <SelectItem key={processo.id} value={processo.id}>{processo.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {approvedProcesses.length === 0 ? (
+                            <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                              {NO_APPROVED_PROCESSES_MESSAGE}
+                            </div>
+                          ) : (
+                            <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {approvedProcesses.map((processo) => (
+                                  <SelectItem key={processo.id} value={processo.id}>{processo.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-2">

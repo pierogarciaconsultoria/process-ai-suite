@@ -206,7 +206,13 @@ const Processos = () => {
               ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    Nenhum processo cadastrado. Clique em “Novo Processo” para começar.
+                    <div className="flex flex-col items-center gap-3 py-6">
+                      <span>Nenhum processo cadastrado ainda. Clique em Novo Processo para começar.</span>
+                      <Button onClick={() => navigate("/processos/novo")}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Novo Processo
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
