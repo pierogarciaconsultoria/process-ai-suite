@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -58,6 +59,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Acesso negado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    await admin
+      .from("convites")
+      .update({
+        status: "revoked",
+        revoked_at: new Date().toISOString(),
+        revoked_reason: "expired",
+      })
+      .eq("empresa_id", empresaId)
+      .eq("status", "pending")
+      .lt("expires_at", new Date().toISOString());
+
     const { data: membros, error: memErr } = await supabase
       .from("membros")
       .select("id, user_id, perfil, created_at")
@@ -80,8 +92,9 @@ serve(async (req) => {
 
     const { data: invites, error: invErr } = await supabase
       .from("convites")
-      .select("id, email, perfil, status, created_at")
-      .eq("empresa_id", empresaId);
+      .select("id, email, perfil, status, created_at, expires_at, accepted_at, revoked_at, revoked_reason")
+      .eq("empresa_id", empresaId)
+      .order("created_at", { ascending: false });
     if (invErr) {
       return new Response(JSON.stringify({ error: invErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

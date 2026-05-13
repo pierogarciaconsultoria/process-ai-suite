@@ -108,29 +108,47 @@ export type Database = {
       }
       convites: {
         Row: {
+          accepted_at: string | null
+          accepted_by: string | null
           created_at: string
           email: string
           empresa_id: string
+          expires_at: string
           id: string
           perfil: string
+          revoked_at: string | null
+          revoked_by: string | null
+          revoked_reason: string | null
           status: string
           token: string | null
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           created_at?: string
           email: string
           empresa_id: string
+          expires_at?: string
           id?: string
           perfil: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          revoked_reason?: string | null
           status: string
           token?: string | null
         }
         Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           created_at?: string
           email?: string
           empresa_id?: string
+          expires_at?: string
           id?: string
           perfil?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          revoked_reason?: string | null
           status?: string
           token?: string | null
         }

@@ -13,7 +13,17 @@ import { useToast } from "@/hooks/use-toast";
 
 type Empresa = { id: string; nome: string };
 type Membro = { id: string; user_id: string; perfil: "admin" | "gestor" | "analista"; created_at: string };
-type Invite = { id: string; email: string; perfil: "admin" | "gestor" | "analista"; status: "pending" | "accepted" | "revoked"; created_at: string };
+type Invite = {
+  id: string;
+  email: string;
+  perfil: "admin" | "gestor" | "analista";
+  status: "pending" | "accepted" | "revoked";
+  created_at: string;
+  expires_at: string;
+  accepted_at?: string | null;
+  revoked_at?: string | null;
+  revoked_reason?: "expired" | "cancelled" | "replaced" | "delivery_failed" | null;
+};
 
 const perfilColors: Record<string, string> = {
   admin: "bg-info text-info-foreground",
@@ -22,6 +32,14 @@ const perfilColors: Record<string, string> = {
 };
 
 const perfilLabels: Record<Membro["perfil"], string> = { admin: "Admin", gestor: "Gestor", analista: "Analista" };
+
+const inviteStatusLabel = (invite: Invite) => {
+  if (invite.status === "accepted") return "Aceito";
+  if (invite.status === "revoked" && invite.revoked_reason === "expired") return "Expirado";
+  if (invite.status === "revoked" && invite.revoked_reason === "cancelled") return "Cancelado";
+  if (invite.status === "revoked") return "Revogado";
+  return "Pendente";
+};
 
 const Usuarios = () => {
   const [search, setSearch] = useState("");
@@ -84,7 +102,7 @@ const Usuarios = () => {
     }
     setLoadingInvite(true);
     const { data, error } = await supabase.functions.invoke("org-invite", {
-      body: { empresaId, email: invEmail.trim(), perfil: invPerfil },
+      body: { empresaId, email: invEmail.trim(), perfil: invPerfil, appBaseUrl: window.location.origin },
     });
     setLoadingInvite(false);
     if (error) {
@@ -99,6 +117,23 @@ const Usuarios = () => {
       toast({ title: "Convite enviado", description: "Convite criado com sucesso." });
     } else {
       toast({ title: "Convite existente", description: "Já há um convite pendente para este email." });
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    const { data, error } = await supabase.functions.invoke("org-revoke-invite", {
+      body: { inviteId },
+    });
+
+    if (error) {
+      toast({ title: "Erro ao revogar convite", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    if (data?.invite) {
+      const updated = data.invite as Invite;
+      setInvites((prev) => prev.map((invite) => (invite.id === updated.id ? updated : invite)));
+      toast({ title: "Convite revogado", description: "O convite foi cancelado com sucesso." });
     }
   };
 
@@ -200,7 +235,9 @@ const Usuarios = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Expira em</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead className="w-[140px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -208,8 +245,18 @@ const Usuarios = () => {
                 <TableRow key={i.id}>
                   <TableCell>{i.email}</TableCell>
                   <TableCell><Badge className={perfilColors[i.perfil]}>{perfilLabels[i.perfil as Membro["perfil"]]}</Badge></TableCell>
-                  <TableCell>{i.status}</TableCell>
+                  <TableCell>{inviteStatusLabel(i)}</TableCell>
+                  <TableCell>{new Date(i.expires_at).toLocaleString("pt-BR")}</TableCell>
                   <TableCell>{new Date(i.created_at).toLocaleString("pt-BR")}</TableCell>
+                  <TableCell>
+                    {i.status === "pending" ? (
+                      <Button variant="outline" size="sm" onClick={() => handleRevokeInvite(i.id)}>
+                        Revogar
+                      </Button>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

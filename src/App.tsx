@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/AppLayout";
 import SupportWidget from "@/components/SupportWidget";
 const Login = React.lazy(() => import("./pages/Login"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+const ConviteAceite = React.lazy(() => import("./pages/ConviteAceite.tsx"));
 const Landing = React.lazy(() => import("./pages/Landing"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Empresas = React.lazy(() => import("./pages/Empresas"));
@@ -72,6 +73,7 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/convite/:token" element={<ConviteAceite />} />
               <Route path="/" element={<Landing />} />
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />

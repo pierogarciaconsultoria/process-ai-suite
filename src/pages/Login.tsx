@@ -56,7 +56,15 @@ const Login = () => {
   useEffect(() => {
     const mode = searchParams.get("mode");
     if (mode === "signup") setIsSignupMode(true);
+    const emailParam = searchParams.get("email");
+    if (emailParam) setEmail(emailParam);
   }, [searchParams]);
+
+  const redirectAfterLogin = (() => {
+    const redirect = searchParams.get("redirect");
+    if (!redirect || !redirect.startsWith("/")) return "/dashboard";
+    return redirect;
+  })();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +72,7 @@ const Login = () => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      navigate("/dashboard");
+      navigate(redirectAfterLogin);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       toast({ title: "Erro ao entrar", description: message, variant: "destructive" });
@@ -82,7 +90,10 @@ const Login = () => {
         password,
         options: {
           data: { nome, empresa, segmento, area_atuacao: areaAtuacao, contexto },
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: `${window.location.origin}/login?${new URLSearchParams({
+            email,
+            redirect: redirectAfterLogin,
+          }).toString()}`,
         },
       });
       if (error) throw error;
