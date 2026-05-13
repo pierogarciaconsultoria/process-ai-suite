@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,15 @@ import { Sparkles, Send, ArrowRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
+import type { Json, Tables } from "@/integrations/supabase/types";
 import { useAiConfig } from "@/hooks/useAiConfig";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
+import {
+  buildProcessInsertPayload,
+  buildProcessUpdatePayload,
+  normalizeSavedStatus,
+  type ProcessoStatus,
+} from "@/lib/processos";
 import {
   type ProcessoFormData,
   type Classificacao,
@@ -36,6 +42,8 @@ export default function EntrevistaProcesso() {
   const ASSISTANT_MIN_DELAY_MS = 2000;
   const ASSISTANT_MAX_DELAY_MS = 3000;
   const navigate = useNavigate();
+  const location = useLocation();
+  const processState = location.state as { processId?: string; formPrefill?: ProcessoFormData } | null;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,6 +54,8 @@ export default function EntrevistaProcesso() {
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
+  const processIdRef = useRef<string | null>(processState?.processId ?? null);
+  const processStatusRef = useRef<ProcessoStatus>("Rascunho");
   const assistantQueueRef = useRef<Promise<void>>(Promise.resolve());
   const isMountedRef = useRef(true);
   const [stage, setStage] = useState<InterviewStage>("askUserName");
@@ -66,6 +76,15 @@ export default function EntrevistaProcesso() {
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (processState?.formPrefill) {
+      setForm(processState.formPrefill);
+      if (processState.formPrefill.entrevistados?.trim()) {
+        setParticipantName(processState.formPrefill.entrevistados.trim());
+      }
+    }
+  }, [processState]);
 
   const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
   const getAssistantDelay = () =>
@@ -97,7 +116,60 @@ export default function EntrevistaProcesso() {
       await enqueueAssistantMessage(askUserName);
     })();
   }, []);
-  const saveSession = (reason: "auto" | "manual") => {
+  const persistProcessDraft = async (
+    snapshotForm: ProcessoFormData,
+    snapshotMessages: ChatMessage[],
+    status: ProcessoStatus = "Rascunho",
+  ) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth?.user?.id ?? null;
+    const empresaId = routeScriptConfig.companyId ?? await resolveAccessibleCompanyId(userId);
+
+    if (!userId || !empresaId) return null;
+
+    if (processIdRef.current) {
+      const payload = buildProcessUpdatePayload({
+        form: snapshotForm,
+        userId,
+        status: normalizeSavedStatus(processStatusRef.current, status),
+        interviewMessages: snapshotMessages,
+        interviewSessionId: sessionIdRef.current,
+      });
+
+      const { data, error } = await supabase
+        .from("processos")
+        .update(payload)
+        .eq("id", processIdRef.current)
+        .eq("company_id", empresaId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      const row = data as Tables<"processos">;
+      processIdRef.current = row.id;
+      processStatusRef.current = normalizeSavedStatus(row.status, status);
+      return row;
+    }
+
+    const payload = buildProcessInsertPayload({
+      form: snapshotForm,
+      companyId: empresaId,
+      userId,
+      status,
+      interviewMessages: snapshotMessages,
+      interviewSessionId: sessionIdRef.current,
+    });
+
+    const { data, error } = await supabase.from("processos").insert(payload).select("*").single();
+    if (error) throw error;
+
+    const row = data as Tables<"processos">;
+    processIdRef.current = row.id;
+    processStatusRef.current = normalizeSavedStatus(row.status, status);
+    return row;
+  };
+
+  const saveSession = async (reason: "auto" | "manual") => {
     try {
       const key = "process:interviewSessions";
       const prev = JSON.parse(localStorage.getItem(key) || "[]");
@@ -105,13 +177,13 @@ export default function EntrevistaProcesso() {
       const next = Array.isArray(prev) ? [...prev, item] : [item];
       localStorage.setItem(key, JSON.stringify(next));
     } catch (e) { void e; }
-    persistSession(reason);
+    await persistSession(reason);
   };
   const persistSession = async (reason: "auto" | "manual") => {
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth?.user?.id ?? null;
-      const empresaId = await resolveAccessibleCompanyId(userId);
+      const empresaId = routeScriptConfig.companyId ?? await resolveAccessibleCompanyId(userId);
       const row = {
         user_id: userId,
         empresa_id: empresaId,
@@ -123,6 +195,7 @@ export default function EntrevistaProcesso() {
       } as unknown;
       const sb = supabase as unknown as { from: (table: string) => { insert: (values: unknown) => Promise<unknown> } };
       await sb.from("interview_sessions").insert(row);
+      await persistProcessDraft(form, messages, "Rascunho");
     } catch (e) { void e; }
   };
 
@@ -594,13 +667,18 @@ export default function EntrevistaProcesso() {
     }
     return { done: true };
   };
-  const applyToForm = (reason: "auto" | "manual" = "manual") => {
+  const applyToForm = async (reason: "auto" | "manual" = "manual") => {
     try {
       localStorage.setItem("process:formPrefill", JSON.stringify(form));
-      saveSession(reason);
+      await saveSession(reason);
       localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
     } catch (e) { void e; }
-    navigate("/processos/diagnostico", { state: {} });
+    navigate("/processos/diagnostico", {
+      state: {
+        processo: form,
+        processId: processIdRef.current,
+      },
+    });
   };
 
   const extractFromPdf = async (file: File): Promise<string> => {

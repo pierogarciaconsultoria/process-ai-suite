@@ -17,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAiConfig } from "@/hooks/useAiConfig";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import {
   type ProcessoFormData,
   type EtapaForm,
@@ -32,8 +33,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import BPMNCanvas from "@/components/BPMNCanvas";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
-
-type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
+import {
+  buildProcessInsertPayload,
+  buildProcessUpdatePayload,
+  mapProcessRowToForm,
+  normalizeSavedStatus,
+  type ChatMessage,
+  type ProcessoStatus,
+} from "@/lib/processos";
 
 // ── Phase / Tab structure ──
 
@@ -150,6 +157,12 @@ const ProcessoFormulario = () => {
   const isEditing = !!id;
   const routeScriptConfig = useAiConfig("route_script");
   const companyId = routeScriptConfig.companyId;
+  const prefillState = location.state as {
+    formPrefill?: ProcessoFormData;
+    fromInterview?: boolean;
+    focusTab?: string;
+    processId?: string;
+  } | null;
 
   const [activeTab, setActiveTab] = useState("identificacao");
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
@@ -157,6 +170,12 @@ const ProcessoFormulario = () => {
   const [descricaoIA, setDescricaoIA] = useState("");
   const [isFillingAI, setIsFillingAI] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentProcessId, setCurrentProcessId] = useState<string | null>(id ?? prefillState?.processId ?? null);
+  const [currentStatus, setCurrentStatus] = useState<ProcessoStatus>("Rascunho");
+  const [currentRevision, setCurrentRevision] = useState("Rev.00");
+  const [currentApprovedAt, setCurrentApprovedAt] = useState<string | null>(null);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   const globalSteps = [
     "Novo processo",
@@ -175,59 +194,94 @@ const ProcessoFormulario = () => {
   };
 
   useEffect(() => {
-    type PrefillState = { formPrefill?: ProcessoFormData; fromInterview?: boolean; focusTab?: string } | null;
-    const state = location.state as PrefillState;
-    const pre = state?.formPrefill;
-
     const resolveInitialTab = () => {
-      if (state?.focusTab && ALL_TABS.includes(state.focusTab)) return state.focusTab;
-      if (!isEditing && state?.fromInterview) return "contexto";
+      if (prefillState?.focusTab && ALL_TABS.includes(prefillState.focusTab)) return prefillState.focusTab;
+      if (!isEditing && prefillState?.fromInterview) return "contexto";
       return "identificacao";
     };
 
-    if (pre) {
-      setForm(pre);
-      const initialTab = resolveInitialTab();
-      setActiveTab(initialTab);
-    } else {
+    if (prefillState?.processId && !currentProcessId) {
+      setCurrentProcessId(prefillState.processId);
+    }
+
+    if (!companyId) return;
+
+    const loadInitialData = async () => {
+      if (currentProcessId) {
+        try {
+          const { data, error } = await supabase
+            .from("processos")
+            .select("*")
+            .eq("id", currentProcessId)
+            .eq("company_id", companyId)
+            .maybeSingle();
+
+          if (error) throw error;
+
+          if (data) {
+            const row = data as Tables<"processos">;
+            setForm(mapProcessRowToForm(row));
+            setChatHistory(Array.isArray(row.interview_messages) ? (row.interview_messages as unknown as ChatMessage[]) : []);
+            setCurrentStatus(normalizeSavedStatus(row.status));
+            setCurrentRevision(row.mapa_revisao || "Rev.00");
+            setCurrentApprovedAt(row.mapa_aprovado_em);
+            setActiveTab(resolveInitialTab());
+            setInitialDataLoaded(true);
+            return;
+          }
+        } catch (error) {
+          console.error("Erro ao carregar processo:", error);
+        }
+      }
+
+      if (prefillState?.formPrefill) {
+        setForm(prefillState.formPrefill);
+        setActiveTab(resolveInitialTab());
+        setInitialDataLoaded(true);
+        return;
+      }
+
       try {
         const raw = localStorage.getItem("process:formPrefill");
         if (raw) {
           const parsed = JSON.parse(raw) as ProcessoFormData;
           setForm(parsed);
           localStorage.removeItem("process:formPrefill");
-          const initialTab = resolveInitialTab();
-          setActiveTab(initialTab);
         }
-      } catch (e) { void e; }
-    }
-  }, [location.state, isEditing]);
+      } catch (error) {
+        void error;
+      }
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const sb = supabase as unknown as { from: (table: string) => { select: (...a: unknown[]) => { order: (...a: unknown[]) => { limit: (n: number) => Promise<{ data?: unknown[] }> } } } };
-        const { data } = await sb.from("interview_sessions").select("messages").order("created_at", { ascending: false }).limit(1);
-        if (Array.isArray(data)) {
-          const rows = data as unknown as { messages: ChatMessage[] }[];
-          if (rows[0]?.messages?.length) {
-            setChatHistory(rows[0].messages);
-            return;
-          }
-        }
-      } catch (e) { void e; }
       try {
         const sid = localStorage.getItem("process:lastInterviewSessionId") || "";
         const sessionsRaw = localStorage.getItem("process:interviewSessions") || "[]";
         const sessions = JSON.parse(sessionsRaw) as Array<{ id: string; messages: ChatMessage[]; at: string }>;
-        const found = sessions.find((s) => s.id === sid) || sessions[sessions.length - 1];
+        const found = sessions.find((session) => session.id === sid) || sessions[sessions.length - 1];
         if (found?.messages?.length) setChatHistory(found.messages);
-      } catch (e) { void e; }
-    })();
-  }, []);
+      } catch (error) {
+        void error;
+      }
+
+      setActiveTab(resolveInitialTab());
+      setInitialDataLoaded(true);
+    };
+
+    void loadInitialData();
+  }, [companyId, currentProcessId, isEditing, prefillState]);
 
   const tabIndex = ALL_TABS.indexOf(activeTab);
   const activePhase = getPhaseForTab(activeTab);
+
+  if (!initialDataLoaded) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando dados do processo...
+        </span>
+      </div>
+    );
+  }
 
   // ── Field helpers ──
   const updateField = <K extends keyof ProcessoFormData>(key: K, value: ProcessoFormData[K]) => {
@@ -287,6 +341,84 @@ const ProcessoFormulario = () => {
 
   const recursosList = (form.recursos || "").split(/\n|,/).map((s) => s.trim()).filter(Boolean);
 
+  const saveProcessRecord = useCallback(async (options?: {
+    status?: ProcessoStatus;
+    diagnostico?: unknown;
+    interviewMessages?: ChatMessage[];
+    interviewSessionId?: string | null;
+  }) => {
+    if (!companyId) {
+      throw new Error("Nenhuma empresa ativa foi identificada para salvar o processo.");
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+
+    const userId = authData.user?.id;
+    if (!userId) {
+      throw new Error("Usuário autenticado não encontrado.");
+    }
+
+    const nextStatus = normalizeSavedStatus(options?.status ?? currentStatus);
+    const diagnostico = (options?.diagnostico ?? null) as Tables<"processos">["diagnostico"];
+
+    if (currentProcessId) {
+      const payload = buildProcessUpdatePayload({
+        form,
+        userId,
+        status: nextStatus,
+        diagnostico: diagnostico as never,
+        interviewMessages: options?.interviewMessages ?? chatHistory,
+        interviewSessionId: options?.interviewSessionId ?? null,
+        currentRevision,
+        currentApprovedAt,
+      });
+
+      const { data, error } = await supabase
+        .from("processos")
+        .update(payload)
+        .eq("id", currentProcessId)
+        .eq("company_id", companyId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      const row = data as Tables<"processos">;
+      setCurrentStatus(normalizeSavedStatus(row.status, nextStatus));
+      setCurrentRevision(row.mapa_revisao || currentRevision);
+      setCurrentApprovedAt(row.mapa_aprovado_em);
+      if (Array.isArray(row.interview_messages)) {
+        setChatHistory(row.interview_messages as unknown as ChatMessage[]);
+      }
+      return row;
+    }
+
+    const payload = buildProcessInsertPayload({
+      form,
+      companyId,
+      userId,
+      status: nextStatus,
+      diagnostico: diagnostico as never,
+      interviewMessages: options?.interviewMessages ?? chatHistory,
+      interviewSessionId: options?.interviewSessionId ?? null,
+      currentRevision,
+      currentApprovedAt,
+    });
+
+    const { data, error } = await supabase.from("processos").insert(payload).select("*").single();
+    if (error) throw error;
+
+    const row = data as Tables<"processos">;
+    setCurrentProcessId(row.id);
+    setCurrentStatus(normalizeSavedStatus(row.status, nextStatus));
+    setCurrentRevision(row.mapa_revisao || currentRevision);
+    setCurrentApprovedAt(row.mapa_aprovado_em);
+    if (Array.isArray(row.interview_messages)) {
+      setChatHistory(row.interview_messages as unknown as ChatMessage[]);
+    }
+    return row;
+  }, [chatHistory, companyId, currentApprovedAt, currentProcessId, currentRevision, currentStatus, form]);
+
   // ── AI Fill ──
   const handleAIFill = async () => {
     if (descricaoIA.trim().length < 10) {
@@ -336,6 +468,7 @@ const ProcessoFormulario = () => {
     if (isDiagnosing) return;
     setIsDiagnosing(true);
     try {
+      const savedProcess = await saveProcessRecord({ status: "Em revisão" });
       const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { 
         body: { 
           processoData: form,
@@ -344,7 +477,14 @@ const ProcessoFormulario = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      navigate("/processos/diagnostico", { state: { diagnostico: data, processo: form } });
+      const diagnosedProcess = await saveProcessRecord({ status: "Em revisão", diagnostico: data });
+      navigate("/processos/diagnostico", {
+        state: {
+          diagnostico: data,
+          processo: form,
+          processId: diagnosedProcess.id ?? savedProcess.id,
+        },
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Tente novamente.";
       console.error("Diagnose error:", err);
@@ -352,12 +492,23 @@ const ProcessoFormulario = () => {
     } finally {
       setIsDiagnosing(false);
     }
-  }, [companyId, form, isDiagnosing, navigate, toast]);
+  }, [companyId, form, isDiagnosing, navigate, saveProcessRecord, toast]);
 
-  const handleSave = () => {
-    toast({ title: "Mapeamento concluido", description: "Escolha o proximo passo para continuar o trabalho com este processo." });
-    navigate("/processos/diagnostico", { state: { processo: form } });
-  };
+  const handleSave = useCallback(async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const savedProcess = await saveProcessRecord();
+      toast({ title: "Mapeamento concluido", description: "Processo salvo com sucesso." });
+      navigate("/processos/diagnostico", { state: { processo: form, processId: savedProcess.id } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não foi possível salvar o processo.";
+      console.error("Save process error:", err);
+      toast({ title: "Erro ao salvar processo", description: message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [form, isSaving, navigate, saveProcessRecord, toast]);
 
   // ── Tab content renderers ──
 
@@ -815,10 +966,17 @@ const ProcessoFormulario = () => {
               Conclua o mapeamento para seguir para a tela de proximas acoes, ou gere o diagnostico agora se ja quiser partir para a analise.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button onClick={handleSave}>
-                Concluir mapeamento
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Concluir mapeamento"
+                )}
               </Button>
-              <Button variant="outline" onClick={handleDiagnose} disabled={isDiagnosing}>
+              <Button variant="outline" onClick={handleDiagnose} disabled={isDiagnosing || isSaving}>
                 {isDiagnosing ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -879,7 +1037,10 @@ const ProcessoFormulario = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate("/processos")}><ArrowLeft className="h-4 w-4 mr-2" /> Voltar</Button>
-          <Button onClick={handleSave}><Save className="h-4 w-4 mr-2" /> Salvar</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            {isSaving ? "Salvando..." : "Salvar"}
+          </Button>
         </div>
       </div>
 

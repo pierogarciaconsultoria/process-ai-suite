@@ -47,6 +47,7 @@ const ProcessoDiagnostico = () => {
   const navigate = useNavigate();
   const diagnostico = location.state?.diagnostico as DiagnosticoResult | undefined;
   const processo = location.state?.processo as ProcessoFormData | undefined;
+  const processId = location.state?.processId as string | undefined;
   const [localDiag, setLocalDiag] = useState<DiagnosticoResult | undefined>(diagnostico);
 
   const steps = [
@@ -110,21 +111,21 @@ const ProcessoDiagnostico = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 className="flex-1"
-                onClick={() => navigate("/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "mapa-as-is" } })}
+                onClick={() => navigate(processId ? `/processos/${processId}/editar` : "/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "mapa-as-is", processId } })}
               >
                 <ClipboardList className="h-4 w-4 mr-2" /> Gerar/atualizar mapa AS-IS
               </Button>
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() => navigate("/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "relatorio" } })}
+                onClick={() => navigate(processId ? `/processos/${processId}/editar` : "/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "relatorio", processId } })}
               >
                 <Activity className="h-4 w-4 mr-2" /> Gerar diagnóstico
               </Button>
               <Button
                 className="flex-1"
                 variant="outline"
-                onClick={() => navigate("/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "identificacao" } })}
+                onClick={() => navigate(processId ? `/processos/${processId}/editar` : "/processos/novo/formulario", { state: { formPrefill: processo, focusTab: "identificacao", processId } })}
               >
                 <Target className="h-4 w-4 mr-2" /> Ver detalhes avançados do processo
               </Button>

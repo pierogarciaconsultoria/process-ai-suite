@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,15 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Eye, Pencil } from "lucide-react";
-import { processos as processosMock, type Processo, type Status } from "@/data/mock-processos";
+import { Loader2, Plus, Search, Eye, Pencil } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { resolveAccessibleCompanyId } from "@/lib/active-company";
+import { mapProcessRowToListItem, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
 
 const statusColors: Record<string, string> = {
-  Novo: "bg-muted text-muted-foreground",
-  Mapeado: "bg-info text-info-foreground",
-  "Em Análise": "bg-warning text-warning-foreground",
-  Documentado: "bg-success text-success-foreground",
+  Rascunho: "bg-muted text-muted-foreground",
+  "Em revisão": "bg-warning text-warning-foreground",
   Aprovado: "bg-primary text-primary-foreground",
+  Publicado: "bg-success text-success-foreground",
+  Obsoleto: "bg-secondary text-secondary-foreground",
 };
 
 const criticidadeColors: Record<string, string> = {
@@ -29,10 +31,50 @@ const Processos = () => {
   const [search, setSearch] = useState("");
   const [areaFilter, setAreaFilter] = useState<string>("");
   const [responsavelFilter, setResponsavelFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<Status | "all" | "">("");
+  const [statusFilter, setStatusFilter] = useState<ProcessoStatus | "all" | "">("");
+  const [lista, setLista] = useState<ProcessoListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  const [lista] = useState<Processo[]>(processosMock);
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProcessos = async () => {
+      setIsLoading(true);
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const activeCompanyId = await resolveAccessibleCompanyId(auth.user?.id ?? null);
+
+        if (!activeCompanyId) {
+          if (isMounted) setLista([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("processos")
+          .select("*")
+          .eq("company_id", activeCompanyId)
+          .order("updated_at", { ascending: false });
+
+        if (error) throw error;
+        if (isMounted) {
+          setLista((data || []).map(mapProcessRowToListItem));
+        }
+      } catch (error) {
+        console.error("Erro ao carregar processos:", error);
+        if (isMounted) setLista([]);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    void loadProcessos();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const areas = useMemo(
     () => Array.from(new Set(lista.map((p) => p.area).filter((a) => a && a.trim().length > 0))),
     [lista],
@@ -121,17 +163,17 @@ const Processos = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Status</Label>
-                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as Status | "all" | "")}>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProcessoStatus | "all" | "")}>
                   <SelectTrigger className="w-[160px]">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="Novo">Novo</SelectItem>
-                    <SelectItem value="Mapeado">Mapeado</SelectItem>
-                    <SelectItem value="Em Análise">Em Análise</SelectItem>
-                    <SelectItem value="Documentado">Documentado</SelectItem>
+                    <SelectItem value="Rascunho">Rascunho</SelectItem>
+                    <SelectItem value="Em revisão">Em revisão</SelectItem>
                     <SelectItem value="Aprovado">Aprovado</SelectItem>
+                    <SelectItem value="Publicado">Publicado</SelectItem>
+                    <SelectItem value="Obsoleto">Obsoleto</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -152,7 +194,16 @@ const Processos = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando processos...
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Nenhum processo cadastrado. Clique em “Novo Processo” para começar.
@@ -177,11 +228,7 @@ const Processos = () => {
                       <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}`)}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(`/processos/${processo.id}/editar`, { state: processo })}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}/editar`)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </TableCell>
