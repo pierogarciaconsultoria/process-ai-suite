@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -5,6 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+type EmpresaRow = {
+  id: string;
+  nome: string;
+  segmento: string | null;
+  owner_id: string;
+};
+
+type MembroRow = {
+  empresa_id: string;
+  perfil: string;
 };
 
 serve(async (req) => {
@@ -35,36 +48,74 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Não autenticado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: membros, error: memErr } = await supabase.from("membros").select("empresa_id").eq("user_id", user.id);
-    if (memErr) {
-      const { data: empresasOwner, error: empOwnerErr } = await supabase
-        .from("empresas")
-        .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
-        .eq("owner_id", user.id);
-      if (empOwnerErr) {
-        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      return new Response(JSON.stringify(empresasOwner || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const ids = Array.from(new Set((membros || []).map((m: { empresa_id: string }) => m.empresa_id)));
-    if (ids.length === 0) {
-      const { data: empresasOwner } = await supabase
-        .from("empresas")
-        .select("id, nome, segmento, tamanho, owner_id, created_at")
-        .eq("owner_id", user.id);
-      return new Response(JSON.stringify(empresasOwner || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const { data: empresas, error: empErr } = await supabase
+    const { data: empresasOwner, error: empOwnerErr } = await supabase
       .from("empresas")
-      .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
-      .in("id", ids);
-    if (empErr) {
+      .select("id, nome, segmento, owner_id")
+      .eq("owner_id", user.id);
+
+    if (empOwnerErr) {
       return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return new Response(JSON.stringify(empresas || []), {
+    const { data: membros, error: memErr } = await supabase
+      .from("membros")
+      .select("empresa_id, perfil")
+      .eq("user_id", user.id);
+
+    if (memErr) {
+      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const membershipRows = (membros as MembroRow[] | null) || [];
+    const memberCompanyIds = Array.from(new Set(membershipRows.map((m) => m.empresa_id).filter(Boolean)));
+
+    let empresasMembro: EmpresaRow[] = [];
+    if (memberCompanyIds.length > 0) {
+      const { data: memberCompanies, error: memberCompaniesError } = await supabase
+        .from("empresas")
+        .select("id, nome, segmento, owner_id")
+        .in("id", memberCompanyIds);
+
+      if (memberCompaniesError) {
+        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      empresasMembro = (memberCompanies as EmpresaRow[] | null) || [];
+    }
+
+    const empresasMap = new Map<string, {
+      id: string;
+      nome: string;
+      segmento: string | null;
+      logo_url: string | null;
+      perfil: string;
+    }>();
+
+    for (const empresa of (empresasOwner as EmpresaRow[] | null) || []) {
+      empresasMap.set(empresa.id, {
+        id: empresa.id,
+        nome: empresa.nome,
+        segmento: empresa.segmento,
+        logo_url: null,
+        perfil: "owner",
+      });
+    }
+
+    for (const empresa of empresasMembro) {
+      const membership = membershipRows.find((item) => item.empresa_id === empresa.id);
+      const existing = empresasMap.get(empresa.id);
+      empresasMap.set(empresa.id, {
+        id: empresa.id,
+        nome: empresa.nome,
+        segmento: empresa.segmento,
+        logo_url: null,
+        perfil: existing?.perfil === "owner" ? "owner" : (membership?.perfil || "analista"),
+      });
+    }
+
+    const empresas = Array.from(empresasMap.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+    return new Response(JSON.stringify(empresas), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

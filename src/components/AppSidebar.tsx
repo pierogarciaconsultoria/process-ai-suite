@@ -39,6 +39,9 @@ const configItems = [{ title: "Configurações", url: "/configuracoes", icon: Se
 type EmpresaOption = {
   id: string;
   nome: string;
+  segmento?: string | null;
+  logo_url?: string | null;
+  perfil?: string;
 };
 
 export function AppSidebar() {
@@ -61,26 +64,33 @@ export function AppSidebar() {
   useEffect(() => {
     const loadEmpresas = async () => {
       const { data, error } = await supabase.functions.invoke("org-list");
-      if (!error && Array.isArray(data)) {
-        const list = (data as Array<Record<string, unknown>>).map((e) => ({
-          id: String(e.id),
-          nome: String(e.nome),
-        }));
-        setEmpresas(list);
-        if (list.length === 0) return;
-        setEmpresaId((prev) => {
-          const exists = prev && list.some((e) => e.id === prev);
-          const nextId = exists ? prev! : list[0].id;
-          try {
-            window.localStorage.setItem("process:activeEmpresaId", nextId);
-            const nome = list.find((e) => e.id === nextId)?.nome ?? "";
-            window.localStorage.setItem("process:activeEmpresaNome", nome);
-          } catch (err) {
-            void err;
-          }
-          return nextId;
-        });
+      if (error || !Array.isArray(data)) {
+        setEmpresas([]);
+        return;
       }
+
+      const list = (data as Array<Record<string, unknown>>).map((e) => ({
+        id: String(e.id),
+        nome: String(e.nome),
+        segmento: e.segmento == null ? null : String(e.segmento),
+        logo_url: e.logo_url == null ? null : String(e.logo_url),
+        perfil: e.perfil == null ? undefined : String(e.perfil),
+      }));
+
+      setEmpresas(list);
+      if (list.length === 0) return;
+      setEmpresaId((prev) => {
+        const exists = prev && list.some((e) => e.id === prev);
+        const nextId = exists ? prev! : list[0].id;
+        try {
+          window.localStorage.setItem("process:activeEmpresaId", nextId);
+          const nome = list.find((e) => e.id === nextId)?.nome ?? "";
+          window.localStorage.setItem("process:activeEmpresaNome", nome);
+        } catch (err) {
+          void err;
+        }
+        return nextId;
+      });
     };
     loadEmpresas();
   }, []);
