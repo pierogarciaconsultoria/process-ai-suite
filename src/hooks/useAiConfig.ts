@@ -3,45 +3,58 @@ import { supabase } from "@/integrations/supabase/client";
 import { AI_CONFIG_DEFAULTS, type AiConfigType } from "@/data/ai-config-defaults";
 
 async function validateAccessibleCompanyId(companyId: string) {
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id")
-    .eq("id", companyId)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("id")
+      .eq("id", companyId)
+      .maybeSingle();
 
-  if (error) return null;
-  return data?.id ?? null;
+    if (error) return null;
+    return data?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveActiveCompanyId(userId: string | null) {
-  const localCompanyId = window.localStorage.getItem("process:activeEmpresaId");
-  if (localCompanyId) {
-    const accessibleCompanyId = await validateAccessibleCompanyId(localCompanyId);
-    if (accessibleCompanyId) return accessibleCompanyId;
-    window.localStorage.removeItem("process:activeEmpresaId");
+  try {
+    const localCompanyId = window.localStorage.getItem("process:activeEmpresaId");
+    if (localCompanyId) {
+      const accessibleCompanyId = await validateAccessibleCompanyId(localCompanyId);
+      if (accessibleCompanyId) return accessibleCompanyId;
+      window.localStorage.removeItem("process:activeEmpresaId");
+    }
+    if (!userId) return null;
+
+    const { data: empresas, error: empresasError } = await supabase
+      .from("empresas")
+      .select("id, created_at")
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (!empresasError) {
+      const ownerRows = (empresas as { id: string; created_at: string }[] | null) || [];
+      if (ownerRows[0]?.id) return ownerRows[0].id;
+    }
+
+    const { data: membros, error: membrosError } = await supabase
+      .from("membros")
+      .select("empresa_id, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (!membrosError) {
+      const memberRows = (membros as { empresa_id: string; created_at: string }[] | null) || [];
+      if (memberRows[0]?.empresa_id) return memberRows[0].empresa_id;
+    }
+
+    return null;
+  } catch {
+    return null;
   }
-  if (!userId) return null;
-
-  const { data: empresas } = await supabase
-    .from("empresas")
-    .select("id, created_at")
-    .eq("owner_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1);
-
-  const ownerRows = (empresas as { id: string; created_at: string }[] | null) || [];
-  if (ownerRows[0]?.id) return ownerRows[0].id;
-
-  const { data: membros } = await supabase
-    .from("membros")
-    .select("empresa_id, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1);
-
-  const memberRows = (membros as { empresa_id: string; created_at: string }[] | null) || [];
-  if (memberRows[0]?.empresa_id) return memberRows[0].empresa_id;
-  return null;
 }
 
 export function useAiConfig(configType: AiConfigType) {
@@ -54,14 +67,19 @@ export function useAiConfig(configType: AiConfigType) {
   const loadConfig = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setContent(AI_CONFIG_DEFAULTS[configType]);
     try {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        setError(authError.message);
+        setCompanyId(null);
+        return;
+      }
       const userId = auth.user?.id ?? null;
       const activeCompanyId = await resolveActiveCompanyId(userId);
       setCompanyId(activeCompanyId);
 
       if (!activeCompanyId) {
-        setContent(AI_CONFIG_DEFAULTS[configType]);
         return;
       }
 
@@ -72,11 +90,17 @@ export function useAiConfig(configType: AiConfigType) {
         .eq("config_type", configType)
         .maybeSingle();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        setError(fetchError.message);
+        setContent(AI_CONFIG_DEFAULTS[configType]);
+        return;
+      }
+
       setContent(data?.content || AI_CONFIG_DEFAULTS[configType]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar configuração");
       setContent(AI_CONFIG_DEFAULTS[configType]);
+      setCompanyId(null);
     } finally {
       setIsLoading(false);
     }

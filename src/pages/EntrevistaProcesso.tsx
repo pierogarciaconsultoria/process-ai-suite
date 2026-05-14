@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,43 @@ type InterviewResponse = {
 };
 type InterviewStage = "askUserName" | "askProcessName" | "askDescription" | "aiFlow";
 
-export default function EntrevistaProcesso() {
+class InterviewPageErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("Erro ao carregar a entrevista:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="space-y-6 animate-fade-in">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-sm text-muted-foreground">
+                Ocorreu um erro ao carregar a entrevista. Atualize a página e tente novamente.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function EntrevistaProcessoPage() {
   const ASSISTANT_MIN_DELAY_MS = 2000;
   const ASSISTANT_MAX_DELAY_MS = 3000;
   const FRIENDLY_CONNECTION_ERROR = "Ops, tive um problema de conexão. Pode tentar novamente?";
@@ -62,6 +98,8 @@ export default function EntrevistaProcesso() {
   const [stage, setStage] = useState<InterviewStage>("askUserName");
   const [participantName, setParticipantName] = useState("");
   const routeScriptConfig = useAiConfig("route_script");
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [hasInitializedConversation, setHasInitializedConversation] = useState(false);
 
   const steps = [
     "Novo processo",
@@ -79,11 +117,16 @@ export default function EntrevistaProcesso() {
   }, []);
 
   useEffect(() => {
-    if (processState?.formPrefill) {
-      setForm(processState.formPrefill);
-      if (processState.formPrefill.entrevistados?.trim()) {
-        setParticipantName(processState.formPrefill.entrevistados.trim());
+    try {
+      if (processState?.formPrefill) {
+        setForm(processState.formPrefill);
+        if (processState.formPrefill.entrevistados?.trim()) {
+          setParticipantName(processState.formPrefill.entrevistados.trim());
+        }
       }
+    } catch (error) {
+      console.error("Erro ao aplicar prefill da entrevista:", error);
+      setInitializationError("Não foi possível carregar os dados iniciais da entrevista.");
     }
   }, [processState]);
 
@@ -105,18 +148,43 @@ export default function EntrevistaProcesso() {
   };
 
   useEffect(() => {
-    const greeting =
-      "Oi, eu sou o Peter. Vou conduzir esta conversa com você para mapear o processo com clareza, leveza e sem complicação.";
-    const reassurance =
-      "Pode ficar à vontade para responder no seu ritmo. Meu papel aqui é entender bem o contexto, organizar as informações e transformar tudo em um mapeamento claro e útil para você.";
-    const askUserName =
-      "Antes de começarmos, como você gostaria que eu te chamasse?";
-    setMessages([{ role: "assistant", content: greeting }]);
-    void (async () => {
-      await enqueueAssistantMessage(reassurance);
-      await enqueueAssistantMessage(askUserName);
-    })();
-  }, []);
+    let cancelled = false;
+
+    const initializeConversation = async () => {
+      try {
+        if (cancelled || routeScriptConfig.isLoading || hasInitializedConversation) {
+          return;
+        }
+
+        if (!routeScriptConfig.companyId) {
+          return;
+        }
+
+        const greeting =
+          "Oi, eu sou o Peter. Vou conduzir esta conversa com você para mapear o processo com clareza, leveza e sem complicação.";
+        const reassurance =
+          "Pode ficar à vontade para responder no seu ritmo. Meu papel aqui é entender bem o contexto, organizar as informações e transformar tudo em um mapeamento claro e útil para você.";
+        const askUserName =
+          "Antes de começarmos, como você gostaria que eu te chamasse?";
+
+        setHasInitializedConversation(true);
+        setMessages([{ role: "assistant", content: greeting }]);
+        await enqueueAssistantMessage(reassurance);
+        await enqueueAssistantMessage(askUserName);
+      } catch (error) {
+        console.error("Erro ao inicializar a entrevista:", error);
+        if (!cancelled) {
+          setInitializationError("Não foi possível inicializar a entrevista.");
+        }
+      }
+    };
+
+    void initializeConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enqueueAssistantMessage, hasInitializedConversation, routeScriptConfig.companyId, routeScriptConfig.isLoading]);
   const persistProcessDraft = async (
     snapshotForm: ProcessoFormData,
     snapshotMessages: ChatMessage[],
@@ -256,6 +324,9 @@ export default function EntrevistaProcesso() {
   }, [messages, isAssistantTyping]);
 
   const assistantBusy = loading || isAssistantTyping;
+
+  const isInitializingPage = routeScriptConfig.isLoading && !hasInitializedConversation;
+  const shouldBlockForCompany = !isInitializingPage && !routeScriptConfig.companyId;
 
   useEffect(() => {
     if (!assistantBusy) {
@@ -786,6 +857,49 @@ export default function EntrevistaProcesso() {
     }
   };
 
+  if (initializationError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">{initializationError}</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isInitializingPage) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">Carregando entrevista...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (shouldBlockForCompany) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground">
+              Selecione uma empresa antes de iniciar a entrevista
+            </div>
+            {routeScriptConfig.error ? (
+              <div className="mt-2 text-xs text-muted-foreground">
+                A configuracao de IA nao foi carregada e os valores padrao serao usados quando a empresa for selecionada.
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card>
@@ -893,5 +1007,13 @@ export default function EntrevistaProcesso() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function EntrevistaProcesso() {
+  return (
+    <InterviewPageErrorBoundary>
+      <EntrevistaProcessoPage />
+    </InterviewPageErrorBoundary>
   );
 }
