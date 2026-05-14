@@ -41,6 +41,7 @@ type InterviewStage = "askUserName" | "askProcessName" | "askDescription" | "aiF
 export default function EntrevistaProcesso() {
   const ASSISTANT_MIN_DELAY_MS = 2000;
   const ASSISTANT_MAX_DELAY_MS = 3000;
+  const FRIENDLY_CONNECTION_ERROR = "Ops, tive um problema de conexão. Pode tentar novamente?";
   const navigate = useNavigate();
   const location = useLocation();
   const processState = location.state as { processId?: string; formPrefill?: ProcessoFormData } | null;
@@ -431,6 +432,7 @@ export default function EntrevistaProcesso() {
     }
 
     if (stage === "askDescription") {
+      const previousMessages = messages;
       const userMsg: ChatMessage = { role: "user", content: trimmed };
       setMessages((m) => [...m, userMsg]);
       setInput("");
@@ -447,8 +449,7 @@ export default function EntrevistaProcesso() {
         const hasErrorField = (d: unknown): d is { error: string } =>
           typeof d === "object" && d !== null && "error" in d;
         if (error || hasErrorField(data)) {
-          const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
-          await handleFallback(userMsg.content, detail);
+          handleInterviewRequestError(previousMessages, trimmed);
           return;
         }
         const resp = data as InterviewResponse;
@@ -463,8 +464,8 @@ export default function EntrevistaProcesso() {
           await handleFallback(userMsg.content, "Resposta incompleta da IA");
         }
       } catch (e) {
-        const detail = e instanceof Error ? e.message : "Erro desconhecido";
-        await handleFallback(userMsg.content, detail);
+        void e;
+        handleInterviewRequestError(previousMessages, trimmed);
       } finally {
         setLoading(false);
       }
@@ -476,6 +477,7 @@ export default function EntrevistaProcesso() {
       applyToForm("manual");
       return;
     }
+    const previousMessages = messages;
     const userMsg: ChatMessage = { role: "user", content: trimmed };
     setMessages((m) => [...m, userMsg]);
     setInput("");
@@ -491,8 +493,7 @@ export default function EntrevistaProcesso() {
       const hasErrorField = (d: unknown): d is { error: string } =>
         typeof d === "object" && d !== null && "error" in d;
       if (error || hasErrorField(data)) {
-        const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
-        await handleFallback(userMsg.content, detail);
+        handleInterviewRequestError(previousMessages, trimmed);
         return;
       }
       const resp = data as InterviewResponse;
@@ -507,8 +508,8 @@ export default function EntrevistaProcesso() {
         await handleFallback(userMsg.content, "Resposta incompleta da IA");
       }
     } catch (e) {
-      const detail = e instanceof Error ? e.message : "Erro desconhecido";
-      await handleFallback(userMsg.content, detail);
+      void e;
+      handleInterviewRequestError(previousMessages, trimmed);
     } finally {
       setLoading(false);
     }
@@ -526,6 +527,18 @@ export default function EntrevistaProcesso() {
     await enqueueAssistantMessage(
       `Ocorreu um erro técnico (${detail}). Vou continuar a entrevista de forma local.\n\n${fallback.nextQuestion ?? "Entrevista concluída. Deseja aplicar no formulário?"}`,
     );
+  };
+
+  const handleInterviewRequestError = (
+    previousMessages: ChatMessage[],
+    previousInput: string,
+  ) => {
+    setMessages([
+      ...previousMessages,
+      { role: "assistant", content: FRIENDLY_CONNECTION_ERROR },
+    ]);
+    setInput(previousInput);
+    setIsAssistantTyping(false);
   };
 
   const computeFallback = (currentForm: ProcessoFormData, answer: string): InterviewResponse => {
@@ -731,6 +744,7 @@ export default function EntrevistaProcesso() {
         return;
       }
       const snippet = text.length > 16000 ? text.slice(0, 16000) : text;
+      const previousMessages = messages;
       const userMsg: ChatMessage = {
         role: "user",
         content: `Extraí o seguinte conteúdo do arquivo anexado. Analise e use para preencher o formulário do processo, propondo objetivo, entradas, etapas, decisões e saídas quando possível:\n\n${snippet}`,
@@ -746,8 +760,11 @@ export default function EntrevistaProcesso() {
       const hasErrorField = (d: unknown): d is { error: string } =>
         typeof d === "object" && d !== null && "error" in d;
       if (error || hasErrorField(data)) {
-        const detail = error instanceof Error ? error.message : hasErrorField(data) ? data.error : "Falha desconhecida";
-        await handleFallback(userMsg.content, detail);
+        setMessages([
+          ...previousMessages,
+          { role: "assistant", content: FRIENDLY_CONNECTION_ERROR },
+        ]);
+        setIsAssistantTyping(false);
         return;
       }
       const resp = data as InterviewResponse;
@@ -758,8 +775,12 @@ export default function EntrevistaProcesso() {
         await enqueueAssistantMessage(resp.nextQuestion);
       }
     } catch (e) {
-      const detail = e instanceof Error ? e.message : "Erro desconhecido";
-      await handleFallback("Arquivo anexado", detail);
+      void e;
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", content: FRIENDLY_CONNECTION_ERROR },
+      ]);
+      setIsAssistantTyping(false);
     } finally {
       setLoading(false);
     }
