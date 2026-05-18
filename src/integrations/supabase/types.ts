@@ -917,6 +917,143 @@ export type Database = {
           },
         ]
       }
+      processos: {
+        Row: {
+          analista: string
+          area: string
+          areas_envolvidas: string
+          bpmn_as_is: string
+          bpmn_to_be: string
+          classificacao: string
+          cliente_processo: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          criticidade: string
+          data_mapeamento: string
+          decisoes: string
+          diagnostico: Json | null
+          entradas: Json
+          entrevistados: string
+          etapas: Json
+          gatilho: string
+          id: string
+          indicadores: Json
+          interview_messages: Json
+          interview_session_id: string | null
+          mapa_aprovado_em: string | null
+          mapa_revisao: string
+          nome: string
+          objetivo: string
+          obsolete_at: string | null
+          oportunidades_melhoria: string
+          plano_acao: Json
+          problemas: Json
+          problemas_texto: string
+          published_at: string | null
+          recursos: string
+          responsavel: string
+          riscos: Json
+          riscos_texto: string
+          saidas: Json
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          analista?: string
+          area?: string
+          areas_envolvidas?: string
+          bpmn_as_is?: string
+          bpmn_to_be?: string
+          classificacao?: string
+          cliente_processo?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          criticidade?: string
+          data_mapeamento?: string
+          decisoes?: string
+          diagnostico?: Json | null
+          entradas?: Json
+          entrevistados?: string
+          etapas?: Json
+          gatilho?: string
+          id?: string
+          indicadores?: Json
+          interview_messages?: Json
+          interview_session_id?: string | null
+          mapa_aprovado_em?: string | null
+          mapa_revisao?: string
+          nome?: string
+          objetivo?: string
+          obsolete_at?: string | null
+          oportunidades_melhoria?: string
+          plano_acao?: Json
+          problemas?: Json
+          problemas_texto?: string
+          published_at?: string | null
+          recursos?: string
+          responsavel?: string
+          riscos?: Json
+          riscos_texto?: string
+          saidas?: Json
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          analista?: string
+          area?: string
+          areas_envolvidas?: string
+          bpmn_as_is?: string
+          bpmn_to_be?: string
+          classificacao?: string
+          cliente_processo?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          criticidade?: string
+          data_mapeamento?: string
+          decisoes?: string
+          diagnostico?: Json | null
+          entradas?: Json
+          entrevistados?: string
+          etapas?: Json
+          gatilho?: string
+          id?: string
+          indicadores?: Json
+          interview_messages?: Json
+          interview_session_id?: string | null
+          mapa_aprovado_em?: string | null
+          mapa_revisao?: string
+          nome?: string
+          objetivo?: string
+          obsolete_at?: string | null
+          oportunidades_melhoria?: string
+          plano_acao?: Json
+          problemas?: Json
+          problemas_texto?: string
+          published_at?: string | null
+          recursos?: string
+          responsavel?: string
+          riscos?: Json
+          riscos_texto?: string
+          saidas?: Json
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
