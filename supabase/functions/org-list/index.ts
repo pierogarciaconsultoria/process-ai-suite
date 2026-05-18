@@ -54,7 +54,7 @@ serve(async (req) => {
       .eq("owner_id", user.id);
 
     if (empOwnerErr) {
-      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw new Error(`Erro ao buscar empresas do owner: ${empOwnerErr.message}`);
     }
 
     const { data: membros, error: memErr } = await supabase
@@ -63,7 +63,7 @@ serve(async (req) => {
       .eq("user_id", user.id);
 
     if (memErr) {
-      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw new Error(`Erro ao buscar memberships do usuário: ${memErr.message}`);
     }
 
     const membershipRows = (membros as MembroRow[] | null) || [];
@@ -77,7 +77,7 @@ serve(async (req) => {
         .in("id", memberCompanyIds);
 
       if (memberCompaniesError) {
-        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        throw new Error(`Erro ao buscar empresas por membership: ${memberCompaniesError.message}`);
       }
 
       empresasMembro = (memberCompanies as EmpresaRow[] | null) || [];
@@ -120,9 +120,6 @@ serve(async (req) => {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (/Could not find the table|schema cache/i.test(msg)) {
-      return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
     return new Response(JSON.stringify({ error: msg || "Erro desconhecido" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

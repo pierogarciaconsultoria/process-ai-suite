@@ -26,6 +26,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -51,6 +52,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const isActive = (path: string) => location.pathname.startsWith(path);
   const [empresas, setEmpresas] = useState<EmpresaOption[]>([]);
+  const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [empresaId, setEmpresaId] = useState<string | undefined>(() => {
     if (typeof window === "undefined") return undefined;
     try {
@@ -62,10 +64,24 @@ export function AppSidebar() {
   });
 
   useEffect(() => {
-    const loadEmpresas = async () => {
+    let isMounted = true;
+
+    const loadEmpresas = async (session: Session | null) => {
+      if (!isMounted) return;
+
+      if (!session?.user) {
+        setEmpresas([]);
+        setLoadingEmpresas(false);
+        return;
+      }
+
+      setLoadingEmpresas(true);
       const { data, error } = await supabase.functions.invoke("org-list");
       if (error || !Array.isArray(data)) {
-        setEmpresas([]);
+        if (isMounted) {
+          setEmpresas([]);
+          setLoadingEmpresas(false);
+        }
         return;
       }
 
@@ -77,7 +93,9 @@ export function AppSidebar() {
         perfil: e.perfil == null ? undefined : String(e.perfil),
       }));
 
+      if (!isMounted) return;
       setEmpresas(list);
+      setLoadingEmpresas(false);
       if (list.length === 0) return;
       setEmpresaId((prev) => {
         const exists = prev && list.some((e) => e.id === prev);
@@ -92,7 +110,22 @@ export function AppSidebar() {
         return nextId;
       });
     };
-    loadEmpresas();
+
+    const bootstrap = async () => {
+      const { data } = await supabase.auth.getSession();
+      await loadEmpresas(data.session);
+    };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void loadEmpresas(session);
+    });
+
+    void bootstrap();
+
+    return () => {
+      isMounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -138,7 +171,11 @@ export function AppSidebar() {
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent>
-                  {empresas.length === 0 ? (
+                  {loadingEmpresas ? (
+                    <SelectItem value="__loading__" disabled>
+                      Carregando empresas...
+                    </SelectItem>
+                  ) : empresas.length === 0 ? (
                     <SelectItem value="__none__" disabled>
                       Nenhuma empresa cadastrada
                     </SelectItem>
