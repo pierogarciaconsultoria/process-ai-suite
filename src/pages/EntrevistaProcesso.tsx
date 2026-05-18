@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -133,19 +133,21 @@ function EntrevistaProcessoPage() {
   const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
   const getAssistantDelay = () =>
     Math.floor(Math.random() * (ASSISTANT_MAX_DELAY_MS - ASSISTANT_MIN_DELAY_MS + 1)) + ASSISTANT_MIN_DELAY_MS;
-  const enqueueAssistantMessage = (content: string, delayMs = getAssistantDelay()) => {
+  const enqueueAssistantMessage = useCallback((content: string, delayMs?: number) => {
+    const ms = delayMs ?? getAssistantDelay();
     assistantQueueRef.current = assistantQueueRef.current
       .catch(() => undefined)
       .then(async () => {
         if (!isMountedRef.current) return;
         setIsAssistantTyping(true);
-        await wait(delayMs);
+        await wait(ms);
         if (!isMountedRef.current) return;
         setMessages((m) => [...m, { role: "assistant", content }]);
         setIsAssistantTyping(false);
       });
     return assistantQueueRef.current;
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -978,9 +980,8 @@ function EntrevistaProcessoPage() {
               }}
             />
             <Button onClick={send} disabled={assistantBusy}>
-              {assistantBusy ? "Aguarde..." : <>
-                Enviar <Send className="h-4 w-4 ml-2" />
-              </>}
+              <span>{assistantBusy ? "Aguarde..." : "Enviar"}</span>
+              <Send className="h-4 w-4 ml-2" />
             </Button>
           </div>
 
