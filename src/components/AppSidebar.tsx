@@ -184,7 +184,7 @@ export function AppSidebar() {
                   }
                 }}
               >
-                <SelectTrigger className="h-8 px-2 text-xs">
+                <SelectTrigger className="h-8 px-2 text-xs text-black [&>span]:text-black">
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent>
