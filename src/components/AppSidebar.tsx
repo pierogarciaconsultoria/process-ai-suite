@@ -65,35 +65,37 @@ export function AppSidebar() {
 
   useEffect(() => {
     let isMounted = true;
+    let inFlight: Promise<void> | null = null;
 
-    const loadEmpresas = async (session: Session | null) => {
+    const runLoad = async (session: Session | null) => {
       if (!isMounted) return;
-
       if (!session?.user) {
         setEmpresas([]);
         setLoadingEmpresas(false);
         return;
       }
-
       setLoadingEmpresas(true);
       const { data, error } = await supabase.functions.invoke("org-list");
+      if (!isMounted) return;
       if (error || !Array.isArray(data)) {
-        if (isMounted) {
-          setEmpresas([]);
-          setLoadingEmpresas(false);
-        }
+        setEmpresas([]);
+        setLoadingEmpresas(false);
         return;
       }
-
-      const list = (data as Array<Record<string, unknown>>).map((e) => ({
-        id: String(e.id),
-        nome: String(e.nome),
-        segmento: e.segmento == null ? null : String(e.segmento),
-        logo_url: e.logo_url == null ? null : String(e.logo_url),
-        perfil: e.perfil == null ? undefined : String(e.perfil),
-      }));
-
-      if (!isMounted) return;
+      const seen = new Set<string>();
+      const list = (data as Array<Record<string, unknown>>)
+        .map((e) => ({
+          id: String(e.id),
+          nome: String(e.nome),
+          segmento: e.segmento == null ? null : String(e.segmento),
+          logo_url: e.logo_url == null ? null : String(e.logo_url),
+          perfil: e.perfil == null ? undefined : String(e.perfil),
+        }))
+        .filter((e) => {
+          if (seen.has(e.id)) return false;
+          seen.add(e.id);
+          return true;
+        });
       setEmpresas(list);
       setLoadingEmpresas(false);
       if (list.length === 0) return;
@@ -111,6 +113,15 @@ export function AppSidebar() {
       });
     };
 
+    const loadEmpresas = (session: Session | null) => {
+      const prev = inFlight ?? Promise.resolve();
+      const next = prev.then(() => runLoad(session));
+      inFlight = next.finally(() => {
+        if (inFlight === next) inFlight = null;
+      });
+      return inFlight;
+    };
+
     const bootstrap = async () => {
       const { data } = await supabase.auth.getSession();
       await loadEmpresas(data.session);
@@ -120,11 +131,17 @@ export function AppSidebar() {
       void loadEmpresas(session);
     });
 
+    const handleRefresh = () => {
+      void supabase.auth.getSession().then(({ data }) => loadEmpresas(data.session));
+    };
+    window.addEventListener("empresas:refresh", handleRefresh);
+
     void bootstrap();
 
     return () => {
       isMounted = false;
       authListener.subscription.unsubscribe();
+      window.removeEventListener("empresas:refresh", handleRefresh);
     };
   }, []);
 
