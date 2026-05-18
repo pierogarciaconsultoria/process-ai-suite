@@ -151,6 +151,7 @@ const Empresas = () => {
     setNovaTamanho("");
     setNovaAreaAtuacao("");
     setNovaContexto("");
+    window.dispatchEvent(new CustomEvent("empresas:refresh"));
     toast({ title: "Empresa cadastrada", description: "A empresa foi criada e vinculada à sua conta." });
 
   };
