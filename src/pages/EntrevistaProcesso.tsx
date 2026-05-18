@@ -980,9 +980,8 @@ function EntrevistaProcessoPage() {
               }}
             />
             <Button onClick={send} disabled={assistantBusy}>
-              {assistantBusy ? "Aguarde..." : <>
-                Enviar <Send className="h-4 w-4 ml-2" />
-              </>}
+              <span>{assistantBusy ? "Aguarde..." : "Enviar"}</span>
+              <Send className="h-4 w-4 ml-2" />
             </Button>
           </div>
 
