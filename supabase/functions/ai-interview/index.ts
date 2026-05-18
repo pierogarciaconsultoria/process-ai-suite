@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -6,6 +7,91 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+type InterviewMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+type OpenAIThreadMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content?: Array<{
+    type?: string;
+    text?: {
+      value?: string;
+    };
+  }>;
+};
+
+const OPENAI_ASSISTANTS_HEADERS = (apiKey: string) => ({
+  Authorization: `Bearer ${apiKey}`,
+  "Content-Type": "application/json",
+  "OpenAI-Beta": "assistants=v2",
+});
+
+async function openAiAssistantsRequest<T>(
+  apiKey: string,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`https://api.openai.com/v1${path}`, {
+    ...init,
+    headers: {
+      ...OPENAI_ASSISTANTS_HEADERS(apiKey),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`OpenAI Assistants API error ${response.status}: ${text}`);
+  }
+
+  return await response.json() as T;
+}
+
+async function pollRunUntilCompleted(
+  apiKey: string,
+  threadId: string,
+  runId: string,
+) {
+  const startedAt = Date.now();
+  const timeoutMs = 60_000;
+  const intervalMs = 1_000;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const run = await openAiAssistantsRequest<{
+      status: string;
+      last_error?: { message?: string };
+    }>(apiKey, `/threads/${threadId}/runs/${runId}`, { method: "GET" });
+
+    if (run.status === "completed") return;
+
+    if (["failed", "cancelled", "expired", "incomplete"].includes(run.status)) {
+      throw new Error(run.last_error?.message || `Run encerrado com status ${run.status}`);
+    }
+
+    if (run.status === "requires_action") {
+      throw new Error("O Assistant solicitou tool calls não suportadas pela ai-interview.");
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error("Tempo limite excedido ao aguardar resposta do Assistant.");
+}
+
+function extractAssistantText(messages: OpenAIThreadMessage[]) {
+  const assistantMessage = messages.find((message) => message.role === "assistant");
+  if (!assistantMessage?.content?.length) return "";
+
+  return assistantMessage.content
+    .filter((item) => item?.type === "text")
+    .map((item) => item.text?.value || "")
+    .join("\n")
+    .trim();
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -19,12 +105,28 @@ serve(async (req: Request) => {
     const current = body?.current ?? {};
     const companyId = body?.company_id ?? null;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }), {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const OPENAI_ASSISTANT_ID = Deno.env.get("OPENAI_ASSISTANT_ID");
+
+    if (!OPENAI_API_KEY) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurado" }), {
         status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!OPENAI_ASSISTANT_ID) {
+      return new Response(JSON.stringify({ error: "OPENAI_ASSISTANT_ID não configurado" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!Array.isArray(history)) {
+      return new Response(JSON.stringify({ error: "Histórico inválido para a entrevista" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -204,53 +306,48 @@ Orientações de preenchimento:
 - Antes de marcar "done": true, garanta que recursos e problemasTexto estejam resolvidos, mesmo que a resposta seja "não existe", "não se aplica" ou equivalente.
 - Quando o usuário disser que não existem indicadores ou plano de ação, use partialUpdate para propor sugestões úteis e realistas, em vez de encerrar com campos vazios.`;
 
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...history,
-    ];
+    const sanitizedHistory = (history as InterviewMessage[])
+      .filter((message) =>
+        message &&
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string" &&
+        message.content.trim().length > 0,
+      )
+      .slice(-30);
 
-    const AI_MODEL = Deno.env.get("AI_MODEL") || "google/gemini-2.5-flash";
-    const isOpenAI = AI_MODEL.startsWith("openai/");
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const thread = await openAiAssistantsRequest<{ id: string }>(OPENAI_API_KEY, "/threads", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
 
-    const response = await fetch(
-      isOpenAI && OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
+    for (const message of sanitizedHistory) {
+      await openAiAssistantsRequest(OPENAI_API_KEY, `/threads/${thread.id}/messages`, {
         method: "POST",
-        headers: {
-          Authorization: isOpenAI && OPENAI_API_KEY ? `Bearer ${OPENAI_API_KEY}` : `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
-          model: isOpenAI ? AI_MODEL.replace(/^openai\//, "") : AI_MODEL,
-          messages,
-          response_format: { type: "json_object" },
+          role: message.role,
+          content: message.content,
         }),
-      }
-    );
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos em Configurações." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const txt = await response.text();
-      return new Response(JSON.stringify({ error: `AI error ${response.status}: ${txt}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const json = await response.json();
-    let content = json.choices?.[0]?.message?.content || "";
+    const run = await openAiAssistantsRequest<{ id: string }>(OPENAI_API_KEY, `/threads/${thread.id}/runs`, {
+      method: "POST",
+      body: JSON.stringify({
+        assistant_id: OPENAI_ASSISTANT_ID,
+        additional_instructions: systemPrompt,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    await pollRunUntilCompleted(OPENAI_API_KEY, thread.id, run.id);
+
+    const messages = await openAiAssistantsRequest<{ data: OpenAIThreadMessage[] }>(
+      OPENAI_API_KEY,
+      `/threads/${thread.id}/messages?order=desc&limit=20`,
+      { method: "GET" },
+    );
+
+    let content = extractAssistantText(messages.data || []);
     content = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
 
     let parsed;
