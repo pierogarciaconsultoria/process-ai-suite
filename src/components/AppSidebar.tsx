@@ -174,17 +174,25 @@ export function AppSidebar() {
               <Select
                 value={empresaId}
                 onValueChange={(value) => {
-                  setEmpresaId(value);
-                  try {
-                    window.localStorage.setItem("process:activeEmpresaId", value);
-                    const nome = empresas.find((e) => e.id === value)?.nome ?? "";
-                    window.localStorage.setItem("process:activeEmpresaNome", nome);
-                  } catch (err) {
-                    void err;
-                  }
+                  // Defer state update so Radix can finish unmounting the
+                  // popover portal before React re-renders. Avoids the
+                  // "removeChild ... not a child of this node" DOM error.
+                  queueMicrotask(() => {
+                    setEmpresaId(value);
+                    try {
+                      window.localStorage.setItem("process:activeEmpresaId", value);
+                      const nome = empresas.find((e) => e.id === value)?.nome ?? "";
+                      window.localStorage.setItem("process:activeEmpresaNome", nome);
+                    } catch (err) {
+                      void err;
+                    }
+                  });
                 }}
               >
-                <SelectTrigger className="h-8 px-2 text-xs text-black [&>span]:text-black">
+                <SelectTrigger
+                  translate="no"
+                  className="h-8 px-2 text-xs text-black [&>span]:text-black notranslate"
+                >
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent>
