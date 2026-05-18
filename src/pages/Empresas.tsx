@@ -61,56 +61,29 @@ const Empresas = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadUserCompany = async () => {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-      if (!user) return;
-      const meta = user.user_metadata as Record<string, unknown>;
-      const empresaValue = meta?.empresa;
-      const empresaNome = typeof empresaValue === "string" ? empresaValue : undefined;
-      if (!empresaNome) return;
-      const exists = empresas.some((e) => e.nome.toLowerCase() === String(empresaNome).toLowerCase());
-      if (exists) return;
-      const { data: created, error } = await supabase.functions.invoke("org-onboarding", {
-        body: {
-          empresaNome,
-          segmento: typeof meta?.segmento === "string" ? meta.segmento : null,
-          area_atuacao: typeof meta?.area_atuacao === "string" ? meta.area_atuacao : null,
-          contexto: typeof meta?.contexto === "string" ? meta.contexto : null,
-        },
-      });
-      if (error) return;
-      if (created?.empresa) {
-        const raw = created.empresa as Record<string, unknown>;
-        const e: Empresa = {
-          id: String(raw.id),
-          nome: String(raw.nome),
-          segmento: String(raw.segmento || ""),
-          tamanho: String(raw.tamanho || ""),
-          area_atuacao: String(raw.area_atuacao || ""),
-          contexto: String(raw.contexto || ""),
-          data_cadastro: String(raw.created_at || new Date().toISOString()),
-        };
-        setEmpresas((prev) => [e, ...prev]);
-      }
-    };
     const loadFromServer = async () => {
       const { data, error } = await supabase.functions.invoke("org-list");
       if (!error && Array.isArray(data)) {
-        const list = (data as Array<Record<string, unknown>>).map((e) => ({
-          id: String(e.id),
-          nome: String(e.nome),
-          segmento: String(e.segmento || ""),
-          tamanho: String(e.tamanho || ""),
-          area_atuacao: String(e.area_atuacao || ""),
-          contexto: String(e.contexto || ""),
-          data_cadastro: String(e.created_at || new Date().toISOString()),
-        })) as Empresa[];
+        const seen = new Set<string>();
+        const list = (data as Array<Record<string, unknown>>)
+          .map((e) => ({
+            id: String(e.id),
+            nome: String(e.nome),
+            segmento: String(e.segmento || ""),
+            tamanho: String(e.tamanho || ""),
+            area_atuacao: String(e.area_atuacao || ""),
+            contexto: String(e.contexto || ""),
+            data_cadastro: String(e.created_at || new Date().toISOString()),
+          }))
+          .filter((e) => {
+            if (seen.has(e.id)) return false;
+            seen.add(e.id);
+            return true;
+          }) as Empresa[];
         setEmpresas(list);
       }
     };
-    loadFromServer().then(loadUserCompany);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadFromServer();
   }, []);
 
   const filtered = empresas.filter((e) =>
@@ -178,6 +151,7 @@ const Empresas = () => {
     setNovaTamanho("");
     setNovaAreaAtuacao("");
     setNovaContexto("");
+    window.dispatchEvent(new CustomEvent("empresas:refresh"));
     toast({ title: "Empresa cadastrada", description: "A empresa foi criada e vinculada à sua conta." });
 
   };
