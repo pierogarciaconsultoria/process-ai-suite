@@ -1,97 +1,45 @@
-## Plano: Módulo de Documentação do Processo
+## Diagnóstico
 
-### Objetivo
+Reproduzi a chamada `POST /org-onboarding` e ela responde **200** com:
 
-Evoluir `Configurações > Documentação do Processo` para uma central configurável de modelos documentais, capaz de:
+```json
+{ "empresa": { "id": "temp-1779108782594", "note": "Fallback sem persistência..." } }
+```
 
-- parametrizar templates, seções, prompts, variáveis, anexos, aprovação e versionamento;
-- gerar documentos a partir de `processo mapeado` ou `descrição livre`;
-- salvar os documentos em estrutura preparada para futura evolução para `Gestão de Documentos` com capacidades de consulta inteligente.
+A última empresa real no banco é de 2026-04-03. Nada novo desde então — mesmo a função respondendo 200.
 
-### Escopo incremental implementado agora
+**Causa raiz:** a edge function `supabase/functions/org-onboarding/index.ts` envolve cada operação (`select existing`, `insert empresa`, `insert membros`, `select empresa`) em um bloco que, no menor erro, devolve um objeto falso com `id: "temp-..."` e mensagem "Fallback sem persistência". O frontend (`Empresas.tsx`) confia nesse retorno, faz `setEmpresas(prev => [e, ...prev])` e exibe a empresa só em memória. Ao recarregar, `org-list` não traz nada porque o insert nunca aconteceu.
 
-#### 1. Planejamento e arquitetura
+Esse fallback foi pensado para "quando o schema ainda não existe", mas hoje o schema existe e o fallback está mascarando o erro real (provavelmente RLS, JWT ou cache de schema). O resultado é a empresa aparecer momentaneamente e depois sumir, exatamente como você descreveu.
 
-- Consolidar a arquitetura do módulo neste arquivo.
-- Manter o card atual `Documentação do Processo` e reaproveitar a rota já existente.
-- Centralizar defaults, tipos e comportamento inicial em um arquivo de configuração do frontend.
+## Plano
 
-#### 2. Frontend
+### 1. Remover todos os fallbacks silenciosos em `org-onboarding/index.ts`
+- Eliminar os blocos `if (existingErr) { return {empresa: temp-...} }`, `if (createErr) {...}`, `if (empFetchErr) {...}` e o catch final com `id: temp-...`.
+- Em qualquer erro real do Supabase, retornar `4xx/500` com `{ error, code, details, hint }` para o frontend ver e logar.
+- Manter logs (`console.error`) com `user.id`, payload e erro completo para aparecerem em `edge function logs`.
 
-- Transformar a página `ConfigDocumentacaoProcesso` em uma tela completa com abas:
-  - `Modelos`
-  - `Estrutura`
-  - `Prompts e IA`
-  - `Variáveis`
-  - `Anexos`
-  - `Aprovação e Versionamento`
-  - `Integração com Documentos Inteligentes`
-- Adicionar ação `Novo Documento` com duas rotas de geração:
-  - a partir de processo mapeado;
-  - a partir de descrição livre.
-- Permitir prévia, edição e salvamento incremental do documento gerado.
+### 2. Garantir contexto de auth correto
+- Validar que o `Authorization: Bearer <jwt>` chega na função (rejeitar 401 se faltar, em vez de seguir).
+- Confirmar `owner_id = user.id` no insert (já está, mas será reforçado após remover fallback).
 
-#### 3. Backend e banco
+### 3. Ajustar o frontend `src/pages/Empresas.tsx`
+- Tratar erro do `supabase.functions.invoke`: mostrar `toast` com a mensagem real do servidor.
+- Após sucesso, em vez de só dar `setEmpresas([e, ...prev])` com o retorno, re-buscar via `org-list` para garantir que veio do banco (ou ao menos checar se `e.id` não começa com `temp-` — defensivo durante a transição).
 
-- Criar migration para tabelas documentais:
-  - `document_templates`
-  - `document_template_sections`
-  - `document_template_prompts`
-  - `document_template_variables`
-  - `document_generation_settings`
-  - `generated_documents`
-  - `generated_document_versions`
-  - `generated_document_attachments`
-  - `document_chunks`
-- Aplicar RLS multitenant:
-  - leitura isolada por empresa;
-  - templates globais do sistema apenas em leitura;
-  - edição/publicação restrita a perfis com permissão.
-- Registrar edge function segura para geração via IA sem expor chaves no frontend.
+### 4. Redeploy + reteste
+- Deploy de `org-onboarding`.
+- Rodar `curl_edge_functions` com um nome novo e confirmar `id` UUID real.
+- `SELECT` em `empresas` confirmando o registro.
+- Se aparecer erro RLS/JWT no retorno, corrigir na sequência (provável causa: cache de schema da PostgREST ou política — será endereçado assim que o erro real for visível).
 
-### Fluxos principais
+### 5. (Opcional, depois) Considerar insert direto pelo client
+- Como existe RLS válida (`owner_id = auth.uid()`), o frontend pode futuramente fazer `supabase.from("empresas").insert(...)` direto, eliminando a edge function. Não está no escopo desta correção, mas reduz superfície de falha.
 
-#### A. Documento a partir de processo mapeado
+## Arquivos a alterar
+- `supabase/functions/org-onboarding/index.ts` — remover fallbacks, propagar erros.
+- `src/pages/Empresas.tsx` — exibir erro real no toast e revalidar lista após criar.
 
-1. Usuário abre `Novo Documento`.
-2. Seleciona `A partir de processo mapeado`.
-3. Escolhe processo e template.
-4. Seleciona seções ou usa as ativas por padrão.
-5. Sistema monta payload com dados estruturados do processo.
-6. Edge function gera markdown com base no template.
-7. Usuário revisa, ajusta e salva.
-
-#### B. Documento a partir de descrição livre
-
-1. Usuário abre `Novo Documento`.
-2. Seleciona `A partir de descrição livre`.
-3. Preenche formulário assistido.
-4. Sistema envia payload de descrição + template para a edge function.
-5. IA retorna markdown estruturado.
-6. Usuário revisa, ajusta e salva.
-
-### Arquivos-alvo
-
-| Arquivo | Papel |
-|---------|-------|
-| `src/pages/ConfigDocumentacaoProcesso.tsx` | Tela principal com abas e modal de criação |
-| `src/data/documentation-config.ts` | Tipos, defaults e helpers do módulo |
-| `supabase/functions/ai-generate-document/index.ts` | Geração segura de documentos com IA |
-| `supabase/config.toml` | Registro da nova edge function |
-| `supabase/migrations/*_document_management.sql` | Estrutura e RLS do módulo |
-
-### Decisões arquiteturais
-
-- `company_id` e `created_by` são obrigatórios em documentos persistidos.
-- `process_id` e `process_mapping_id` permanecem opcionais.
-- Como o projeto ainda não possui uma tabela relacional oficial de processos, os campos de processo no módulo documental ficam preparados de forma compatível e opcional.
-- O frontend usa persistência local como camada incremental de UX, sem impedir a futura troca por persistência 100% no banco.
-- O documento final é salvo em `markdown`, com metadados suficientes para futura chunkização, embeddings e consulta inteligente.
-
-### Próximos passos após esta entrega
-
-- Conectar o CRUD da tela diretamente às novas tabelas do Supabase.
-- Implementar importação real de anexos para storage.
-- Conectar documentos gerados aos processos persistidos quando o módulo de processos tiver IDs relacionáveis no banco.
-- Adicionar visualização de versões anteriores e fluxo real de aprovação/publicação.
-- Evoluir para indexação/chunks/embeddings no módulo futuro de gestão documental.
+## Entregável
+- Criar uma empresa pela UI persiste em `public.empresas` e permanece após reload.
+- Qualquer falha futura aparece como erro claro (toast + log da edge function), sem "empresa fantasma".

@@ -129,25 +129,57 @@ const Empresas = () => {
         segmento: novaSegmento.trim() || null,
         tamanho: novaTamanho.trim() || null,
         area_atuacao: novaAreaAtuacao.trim() || null,
-        contexto: novaContexto.trim() || null
+        contexto: novaContexto.trim() || null,
       },
     });
     setLoadingCreate(false);
-    if (error) {
-      toast({ title: "Erro ao cadastrar", description: error.message, variant: "destructive" });
+
+    // supabase.functions.invoke devolve `error` mas não o body do erro;
+    // o servidor agora retorna {error, message, ...} em status 4xx/5xx.
+    const serverError = (data as { error?: string; message?: string } | null)?.error;
+    if (error || serverError) {
+      const description = serverError
+        ? `${serverError}${(data as { message?: string })?.message ? ` — ${(data as { message?: string }).message}` : ""}`
+        : error?.message || "Erro desconhecido ao cadastrar empresa.";
+      toast({ title: "Erro ao cadastrar", description, variant: "destructive" });
       return;
     }
-    if (data?.empresa) {
-      const e = data.empresa as Empresa;
-      setEmpresas((prev) => [e, ...prev]);
-      setOpen(false);
-      setNovaNome("");
-      setNovaSegmento("");
-      setNovaTamanho("");
-      setNovaAreaAtuacao("");
-      setNovaContexto("");
-      toast({ title: "Empresa cadastrada", description: "A empresa foi criada e vinculada à sua conta." });
+
+    const created = (data as { empresa?: Empresa })?.empresa;
+    if (!created || !created.id || created.id.startsWith("temp-")) {
+      toast({
+        title: "Empresa não foi persistida",
+        description: "O servidor não retornou um registro válido. Verifique os logs.",
+        variant: "destructive",
+      });
+      return;
     }
+
+    // Revalida a partir do servidor para garantir consistência
+    const { data: listData } = await supabase.functions.invoke("org-list");
+    if (Array.isArray(listData)) {
+      const list = (listData as Array<Record<string, unknown>>).map((e) => ({
+        id: String(e.id),
+        nome: String(e.nome),
+        segmento: String(e.segmento || ""),
+        tamanho: String(e.tamanho || ""),
+        area_atuacao: String(e.area_atuacao || ""),
+        contexto: String(e.contexto || ""),
+        data_cadastro: String(e.created_at || new Date().toISOString()),
+      })) as Empresa[];
+      setEmpresas(list);
+    } else {
+      setEmpresas((prev) => [created, ...prev]);
+    }
+
+    setOpen(false);
+    setNovaNome("");
+    setNovaSegmento("");
+    setNovaTamanho("");
+    setNovaAreaAtuacao("");
+    setNovaContexto("");
+    toast({ title: "Empresa cadastrada", description: "A empresa foi criada e vinculada à sua conta." });
+
   };
 
   return (
