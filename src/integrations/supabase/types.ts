@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_configurations: {
+        Row: {
+          company_id: string
+          config_type: string
+          content: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          config_type: string
+          content: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          config_type?: string
+          content?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chamado_mensagens: {
         Row: {
           anexo_url: string | null
@@ -113,7 +148,7 @@ export type Database = {
           created_at: string
           email: string
           empresa_id: string
-          expires_at: string
+          expires_at: string | null
           id: string
           perfil: string
           revoked_at: string | null
@@ -128,7 +163,7 @@ export type Database = {
           created_at?: string
           email: string
           empresa_id: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
           perfil: string
           revoked_at?: string | null
@@ -143,7 +178,7 @@ export type Database = {
           created_at?: string
           email?: string
           empresa_id?: string
-          expires_at?: string
+          expires_at?: string | null
           id?: string
           perfil?: string
           revoked_at?: string | null
@@ -156,74 +191,6 @@ export type Database = {
           {
             foreignKeyName: "convites_empresa_id_fkey"
             columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      empresas: {
-        Row: {
-          area_atuacao: string | null
-          contexto: string | null
-          created_at: string
-          id: string
-          nome: string
-          owner_id: string
-          segmento: string | null
-          tamanho: string | null
-        }
-        Insert: {
-          area_atuacao?: string | null
-          contexto?: string | null
-          created_at?: string
-          id?: string
-          nome: string
-          owner_id: string
-          segmento?: string | null
-          tamanho?: string | null
-        }
-        Update: {
-          area_atuacao?: string | null
-          contexto?: string | null
-          created_at?: string
-          id?: string
-          nome?: string
-          owner_id?: string
-          segmento?: string | null
-          tamanho?: string | null
-        }
-        Relationships: []
-      }
-      ai_configurations: {
-        Row: {
-          company_id: string
-          config_type: string
-          content: string
-          id: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          company_id: string
-          config_type: string
-          content: string
-          id?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          company_id?: string
-          config_type?: string
-          content?: string
-          id?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_configurations_company_id_fkey"
-            columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "empresas"
             referencedColumns: ["id"]
@@ -322,7 +289,7 @@ export type Database = {
           {
             foreignKeyName: "document_generation_settings_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
@@ -592,6 +559,39 @@ export type Database = {
           },
         ]
       }
+      empresas: {
+        Row: {
+          area_atuacao: string | null
+          contexto: string | null
+          created_at: string
+          id: string
+          nome: string
+          owner_id: string
+          segmento: string | null
+          tamanho: string | null
+        }
+        Insert: {
+          area_atuacao?: string | null
+          contexto?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          owner_id: string
+          segmento?: string | null
+          tamanho?: string | null
+        }
+        Update: {
+          area_atuacao?: string | null
+          contexto?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          owner_id?: string
+          segmento?: string | null
+          tamanho?: string | null
+        }
+        Relationships: []
+      }
       generated_document_attachments: {
         Row: {
           company_id: string
@@ -698,11 +698,11 @@ export type Database = {
         Row: {
           ai_model: string | null
           ai_prompt_used: string | null
+          approval_history: Json
           approved_at: string | null
           approved_by: string | null
           approver_name: string | null
           approver_role: string | null
-          approval_history: Json
           archived_at: string | null
           area: string | null
           code: string | null
@@ -722,10 +722,10 @@ export type Database = {
           linked_map_approved_at: string | null
           linked_map_revision: string | null
           map_version_label: string | null
+          procedure_category: string | null
           process_id: string | null
           process_mapping_id: string | null
           process_name: string | null
-          procedure_category: string | null
           published_at: string | null
           review_history: Json
           revision: string
@@ -740,11 +740,11 @@ export type Database = {
         Insert: {
           ai_model?: string | null
           ai_prompt_used?: string | null
+          approval_history?: Json
           approved_at?: string | null
           approved_by?: string | null
           approver_name?: string | null
           approver_role?: string | null
-          approval_history?: Json
           archived_at?: string | null
           area?: string | null
           code?: string | null
@@ -764,10 +764,10 @@ export type Database = {
           linked_map_approved_at?: string | null
           linked_map_revision?: string | null
           map_version_label?: string | null
+          procedure_category?: string | null
           process_id?: string | null
           process_mapping_id?: string | null
           process_name?: string | null
-          procedure_category?: string | null
           published_at?: string | null
           review_history?: Json
           revision?: string
@@ -782,11 +782,11 @@ export type Database = {
         Update: {
           ai_model?: string | null
           ai_prompt_used?: string | null
+          approval_history?: Json
           approved_at?: string | null
           approved_by?: string | null
           approver_name?: string | null
           approver_role?: string | null
-          approval_history?: Json
           archived_at?: string | null
           area?: string | null
           code?: string | null
@@ -806,10 +806,10 @@ export type Database = {
           linked_map_approved_at?: string | null
           linked_map_revision?: string | null
           map_version_label?: string | null
+          procedure_category?: string | null
           process_id?: string | null
           process_mapping_id?: string | null
           process_name?: string | null
-          procedure_category?: string | null
           published_at?: string | null
           review_history?: Json
           revision?: string
@@ -882,143 +882,6 @@ export type Database = {
           },
         ]
       }
-      processos: {
-        Row: {
-          analista: string
-          area: string
-          areas_envolvidas: string
-          bpmn_as_is: string
-          bpmn_to_be: string
-          classificacao: string
-          cliente_processo: string
-          company_id: string
-          created_at: string
-          created_by: string | null
-          criticidade: string
-          data_mapeamento: string
-          decisoes: string
-          diagnostico: Json | null
-          entradas: Json
-          entrevistados: string
-          etapas: Json
-          gatilho: string
-          id: string
-          indicadores: Json
-          interview_messages: Json
-          interview_session_id: string | null
-          mapa_aprovado_em: string | null
-          mapa_revisao: string
-          nome: string
-          objetivo: string
-          obsolete_at: string | null
-          oportunidades_melhoria: string
-          plano_acao: Json
-          problemas: Json
-          problemas_texto: string
-          published_at: string | null
-          recursos: string
-          responsavel: string
-          riscos: Json
-          riscos_texto: string
-          saidas: Json
-          status: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          analista?: string
-          area?: string
-          areas_envolvidas?: string
-          bpmn_as_is?: string
-          bpmn_to_be?: string
-          classificacao?: string
-          cliente_processo?: string
-          company_id: string
-          created_at?: string
-          created_by?: string | null
-          criticidade?: string
-          data_mapeamento?: string
-          decisoes?: string
-          diagnostico?: Json | null
-          entradas?: Json
-          entrevistados?: string
-          etapas?: Json
-          gatilho?: string
-          id?: string
-          indicadores?: Json
-          interview_messages?: Json
-          interview_session_id?: string | null
-          mapa_aprovado_em?: string | null
-          mapa_revisao?: string
-          nome?: string
-          objetivo?: string
-          obsolete_at?: string | null
-          oportunidades_melhoria?: string
-          plano_acao?: Json
-          problemas?: Json
-          problemas_texto?: string
-          published_at?: string | null
-          recursos?: string
-          responsavel?: string
-          riscos?: Json
-          riscos_texto?: string
-          saidas?: Json
-          status?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          analista?: string
-          area?: string
-          areas_envolvidas?: string
-          bpmn_as_is?: string
-          bpmn_to_be?: string
-          classificacao?: string
-          cliente_processo?: string
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          criticidade?: string
-          data_mapeamento?: string
-          decisoes?: string
-          diagnostico?: Json | null
-          entradas?: Json
-          entrevistados?: string
-          etapas?: Json
-          gatilho?: string
-          id?: string
-          indicadores?: Json
-          interview_messages?: Json
-          interview_session_id?: string | null
-          mapa_aprovado_em?: string | null
-          mapa_revisao?: string
-          nome?: string
-          objetivo?: string
-          obsolete_at?: string | null
-          oportunidades_melhoria?: string
-          plano_acao?: Json
-          problemas?: Json
-          problemas_texto?: string
-          published_at?: string | null
-          recursos?: string
-          responsavel?: string
-          riscos?: Json
-          riscos_texto?: string
-          saidas?: Json
-          status?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "processos_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       membros: {
         Row: {
           created_at: string
@@ -1060,6 +923,15 @@ export type Database = {
     }
     Functions: {
       get_user_empresa_ids: { Args: { _user_id: string }; Returns: string[] }
+      user_can_manage_company: {
+        Args: { _empresa_id: string }
+        Returns: boolean
+      }
+      user_can_manage_documentation: {
+        Args: { _empresa_id: string }
+        Returns: boolean
+      }
+      user_empresa_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
