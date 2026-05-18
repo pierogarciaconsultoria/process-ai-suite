@@ -7,6 +7,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,46 +21,52 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+
+    if (!token) {
+      return json({ error: "Não autenticado (token ausente)" }, 401);
+    }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Supabase anon key não configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      console.error("[org-onboarding] missing SUPABASE_URL or SUPABASE_ANON_KEY");
+      return json({ error: "Configuração ausente no servidor" }, 500);
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    const { data: userRes } = await supabase.auth.getUser();
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr) {
+      console.error("[org-onboarding] auth.getUser error:", userErr);
+      return json({ error: "Não autenticado", details: userErr.message }, 401);
+    }
     const user = userRes?.user;
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "Não autenticado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return json({ error: "Não autenticado" }, 401);
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const nomeRaw = body?.nome ?? body?.empresaNome;
     const nome = typeof nomeRaw === "string" ? nomeRaw.trim() : "";
     const segmento = body?.segmento ? String(body.segmento).trim() : null;
     const tamanho = body?.tamanho ? String(body.tamanho).trim() : null;
     const area_atuacao = body?.area_atuacao ? String(body.area_atuacao).trim() : null;
     const contexto = body?.contexto ? String(body.contexto).trim() : null;
-    const perfil = body?.perfil && ["admin","gestor","analista"].includes(String(body.perfil)) ? String(body.perfil) : "admin";
+    const perfil =
+      body?.perfil && ["admin", "gestor", "analista"].includes(String(body.perfil))
+        ? String(body.perfil)
+        : "admin";
 
     if (!nome) {
-      return new Response(
-        JSON.stringify({ error: "Nome da empresa é obrigatório" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return json({ error: "Nome da empresa é obrigatório" }, 400);
     }
 
+    // 1) Verifica se já existe empresa com mesmo nome para este owner
     const { data: existing, error: existingErr } = await supabase
       .from("empresas")
       .select("id, nome")
@@ -61,45 +74,48 @@ serve(async (req) => {
       .eq("nome", nome)
       .limit(1)
       .maybeSingle();
-    if (existingErr) {
-      const empresa = {
-        id: `temp-${Date.now()}`,
-        nome,
-        segmento,
-        tamanho,
-        area_atuacao,
-        contexto,
-        owner_id: user.id,
-        created_at: new Date().toISOString(),
-        note: "Fallback sem persistência: aplique migrações do banco para ativar empresas.",
-      };
-      return new Response(JSON.stringify({ empresa }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    let empresaId = existing?.id;
 
+    if (existingErr) {
+      console.error("[org-onboarding] select existing error:", existingErr);
+      return json(
+        {
+          error: "Erro ao consultar empresa existente",
+          code: existingErr.code,
+          message: existingErr.message,
+          details: existingErr.details,
+          hint: existingErr.hint,
+        },
+        500,
+      );
+    }
+
+    let empresaId = existing?.id as string | undefined;
+
+    // 2) Insere se não existir
     if (!empresaId) {
       const { data: empresaCreated, error: createErr } = await supabase
         .from("empresas")
         .insert({ nome, segmento, tamanho, area_atuacao, contexto, owner_id: user.id })
-        .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
+        .select("id")
         .single();
-      if (createErr) {
-        const empresa = {
-          id: `temp-${Date.now()}`,
-          nome,
-          segmento,
-          tamanho,
-          area_atuacao,
-          contexto,
-          owner_id: user.id,
-          created_at: new Date().toISOString(),
-          note: "Fallback sem persistência: aplique migrações do banco para ativar empresas.",
-        };
-        return new Response(JSON.stringify({ empresa }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      if (createErr || !empresaCreated) {
+        console.error("[org-onboarding] insert empresa error:", createErr, "user:", user.id);
+        return json(
+          {
+            error: "Erro ao criar empresa",
+            code: createErr?.code,
+            message: createErr?.message,
+            details: createErr?.details,
+            hint: createErr?.hint,
+          },
+          400,
+        );
       }
       empresaId = empresaCreated.id;
     }
 
+    // 3) Garante membership (idempotente)
     const { data: membership, error: memSelErr } = await supabase
       .from("membros")
       .select("id")
@@ -108,58 +124,42 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
+    if (memSelErr) {
+      console.error("[org-onboarding] select membros error:", memSelErr);
+    }
+
     if (!memSelErr && !membership) {
       const { error: memberErr } = await supabase
         .from("membros")
         .insert({ user_id: user.id, empresa_id: empresaId, perfil, invited_by: user.id });
       if (memberErr) {
-        // ignora erro de membros em fallback
+        console.error("[org-onboarding] insert membros error:", memberErr);
       }
     }
 
+    // 4) Retorna a empresa final
     const { data: empresa, error: empFetchErr } = await supabase
       .from("empresas")
       .select("id, nome, segmento, tamanho, area_atuacao, contexto, owner_id, created_at")
       .eq("id", empresaId)
       .single();
 
-    if (empFetchErr) {
-      const fallbackEmpresa = {
-        id: empresaId,
-        nome,
-        segmento,
-        tamanho,
-        area_atuacao,
-        contexto,
-        owner_id: user.id,
-        created_at: new Date().toISOString(),
-        note: "Fallback sem persistência: aplique migrações do banco para ativar empresas.",
-      };
-      return new Response(JSON.stringify({ empresa: fallbackEmpresa }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (empFetchErr || !empresa) {
+      console.error("[org-onboarding] fetch empresa error:", empFetchErr);
+      return json(
+        {
+          error: "Empresa criada mas não pôde ser lida",
+          code: empFetchErr?.code,
+          message: empFetchErr?.message,
+        },
+        500,
+      );
     }
 
-    return new Response(JSON.stringify({ empresa }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ empresa });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (/Could not find the table|schema cache/i.test(msg)) {
-      const empresa = {
-        id: `temp-${Date.now()}`,
-        nome: "Empresa temporária",
-        segmento: null,
-        tamanho: null,
-        area_atuacao: null,
-        contexto: null,
-        owner_id: "unknown",
-        created_at: new Date().toISOString(),
-        note: "Fallback sem persistência: aplique migrações do banco (empresas/membros).",
-      };
-      return new Response(JSON.stringify({ empresa }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    return new Response(JSON.stringify({ error: msg || "Erro desconhecido" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[org-onboarding] unhandled error:", msg);
+    return json({ error: msg || "Erro desconhecido" }, 500);
   }
 });
