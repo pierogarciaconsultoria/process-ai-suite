@@ -30,11 +30,7 @@ const OPENAI_ASSISTANTS_HEADERS = (apiKey: string) => ({
   "OpenAI-Beta": "assistants=v2",
 });
 
-async function openAiAssistantsRequest<T>(
-  apiKey: string,
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+async function openAiAssistantsRequest<T>(apiKey: string, path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`https://api.openai.com/v1${path}`, {
     ...init,
     headers: {
@@ -48,14 +44,10 @@ async function openAiAssistantsRequest<T>(
     throw new Error(`OpenAI Assistants API error ${response.status}: ${text}`);
   }
 
-  return await response.json() as T;
+  return (await response.json()) as T;
 }
 
-async function pollRunUntilCompleted(
-  apiKey: string,
-  threadId: string,
-  runId: string,
-) {
+async function pollRunUntilCompleted(apiKey: string, threadId: string, runId: string) {
   const startedAt = Date.now();
   const timeoutMs = 60_000;
   const intervalMs = 1_000;
@@ -185,7 +177,11 @@ Quando necessário, incentive exemplos concretos, detalhe operacional e contexto
       if (skinIdentityRaw) {
         try {
           const parsedSkin = JSON.parse(skinIdentityRaw);
-          if (parsedSkin && typeof parsedSkin === "object" && ("nome" in parsedSkin || "tom" in parsedSkin || "estilo" in parsedSkin)) {
+          if (
+            parsedSkin &&
+            typeof parsedSkin === "object" &&
+            ("nome" in parsedSkin || "tom" in parsedSkin || "estilo" in parsedSkin)
+          ) {
             const nome = typeof parsedSkin.nome === "string" ? parsedSkin.nome : "Peter";
             const tom = typeof parsedSkin.tom === "string" ? parsedSkin.tom : "consultivo, humano e didático";
             const estilo = typeof parsedSkin.estilo === "string" ? parsedSkin.estilo : "profissional e acolhedor";
@@ -307,11 +303,12 @@ Orientações de preenchimento:
 - Quando o usuário disser que não existem indicadores ou plano de ação, use partialUpdate para propor sugestões úteis e realistas, em vez de encerrar com campos vazios.`;
 
     const sanitizedHistory = (history as InterviewMessage[])
-      .filter((message) =>
-        message &&
-        (message.role === "user" || message.role === "assistant") &&
-        typeof message.content === "string" &&
-        message.content.trim().length > 0,
+      .filter(
+        (message) =>
+          message &&
+          (message.role === "user" || message.role === "assistant") &&
+          typeof message.content === "string" &&
+          message.content.trim().length > 0,
       )
       .slice(-30);
 
@@ -335,7 +332,6 @@ Orientações de preenchimento:
       body: JSON.stringify({
         assistant_id: OPENAI_ASSISTANT_ID,
         additional_instructions: systemPrompt,
-        response_format: { type: "json_object" },
       }),
     });
 
@@ -348,13 +344,20 @@ Orientações de preenchimento:
     );
 
     let content = extractAssistantText(messages.data || []);
-    content = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    content = content
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
 
     let parsed;
     try {
       parsed = JSON.parse(content);
     } catch {
-      parsed = { nextQuestion: content || "Descreva brevemente o objetivo do processo.", partialUpdate: {}, done: false };
+      parsed = {
+        nextQuestion: content || "Descreva brevemente o objetivo do processo.",
+        partialUpdate: {},
+        done: false,
+      };
     }
 
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
