@@ -34,6 +34,8 @@ interface BPMNCanvasProps {
   readOnly?: boolean;
   formData?: ProcessoFormData;
   mode?: "as-is" | "to-be";
+  companyId: string;
+  processId?: string | null;
 }
 
 interface BpmnCanvas {
@@ -48,7 +50,7 @@ interface BpmnInstance {
   destroy(): void;
 }
 
-export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, mode = "as-is" }: BPMNCanvasProps) {
+export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, mode = "as-is", companyId, processId }: BPMNCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bpmnInstanceRef = useRef<BpmnInstance | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -184,6 +186,8 @@ export default function BPMNCanvas({ xml, onChange, readOnly = false, formData, 
           resumo: formData.objetivo,
           mode,
           oportunidadesMelhoria: mode === "to-be" ? formData.oportunidadesMelhoria : undefined,
+          company_id: companyId,
+          process_id: processId,
         },
       });
 

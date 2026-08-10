@@ -52,7 +52,7 @@ const ConfigSkinIA = () => {
     try {
       const roteiro = routeScriptConfig.content || "";
       const { data, error } = await supabase.functions.invoke("ai-review-config", {
-        body: { roteiro, skin: buildAiSkinPayload(skin, validationRules) },
+        body: { roteiro, skin: buildAiSkinPayload(skin, validationRules), company_id: identityConfig.companyId },
       });
       if (error) throw error;
       if (data?.error) {

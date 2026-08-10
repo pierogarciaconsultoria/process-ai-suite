@@ -176,6 +176,7 @@ const ProcessoFormulario = () => {
   const [currentRevision, setCurrentRevision] = useState("Rev.00");
   const [currentApprovedAt, setCurrentApprovedAt] = useState<string | null>(null);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<"forbidden" | "not_found" | "load_error" | null>(null);
 
   const globalSteps = [
     "Novo processo",
@@ -204,7 +205,16 @@ const ProcessoFormulario = () => {
       setCurrentProcessId(prefillState.processId);
     }
 
-    if (!companyId) return;
+    if (!companyId) {
+      if (!routeScriptConfig.isLoading) {
+        setLoadError("forbidden");
+        setInitialDataLoaded(true);
+      }
+      return;
+    }
+
+    setLoadError(null);
+    setInitialDataLoaded(false);
 
     const loadInitialData = async () => {
       if (currentProcessId) {
@@ -229,8 +239,15 @@ const ProcessoFormulario = () => {
             setInitialDataLoaded(true);
             return;
           }
+          setLoadError("not_found");
+          setInitialDataLoaded(true);
+          return;
         } catch (error) {
           console.error("Erro ao carregar processo:", error);
+          const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+          setLoadError(code === "42501" ? "forbidden" : "load_error");
+          setInitialDataLoaded(true);
+          return;
         }
       }
 
@@ -267,21 +284,10 @@ const ProcessoFormulario = () => {
     };
 
     void loadInitialData();
-  }, [companyId, currentProcessId, isEditing, prefillState]);
+  }, [companyId, currentProcessId, isEditing, prefillState, routeScriptConfig.isLoading]);
 
   const tabIndex = ALL_TABS.indexOf(activeTab);
   const activePhase = getPhaseForTab(activeTab);
-
-  if (!initialDataLoaded) {
-    return (
-      <div className="flex min-h-[320px] items-center justify-center text-muted-foreground">
-        <span className="inline-flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando dados do processo...
-        </span>
-      </div>
-    );
-  }
 
   // ── Field helpers ──
   const updateField = <K extends keyof ProcessoFormData>(key: K, value: ProcessoFormData[K]) => {
@@ -473,6 +479,7 @@ const ProcessoFormulario = () => {
         body: { 
           processoData: form,
           company_id: companyId,
+          process_id: savedProcess.id,
         } 
       });
       if (error) throw error;
@@ -509,6 +516,40 @@ const ProcessoFormulario = () => {
       setIsSaving(false);
     }
   }, [form, isSaving, navigate, saveProcessRecord, toast]);
+
+  if (!initialDataLoaded) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando dados do processo...
+        </span>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    const forbidden = loadError === "forbidden";
+    const notFound = loadError === "not_found";
+    return (
+      <div className="flex min-h-[320px] items-center justify-center p-6">
+        <div className="max-w-md text-center">
+          <div className="text-4xl font-bold text-destructive">{forbidden ? "403" : notFound ? "404" : "!"}</div>
+          <h1 className="mt-3 text-xl font-semibold">
+            {forbidden ? "Acesso negado" : notFound ? "Processo não encontrado" : "Falha ao carregar processo"}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {forbidden
+              ? "Você não possui permissão para acessar este processo."
+              : notFound
+                ? "O processo não existe ou não pertence à empresa ativa."
+                : "Não foi possível confirmar o acesso ao processo. Tente novamente."}
+          </p>
+          <Button className="mt-5" onClick={() => navigate("/processos")}>Voltar para processos</Button>
+        </div>
+      </div>
+    );
+  }
 
   // ── Tab content renderers ──
 
@@ -839,6 +880,8 @@ const ProcessoFormulario = () => {
                             saidas: form.saidas,
                             nomeProcesso: form.nomeProcesso,
                             mode: "as-is",
+                            company_id: companyId,
+                            process_id: currentProcessId,
                           },
                         });
                         if (error) throw error;
@@ -871,6 +914,8 @@ const ProcessoFormulario = () => {
               onChange={(xml) => updateField("bpmnAsIs", xml)}
               formData={form}
               mode="as-is"
+              companyId={companyId!}
+              processId={currentProcessId}
             />
           </div>
         );
@@ -928,6 +973,8 @@ const ProcessoFormulario = () => {
               onChange={(xml) => updateField("bpmnToBe", xml)}
               formData={form}
               mode="to-be"
+              companyId={companyId!}
+              processId={currentProcessId}
             />
           </div>
         );

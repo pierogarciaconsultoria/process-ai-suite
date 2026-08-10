@@ -8,6 +8,8 @@ import { MessageCircle } from "lucide-react";
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
 const SupportWidget = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authResolved, setAuthResolved] = useState(false);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,6 +26,30 @@ const SupportWidget = () => {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
+
+  useEffect(() => {
+    let active = true;
+    let authEventReceived = false;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active && !authEventReceived) {
+        setIsAuthenticated(Boolean(data.session));
+        setAuthResolved(true);
+      }
+    }).catch(() => {
+      if (active && !authEventReceived) setAuthResolved(true);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active) {
+        authEventReceived = true;
+        setIsAuthenticated(Boolean(session));
+        setAuthResolved(true);
+      }
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   const send = async () => {
     if (!input.trim() || loading) return;
@@ -47,6 +73,8 @@ const SupportWidget = () => {
       setLoading(false);
     }
   };
+
+  if (!authResolved || !isAuthenticated) return null;
 
   return (
     <>
@@ -93,4 +121,3 @@ const SupportWidget = () => {
 };
 
 export default SupportWidget;
-

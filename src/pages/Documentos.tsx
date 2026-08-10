@@ -141,7 +141,7 @@ function markdownToHtml(markdown: string) {
     .replace(/^### (.*)$/gm, "<h3>$1</h3>")
     .replace(/^## (.*)$/gm, "<h2>$1</h2>")
     .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-    .replace(/^\> (.*)$/gm, "<blockquote>$1</blockquote>")
+    .replace(/^> (.*)$/gm, "<blockquote>$1</blockquote>")
     .replace(/^- (.*)$/gm, "<li>$1</li>")
     .replace(/\n{2,}/g, "</p><p>")
     .replace(/\n/g, "<br />");
@@ -647,6 +647,7 @@ export default function Documentos() {
           : null,
         generationConfig: activeTemplate.promptConfig,
         companyContext,
+        process_id: sourceMode === "linked_process" ? selectedProcessId : null,
       };
       const { data, error } = await supabase.functions.invoke("ai-generate-document", { body: payload });
       if (error) throw error;

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,10 +174,13 @@ serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
+    const { client, user } = await authenticateRequest(req);
     const body = await req.json();
     const processoData = body?.processoData;
-    const companyId = body?.company_id ?? null;
+    const companyId = requireString(body?.company_id, "company_id");
+    const processId = requireString(body?.process_id, "process_id");
+    await authorizeCompany(client, user.id, companyId);
+    await authorizeProcess(client, processId, companyId);
     if (!processoData) {
       return new Response(
         JSON.stringify({ error: "Dados do processo são obrigatórios." }),
@@ -186,18 +189,9 @@ serve(async (req: Request) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(
         JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Supabase não configurado para buscar configurações da IA" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -228,15 +222,13 @@ Quando necessário, incentive exemplos concretos, detalhe operacional e contexto
     let validationRules = DEFAULT_VALIDATION_RULES;
 
     if (companyId) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        global: { headers: { Authorization: authHeader } },
-      });
-
-      const { data: configs } = await supabase
+      const { data: configs, error: configsError } = await client
         .from("ai_configurations")
         .select("config_type, content")
         .eq("company_id", companyId)
         .in("config_type", ["route_script", "skin_identity", "skin_validation"]);
+
+      if (configsError) throw configsError;
 
       const typedConfigs = (configs || []) as Array<{ config_type: string; content: string }>;
       const routeScriptConfig = typedConfigs.find((item) => item.config_type === "route_script")?.content;
@@ -386,9 +378,6 @@ Seja direto, executivo e orientado à melhoria. Sem enrolação. Sempre gere ins
     });
   } catch (e) {
     console.error("ai-diagnose-process error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(e, corsHeaders);
   }
 });

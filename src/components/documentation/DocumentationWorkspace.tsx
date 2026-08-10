@@ -364,7 +364,7 @@ export default function DocumentationWorkspace() {
     };
 
     void loadWorkspace();
-  }, []);
+  }, [toast]);
 
   const activeTemplate = useMemo(
     () => state?.templates.find((template) => template.id === selectedTemplateId) ?? state?.templates[0] ?? null,
@@ -715,6 +715,7 @@ export default function DocumentationWorkspace() {
         manualDescription: documentOrigin === "manual_description" ? manualDescription : null,
         generationConfig: activeTemplate.promptConfig,
         companyContext,
+        process_id: documentOrigin === "mapped_process" ? selectedProcessId : null,
       };
 
       const { data, error } = await supabase.functions.invoke("ai-generate-document", { body: payload });

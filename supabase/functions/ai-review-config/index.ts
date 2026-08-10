@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { authenticateRequest, authorizeCompany, errorResponse, requireString } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +13,10 @@ serve(async (req) => {
   }
 
   try {
+    const { client, user } = await authenticateRequest(req);
     const body = await req.json();
+    const companyId = requireString(body?.company_id, "company_id");
+    await authorizeCompany(client, user.id, companyId, ["admin", "gestor"]);
     const roteiro: string = body?.roteiro || "";
     const skin = body?.skin || null;
 
@@ -115,14 +119,6 @@ Responda SEMPRE em JSON com as chaves:
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(
-      JSON.stringify({
-        error: e instanceof Error ? e.message : "Erro desconhecido",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return errorResponse(e, corsHeaders);
   }
 });

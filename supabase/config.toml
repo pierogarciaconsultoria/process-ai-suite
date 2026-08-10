@@ -1,25 +1,25 @@
 project_id = "owenetohbgzhzwncwzbn"
 
 [functions.ai-fill-process]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-diagnose-process]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-generate-bpmn]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-interview]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-helpcenter]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-review-config]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-summarize-process]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-generate-document]
-verify_jwt = false
+verify_jwt = true

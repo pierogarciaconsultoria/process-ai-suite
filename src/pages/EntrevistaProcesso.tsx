@@ -146,7 +146,6 @@ function EntrevistaProcessoPage() {
         setIsAssistantTyping(false);
       });
     return assistantQueueRef.current;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -517,6 +516,7 @@ function EntrevistaProcessoPage() {
             history: [...messages, userMsg],
             current: form,
             company_id: routeScriptConfig.companyId,
+            process_id: processIdRef.current,
           },
         });
         const hasErrorField = (d: unknown): d is { error: string } =>
@@ -561,6 +561,7 @@ function EntrevistaProcessoPage() {
           history: [...messages, userMsg],
           current: form,
           company_id: routeScriptConfig.companyId,
+          process_id: processIdRef.current,
         },
       });
       const hasErrorField = (d: unknown): d is { error: string } =>
@@ -828,6 +829,7 @@ function EntrevistaProcessoPage() {
           history: [...messages, userMsg],
           current: form,
           company_id: routeScriptConfig.companyId,
+          process_id: processIdRef.current,
         },
       });
       const hasErrorField = (d: unknown): d is { error: string } =>

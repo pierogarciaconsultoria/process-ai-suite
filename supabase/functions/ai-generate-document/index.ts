@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,7 @@ serve(async (req) => {
   }
 
   try {
+    const { client, user } = await authenticateRequest(req);
     const body = await req.json();
     const {
       template,
@@ -36,7 +38,14 @@ serve(async (req) => {
       manualDescription = null,
       generationConfig = null,
       companyContext = null,
+      process_id = null,
     } = body ?? {};
+    const companyId = requireString(companyContext?.companyId, "company_id");
+    await authorizeCompany(client, user.id, companyId);
+    if (mappedProcessData) {
+      const processId = requireString(process_id, "process_id");
+      await authorizeProcess(client, processId, companyId);
+    }
 
     if (!template) {
       return new Response(
@@ -145,9 +154,6 @@ Você deve responder SEMPRE em JSON com as chaves:
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return errorResponse(e, corsHeaders);
   }
 });

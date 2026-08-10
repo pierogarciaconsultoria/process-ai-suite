@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { authenticateRequest, errorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
   try {
+    await authenticateRequest(req);
     const body = await req.json();
     const history = body?.history ?? [];
     const page = body?.page ?? "/";
@@ -90,6 +92,6 @@ Formato: responda em texto simples, com listas curtas quando necessário.`;
     const content = json.choices?.[0]?.message?.content || "Certo. Em que mais posso ajudar?";
     return new Response(JSON.stringify({ answer: content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    return new Response(JSON.stringify({ answer: "Não consegui acessar o mecanismo de IA no momento. Você pode tentar:\n\n1) Verificar conexão e tentar novamente.\n2) Gerar o Relatório em Processos > Novo Processo > FASE 4.\n3) Abrir um chamado em Configurações > Chamados." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return errorResponse(e, corsHeaders);
   }
 });

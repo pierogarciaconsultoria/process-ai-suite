@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,7 @@ serve(async (req) => {
   }
 
   try {
+    const { client, user } = await authenticateRequest(req);
     const {
       etapas,
       decisoes,
@@ -22,7 +24,14 @@ serve(async (req) => {
       mode,
       oportunidadesMelhoria,
       resumo,
+      company_id,
+      process_id,
     } = await req.json();
+    const companyId = requireString(company_id, "company_id");
+    await authorizeCompany(client, user.id, companyId);
+    if (typeof process_id === "string" && process_id.trim()) {
+      await authorizeProcess(client, process_id.trim(), companyId);
+    }
 
     const hasEtapas = Array.isArray(etapas) && etapas.length > 0;
     const hasResumo = typeof resumo === "string" && resumo.trim().length > 0;
@@ -141,9 +150,6 @@ Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
     });
   } catch (e) {
     console.error("ai-generate-bpmn error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse(e, corsHeaders);
   }
 });

@@ -101,7 +101,6 @@ const App = () => (
               <Route path="/configuracoes/chamados" element={<ConfigChamados />} />
               <Route path="/configuracoes/chamados/:id" element={<ChamadoDetalhe />} />
               <Route path="/usuarios" element={<Navigate to="/configuracoes/usuarios" replace />} />
-              <Route path="/empresas" element={<Navigate to="/configuracoes/empresas" replace />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

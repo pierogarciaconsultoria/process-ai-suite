@@ -134,7 +134,7 @@ const ConfigRoteiroEntrevista = () => {
     try {
       const skin = buildAiSkinPayload(skinIdentityConfig.content, skinValidationConfig.content);
       const { data, error } = await supabase.functions.invoke("ai-review-config", {
-        body: { roteiro: content, skin },
+        body: { roteiro: content, skin, company_id: skinIdentityConfig.companyId },
       });
       if (error) throw error;
       if (data?.error) {

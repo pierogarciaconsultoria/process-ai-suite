@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Network, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { safeInternalRedirect } from "@/lib/auth-navigation";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check } from "lucide-react";
@@ -62,8 +63,7 @@ const Login = () => {
 
   const redirectAfterLogin = (() => {
     const redirect = searchParams.get("redirect");
-    if (!redirect || !redirect.startsWith("/")) return "/dashboard";
-    return redirect;
+    return safeInternalRedirect(redirect);
   })();
 
   const handleLogin = async (e: React.FormEvent) => {

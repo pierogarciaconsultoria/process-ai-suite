@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +13,12 @@ serve(async (req) => {
   }
 
   try {
-    const { processoData, customScript, aiSkin } = await req.json();
+    const { client, user } = await authenticateRequest(req);
+    const { processoData, customScript, aiSkin, company_id, process_id } = await req.json();
+    const companyId = requireString(company_id, "company_id");
+    await authorizeCompany(client, user.id, companyId);
+    const processId = requireString(process_id, "process_id");
+    await authorizeProcess(client, processId, companyId);
     if (!processoData) {
       return new Response(
         JSON.stringify({ error: "Dados do processo são obrigatórios para gerar o resumo." }),
@@ -109,9 +115,6 @@ Instruções:
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return errorResponse(e, corsHeaders);
   }
 });
