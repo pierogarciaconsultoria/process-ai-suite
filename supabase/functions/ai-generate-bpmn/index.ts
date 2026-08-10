@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
+import { acquireAiQuota, fetchWithAiQuota } from "../_shared/quota.ts";
+import { runConfiguredAssistant, stripCodeFence } from "../_shared/openai-assistant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +28,7 @@ serve(async (req) => {
       resumo,
       company_id,
       process_id,
+      use_peter_assistant,
     } = await req.json();
     const companyId = requireString(company_id, "company_id");
     await authorizeCompany(client, user.id, companyId);
@@ -94,7 +97,23 @@ ${etapasText}
 
 Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    if (use_peter_assistant === true) {
+      const lease = await acquireAiQuota(client, "ai-generate-bpmn", companyId);
+      try {
+        const content = stripCodeFence(await runConfiguredAssistant(OPENAI_API_KEY, systemPrompt, userPrompt));
+        if (!content.includes("<bpmn:definitions") && !content.includes("<definitions")) {
+          throw new Error("O Peter não retornou um XML BPMN válido.");
+        }
+        return new Response(JSON.stringify({ xml: content }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } finally {
+        await lease.complete(userPrompt.length, Math.max(1, Math.ceil(userPrompt.length / 200)));
+      }
+    }
+
+    const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+    const response = await fetchWithAiQuota(client, "ai-generate-bpmn", companyId, userPrompt.length, `${openAiBaseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,

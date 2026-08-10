@@ -13,28 +13,18 @@ create unique index if not exists empresas_owner_nome_unique on public.empresas 
 
 alter table public.empresas enable row level security;
 
-create policy if not exists empresas_select_by_membership
-  on public.empresas
-  for select
-  using (
-    id in (
-      select empresa_id from public.membros where user_id = auth.uid()
-    )
-    or owner_id = auth.uid()
-  );
-
-create policy if not exists empresas_insert_by_owner
+create policy empresas_insert_by_owner
   on public.empresas
   for insert
   with check (owner_id = auth.uid());
 
-create policy if not exists empresas_update_by_owner
+create policy empresas_update_by_owner
   on public.empresas
   for update
   using (owner_id = auth.uid())
   with check (owner_id = auth.uid());
 
-create policy if not exists empresas_delete_by_owner
+create policy empresas_delete_by_owner
   on public.empresas
   for delete
   using (owner_id = auth.uid());
@@ -51,12 +41,25 @@ create table if not exists public.membros (
 
 alter table public.membros enable row level security;
 
-create policy if not exists membros_select_self
+-- This policy depends on public.membros, so it must be created only after the
+-- membership table exists. Keeping the policy here makes clean local installs
+-- deterministic without changing its authorization semantics.
+create policy empresas_select_by_membership
+  on public.empresas
+  for select
+  using (
+    id in (
+      select empresa_id from public.membros where user_id = auth.uid()
+    )
+    or owner_id = auth.uid()
+  );
+
+create policy membros_select_self
   on public.membros
   for select
   using (user_id = auth.uid());
 
-create policy if not exists membros_select_by_company
+create policy membros_select_by_company
   on public.membros
   for select
   using (
@@ -64,7 +67,7 @@ create policy if not exists membros_select_by_company
       select empresa_id from public.membros where user_id = auth.uid()
     )
   );
-create policy if not exists membros_insert_by_owner
+create policy membros_insert_by_owner
   on public.membros
   for insert
   with check (
@@ -84,7 +87,7 @@ create table if not exists public.convites (
 
 alter table public.convites enable row level security;
 
-create policy if not exists convites_select_by_membership
+create policy convites_select_by_membership
   on public.convites
   for select
   using (
@@ -93,7 +96,7 @@ create policy if not exists convites_select_by_membership
     )
   );
 
-create policy if not exists convites_insert_by_admin_or_owner
+create policy convites_insert_by_admin_or_owner
   on public.convites
   for insert
   with check (

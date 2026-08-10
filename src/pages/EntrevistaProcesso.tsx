@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, Send, ArrowRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Cloud, Loader2, Send, Sparkles } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import {
   buildProcessInsertPayload,
   buildProcessUpdatePayload,
+  mapProcessRowToForm,
   normalizeSavedStatus,
   type ProcessoStatus,
 } from "@/lib/processos";
@@ -80,7 +81,10 @@ function EntrevistaProcessoPage() {
   const FRIENDLY_CONNECTION_ERROR = "Ops, tive um problema de conexão. Pode tentar novamente?";
   const navigate = useNavigate();
   const location = useLocation();
-  const processState = location.state as { processId?: string; formPrefill?: ProcessoFormData } | null;
+  const { id: routeProcessId } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const processState = location.state as { processId?: string; formPrefill?: ProcessoFormData; guidedExperience?: boolean } | null;
+  const guidedExperience = processState?.guidedExperience === true || searchParams.get("guided") === "1";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,7 +95,7 @@ function EntrevistaProcessoPage() {
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
-  const processIdRef = useRef<string | null>(processState?.processId ?? null);
+  const processIdRef = useRef<string | null>(routeProcessId ?? processState?.processId ?? null);
   const processStatusRef = useRef<ProcessoStatus>("Rascunho");
   const assistantQueueRef = useRef<Promise<void>>(Promise.resolve());
   const isMountedRef = useRef(true);
@@ -100,6 +104,12 @@ function EntrevistaProcessoPage() {
   const routeScriptConfig = useAiConfig("route_script");
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [hasInitializedConversation, setHasInitializedConversation] = useState(false);
+  const [isRestoringDraft, setIsRestoringDraft] = useState(Boolean(routeProcessId ?? processState?.processId));
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const saveSequenceRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastSavedSignatureRef = useRef("");
+  const allowNavigationRef = useRef(false);
 
   const steps = [
     "Novo processo",
@@ -117,18 +127,49 @@ function EntrevistaProcessoPage() {
   }, []);
 
   useEffect(() => {
-    try {
-      if (processState?.formPrefill) {
-        setForm(processState.formPrefill);
-        if (processState.formPrefill.entrevistados?.trim()) {
-          setParticipantName(processState.formPrefill.entrevistados.trim());
+    let cancelled = false;
+    const restoreDraft = async () => {
+      try {
+        if (processState?.formPrefill) {
+          setForm(processState.formPrefill);
+          setParticipantName(processState.formPrefill.entrevistados?.trim() || "");
         }
+        const processId = routeProcessId ?? processState?.processId;
+        if (!processId) return;
+        setIsRestoringDraft(true);
+        const { data, error } = await supabase.from("processos").select("*").eq("id", processId).single();
+        if (error || !data) throw error || new Error("Rascunho não encontrado.");
+        if (cancelled) return;
+        const row = data as Tables<"processos">;
+        const restoredForm = mapProcessRowToForm(row);
+        const restoredMessages = Array.isArray(row.interview_messages)
+          ? row.interview_messages as unknown as ChatMessage[]
+          : [];
+        processIdRef.current = row.id;
+        processStatusRef.current = normalizeSavedStatus(row.status, "Rascunho");
+        sessionIdRef.current = row.interview_session_id || sessionIdRef.current;
+        setForm(restoredForm);
+        setMessages(restoredMessages);
+        setParticipantName(restoredForm.entrevistados?.trim() || "");
+        if (restoredMessages.length > 0) {
+          if (!restoredForm.entrevistados.trim()) setStage("askUserName");
+          else if (!restoredForm.nomeProcesso.trim()) setStage("askProcessName");
+          else if (!restoredForm.objetivo.trim() && !restoredForm.etapas.some((item) => item.atividade.trim())) setStage("askDescription");
+          else setStage("aiFlow");
+          setHasInitializedConversation(true);
+        }
+        lastSavedSignatureRef.current = JSON.stringify({ form: restoredForm, messages: restoredMessages });
+        setSaveStatus("saved");
+      } catch (error) {
+        console.error("Erro ao restaurar entrevista:", error);
+        if (!cancelled) setInitializationError("Não foi possível retomar este rascunho.");
+      } finally {
+        if (!cancelled) setIsRestoringDraft(false);
       }
-    } catch (error) {
-      console.error("Erro ao aplicar prefill da entrevista:", error);
-      setInitializationError("Não foi possível carregar os dados iniciais da entrevista.");
-    }
-  }, [processState]);
+    };
+    void restoreDraft();
+    return () => { cancelled = true; };
+  }, [processState?.formPrefill, processState?.processId, routeProcessId]);
 
   const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
   const getAssistantDelay = () =>
@@ -153,7 +194,7 @@ function EntrevistaProcessoPage() {
 
     const initializeConversation = async () => {
       try {
-        if (cancelled || routeScriptConfig.isLoading || hasInitializedConversation) {
+        if (cancelled || isRestoringDraft || routeScriptConfig.isLoading || hasInitializedConversation) {
           return;
         }
 
@@ -185,8 +226,8 @@ function EntrevistaProcessoPage() {
     return () => {
       cancelled = true;
     };
-  }, [enqueueAssistantMessage, hasInitializedConversation, routeScriptConfig.companyId, routeScriptConfig.isLoading]);
-  const persistProcessDraft = async (
+  }, [enqueueAssistantMessage, hasInitializedConversation, isRestoringDraft, routeScriptConfig.companyId, routeScriptConfig.isLoading]);
+  const persistProcessDraft = useCallback(async (
     snapshotForm: ProcessoFormData,
     snapshotMessages: ChatMessage[],
     status: ProcessoStatus = "Rascunho",
@@ -237,6 +278,76 @@ function EntrevistaProcessoPage() {
     processIdRef.current = row.id;
     processStatusRef.current = normalizeSavedStatus(row.status, status);
     return row;
+  }, [routeScriptConfig.companyId]);
+
+  useEffect(() => {
+    if (isRestoringDraft || !hasInitializedConversation || !routeScriptConfig.companyId) return;
+    if (!messages.some((message) => message.role === "user")) return;
+    const signature = JSON.stringify({ form, messages });
+    if (signature === lastSavedSignatureRef.current) return;
+
+    const sequence = ++saveSequenceRef.current;
+    setSaveStatus("saving");
+    const timer = window.setTimeout(() => {
+      const snapshotForm = form;
+      const snapshotMessages = messages;
+      saveQueueRef.current = saveQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const row = await persistProcessDraft(snapshotForm, snapshotMessages, "Rascunho");
+          if (!row) throw new Error("Usuário ou empresa não identificados para o salvamento automático.");
+          lastSavedSignatureRef.current = signature;
+          if (!routeProcessId) {
+            navigate(`/processos/${row.id}/entrevista${guidedExperience ? "?guided=1" : ""}`, {
+              replace: true,
+              state: { guidedExperience },
+            });
+          }
+          if (sequence === saveSequenceRef.current) setSaveStatus("saved");
+        })
+        .catch((error) => {
+          console.error("Falha no salvamento automático da entrevista:", error);
+          if (sequence === saveSequenceRef.current) setSaveStatus("error");
+        });
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [form, guidedExperience, hasInitializedConversation, isRestoringDraft, messages, navigate, persistProcessDraft, routeProcessId, routeScriptConfig.companyId]);
+
+  useEffect(() => {
+    const hasUnsyncedChanges = saveStatus !== "saved" || input.trim().length > 0;
+    if (!hasUnsyncedChanges) return;
+    const message = "Há respostas que ainda não foram sincronizadas. Deseja sair mesmo assim?";
+    const protectedUrl = window.location.href;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = message;
+    };
+    const captureLink = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!target || allowNavigationRef.current) return;
+      if (!window.confirm(message)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    const handlePopState = () => {
+      if (allowNavigationRef.current || window.confirm(message)) return;
+      window.history.pushState(null, "", protectedUrl);
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    document.addEventListener("click", captureLink, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+      document.removeEventListener("click", captureLink, true);
+    };
+  }, [input, saveStatus]);
+
+  const confirmNavigation = () => {
+    if (saveStatus === "saved" && !input.trim()) return true;
+    return window.confirm("Há respostas que ainda não foram sincronizadas. Deseja sair mesmo assim?");
   };
 
   const saveSession = async (reason: "auto" | "manual") => {
@@ -326,7 +437,7 @@ function EntrevistaProcessoPage() {
 
   const assistantBusy = loading || isAssistantTyping;
 
-  const isInitializingPage = routeScriptConfig.isLoading && !hasInitializedConversation;
+  const isInitializingPage = isRestoringDraft || (routeScriptConfig.isLoading && !hasInitializedConversation);
   const shouldBlockForCompany = !isInitializingPage && !routeScriptConfig.companyId;
 
   useEffect(() => {
@@ -530,7 +641,8 @@ function EntrevistaProcessoPage() {
           setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
         }
         if (resp.done) {
-          applyToForm("manual");
+          const completedForm = resp.partialUpdate ? mergeFormUpdate(form, resp.partialUpdate) : form;
+          applyToForm("auto", completedForm);
         } else if (resp.nextQuestion) {
           await enqueueAssistantMessage(resp.nextQuestion);
         } else {
@@ -575,7 +687,8 @@ function EntrevistaProcessoPage() {
         setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
       }
       if (resp.done) {
-        applyToForm("manual");
+        const completedForm = resp.partialUpdate ? mergeFormUpdate(form, resp.partialUpdate) : form;
+        applyToForm("auto", completedForm);
       } else if (resp.nextQuestion) {
         await enqueueAssistantMessage(resp.nextQuestion);
       } else {
@@ -595,7 +708,8 @@ function EntrevistaProcessoPage() {
       setForm((prev) => mergeFormUpdate(prev, fallback.partialUpdate));
     }
     if (fallback.done) {
-      applyToForm("auto");
+      const completedForm = fallback.partialUpdate ? mergeFormUpdate(form, fallback.partialUpdate) : form;
+      applyToForm("auto", completedForm);
       return;
     }
     await enqueueAssistantMessage(
@@ -754,15 +868,40 @@ function EntrevistaProcessoPage() {
     }
     return { done: true };
   };
-  const applyToForm = async (reason: "auto" | "manual" = "manual") => {
+  const applyToForm = async (
+    reason: "auto" | "manual" = "manual",
+    completedForm: ProcessoFormData = form,
+  ) => {
+    if (guidedExperience) {
+      setLoading(true);
+      try {
+        const row = await persistProcessDraft(completedForm, messages, "Em revisão");
+        if (!row) throw new Error("Não foi possível identificar usuário e empresa para salvar o processo.");
+        localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
+        allowNavigationRef.current = true;
+        navigate(`/processos/${row.id}/resultado-guiado`, {
+          state: { processo: completedForm, autoGenerate: true },
+        });
+      } catch (error) {
+        console.error("Erro ao concluir experiência guiada:", error);
+        setMessages((current) => [
+          ...current,
+          { role: "assistant", content: "Não consegui salvar o processo com segurança. Revise sua conexão e tente concluir novamente." },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     try {
-      localStorage.setItem("process:formPrefill", JSON.stringify(form));
+      localStorage.setItem("process:formPrefill", JSON.stringify(completedForm));
       await saveSession(reason);
       localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
     } catch (e) { void e; }
+    allowNavigationRef.current = true;
     navigate("/processos/diagnostico", {
       state: {
-        processo: form,
+        processo: completedForm,
         processId: processIdRef.current,
       },
     });
@@ -845,7 +984,8 @@ function EntrevistaProcessoPage() {
       const resp = data as InterviewResponse;
       if (resp.partialUpdate) setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
       if (resp.done) {
-        applyToForm("manual");
+        const completedForm = resp.partialUpdate ? mergeFormUpdate(form, resp.partialUpdate) : form;
+        applyToForm("auto", completedForm);
       } else if (resp.nextQuestion) {
         await enqueueAssistantMessage(resp.nextQuestion);
       }
@@ -939,9 +1079,19 @@ function EntrevistaProcessoPage() {
           <h1 className="text-2xl font-bold text-foreground">Entrevista com IA</h1>
           <p className="text-muted-foreground">Condução guiada para mapear seu processo sem preenchimento manual.</p>
         </div>
-        <Badge variant="secondary" className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4" /> Progresso {progress}%
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            variant={saveStatus === "error" ? "destructive" : "secondary"}
+            className="flex items-center gap-2"
+            aria-live="polite"
+          >
+            {saveStatus === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : saveStatus === "error" ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+            {saveStatus === "saving" ? "Salvando…" : saveStatus === "error" ? "Falha ao salvar" : "Salvo"}
+          </Badge>
+          <Badge variant="secondary" className="flex items-center gap-2">
+            <Cloud className="h-4 w-4" /> Progresso {progress}%
+          </Badge>
+        </div>
       </div>
 
       <Card>
@@ -1002,9 +1152,18 @@ function EntrevistaProcessoPage() {
           </div>
 
           <div className="mt-6 flex justify-between">
-            <Button variant="outline" onClick={() => navigate("/processos")}>Cancelar</Button>
-            <Button onClick={() => applyToForm("manual")}>
-              Aplicar no Formulário <ArrowRight className="h-4 w-4 ml-2" />
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!confirmNavigation()) return;
+                allowNavigationRef.current = true;
+                navigate("/processos");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => applyToForm("manual")} disabled={assistantBusy}>
+              {guidedExperience ? "Concluir e gerar análise" : "Aplicar no Formulário"} <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
         </CardContent>

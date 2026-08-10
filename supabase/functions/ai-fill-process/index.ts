@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, errorResponse, requireString } from "../_shared/auth.ts";
+import { fetchWithAiQuota } from "../_shared/quota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,7 +105,8 @@ Limite etapas a 4-8 itens. Gere 2-4 riscos. Gere 2-4 indicadores. Gere 1-3 açõ
 Para probabilidade e impacto de riscos, use valores entre 1 e 5.
 `;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const lovableBaseUrl = Deno.env.get("LOVABLE_BASE_URL") ?? "https://ai.gateway.lovable.dev/v1";
+    const response = await fetchWithAiQuota(client, "ai-fill-process", companyId, descricao.length, `${lovableBaseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,

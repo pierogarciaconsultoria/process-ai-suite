@@ -12,7 +12,7 @@ create table if not exists public.interview_sessions (
 
 alter table public.interview_sessions enable row level security;
 
-create policy if not exists interview_sessions_select_by_user_or_membership
+create policy interview_sessions_select_by_user_or_membership
   on public.interview_sessions
   for select
   using (
@@ -20,18 +20,18 @@ create policy if not exists interview_sessions_select_by_user_or_membership
     or empresa_id in (select empresa_id from public.membros where user_id = auth.uid())
   );
 
-create policy if not exists interview_sessions_insert_by_user
+create policy interview_sessions_insert_by_user
   on public.interview_sessions
   for insert
   with check (user_id = auth.uid());
 
-create policy if not exists interview_sessions_update_by_user
+create policy interview_sessions_update_by_user
   on public.interview_sessions
   for update
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
-create policy if not exists interview_sessions_delete_by_user
+create policy interview_sessions_delete_by_user
   on public.interview_sessions
   for delete
   using (user_id = auth.uid());

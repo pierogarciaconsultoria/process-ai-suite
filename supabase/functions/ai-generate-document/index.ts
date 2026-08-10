@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
+import { acquireAiQuota, fetchWithAiQuota } from "../_shared/quota.ts";
+import { runConfiguredAssistant, stripCodeFence } from "../_shared/openai-assistant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,6 +41,7 @@ serve(async (req) => {
       generationConfig = null,
       companyContext = null,
       process_id = null,
+      use_peter_assistant = false,
     } = body ?? {};
     const companyId = requireString(companyContext?.companyId, "company_id");
     await authorizeCompany(client, user.id, companyId);
@@ -117,8 +120,25 @@ Você deve responder SEMPRE em JSON com as chaves:
 - generation_metadata
 - ai_prompt_used`;
 
-    const response = await fetch(
-      "https://api.openai.com/v1/chat/completions",
+    if (use_peter_assistant === true) {
+      const userContent = JSON.stringify(contextPayload);
+      const lease = await acquireAiQuota(client, "ai-generate-document", companyId);
+      try {
+        const content = stripCodeFence(await runConfiguredAssistant(
+          OPENAI_API_KEY,
+          `${systemPrompt}\nRetorne somente o objeto JSON solicitado, sem markdown ao redor do JSON.`,
+          userContent,
+        ));
+        JSON.parse(content);
+        return new Response(content, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } finally {
+        await lease.complete(userContent.length, Math.max(1, Math.ceil(userContent.length / 200)));
+      }
+    }
+
+    const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+    const response = await fetchWithAiQuota(client, "ai-generate-document", companyId, JSON.stringify(contextPayload).length,
+      `${openAiBaseUrl}/chat/completions`,
       {
         method: "POST",
         headers: {

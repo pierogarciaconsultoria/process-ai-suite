@@ -193,7 +193,7 @@ alter table public.generated_document_versions enable row level security;
 alter table public.generated_document_attachments enable row level security;
 alter table public.document_chunks enable row level security;
 
-create policy if not exists document_templates_select_policy
+create policy document_templates_select_policy
   on public.document_templates
   for select
   using (
@@ -201,7 +201,7 @@ create policy if not exists document_templates_select_policy
     or company_id in (select public.user_empresa_ids())
   );
 
-create policy if not exists document_templates_insert_policy
+create policy document_templates_insert_policy
   on public.document_templates
   for insert
   with check (
@@ -211,7 +211,7 @@ create policy if not exists document_templates_insert_policy
     and is_system_template = false
   );
 
-create policy if not exists document_templates_update_policy
+create policy document_templates_update_policy
   on public.document_templates
   for update
   using (
@@ -225,7 +225,7 @@ create policy if not exists document_templates_update_policy
     and is_system_template = false
   );
 
-create policy if not exists document_templates_delete_policy
+create policy document_templates_delete_policy
   on public.document_templates
   for delete
   using (
@@ -234,7 +234,7 @@ create policy if not exists document_templates_delete_policy
     and is_system_template = false
   );
 
-create policy if not exists document_template_sections_manage_policy
+create policy document_template_sections_manage_policy
   on public.document_template_sections
   for all
   using (
@@ -246,7 +246,7 @@ create policy if not exists document_template_sections_manage_policy
     and public.user_can_manage_documentation(company_id)
   );
 
-create policy if not exists document_template_prompts_manage_policy
+create policy document_template_prompts_manage_policy
   on public.document_template_prompts
   for all
   using (
@@ -258,7 +258,7 @@ create policy if not exists document_template_prompts_manage_policy
     and public.user_can_manage_documentation(company_id)
   );
 
-create policy if not exists document_template_variables_manage_policy
+create policy document_template_variables_manage_policy
   on public.document_template_variables
   for all
   using (
@@ -270,7 +270,7 @@ create policy if not exists document_template_variables_manage_policy
     and public.user_can_manage_documentation(company_id)
   );
 
-create policy if not exists document_generation_settings_manage_policy
+create policy document_generation_settings_manage_policy
   on public.document_generation_settings
   for all
   using (
@@ -282,12 +282,12 @@ create policy if not exists document_generation_settings_manage_policy
     and public.user_can_manage_documentation(company_id)
   );
 
-create policy if not exists generated_documents_select_policy
+create policy generated_documents_select_policy
   on public.generated_documents
   for select
   using (company_id in (select public.user_empresa_ids()));
 
-create policy if not exists generated_documents_insert_policy
+create policy generated_documents_insert_policy
   on public.generated_documents
   for insert
   with check (
@@ -295,7 +295,7 @@ create policy if not exists generated_documents_insert_policy
     and created_by = auth.uid()
   );
 
-create policy if not exists generated_documents_update_policy
+create policy generated_documents_update_policy
   on public.generated_documents
   for update
   using (
@@ -307,19 +307,19 @@ create policy if not exists generated_documents_update_policy
     and public.user_can_manage_documentation(company_id)
   );
 
-create policy if not exists generated_document_versions_manage_policy
+create policy generated_document_versions_manage_policy
   on public.generated_document_versions
   for all
   using (company_id in (select public.user_empresa_ids()))
   with check (company_id in (select public.user_empresa_ids()));
 
-create policy if not exists generated_document_attachments_manage_policy
+create policy generated_document_attachments_manage_policy
   on public.generated_document_attachments
   for all
   using (company_id in (select public.user_empresa_ids()))
   with check (company_id in (select public.user_empresa_ids()));
 
-create policy if not exists document_chunks_manage_policy
+create policy document_chunks_manage_policy
   on public.document_chunks
   for all
   using (company_id in (select public.user_empresa_ids()))

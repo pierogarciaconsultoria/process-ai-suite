@@ -29,8 +29,11 @@ export async function authenticateRequest(req: Request): Promise<AuthContext> {
 export function errorResponse(error: unknown, corsHeaders: Record<string, string>): Response {
   const status = error instanceof HttpError ? error.status : 500;
   const message = error instanceof Error ? error.message : "Erro desconhecido";
+  const retryHeaders = error instanceof HttpError && error.retryAfter
+    ? { "Retry-After": String(error.retryAfter) }
+    : {};
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...retryHeaders, "Content-Type": "application/json" },
   });
 }

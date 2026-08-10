@@ -1,7 +1,7 @@
 export type CompanyRole = "owner" | "admin" | "gestor" | "analista";
 
 export class HttpError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(public readonly status: number, message: string, public readonly retryAfter?: number) {
     super(message);
     this.name = "HttpError";
   }

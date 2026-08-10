@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, errorResponse } from "../_shared/auth.ts";
+import { fetchWithAiQuota } from "../_shared/quota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,10 +13,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
   try {
-    await authenticateRequest(req);
+    const { client } = await authenticateRequest(req);
     const body = await req.json();
     const history = body?.history ?? [];
     const page = body?.page ?? "/";
+    if (!Array.isArray(history) || typeof page !== "string") {
+      return new Response(JSON.stringify({ error: "Payload inválido para a central de ajuda." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const lastUser = Array.isArray(history) ? [...history].reverse().find((m: any) => m?.role === "user")?.content?.toLowerCase?.() ?? "" : "";
     const quickIntents = [
@@ -53,7 +60,8 @@ Formato: responda em texto simples, com listas curtas quando necessário.`;
       return new Response(JSON.stringify({ answer: content }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+    const response = await fetchWithAiQuota(client, "ai-helpcenter", null, JSON.stringify(history).length, `${openAiBaseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,

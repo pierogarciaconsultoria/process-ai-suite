@@ -25,4 +25,21 @@ describe("Edge Function security contract", () => {
       expect(source).not.toMatch(/SERVICE_ROLE|service_role/);
     });
   }
+
+  it.each(["ai-diagnose-process", "ai-generate-bpmn", "ai-generate-document"])(
+    "%s only invokes the configured Peter Assistant after tenant authorization",
+    (functionName) => {
+      const source = readFileSync(resolve("supabase/functions", functionName, "index.ts"), "utf8");
+      const authorizationIndex = source.indexOf("await authorizeCompany(");
+      const assistantIndex = source.indexOf("runConfiguredAssistant(");
+      expect(authorizationIndex).toBeGreaterThanOrEqual(0);
+      expect(assistantIndex).toBeGreaterThan(authorizationIndex);
+    },
+  );
+
+  it("the shared Assistant client never uses a service role", () => {
+    const source = readFileSync(resolve("supabase/functions/_shared/openai-assistant.ts"), "utf8");
+    expect(source).not.toMatch(/SERVICE_ROLE|service_role/);
+    expect(source).toContain('Deno.env.get("OPENAI_ASSISTANT_ID")');
+  });
 });

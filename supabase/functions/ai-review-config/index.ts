@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, errorResponse, requireString } from "../_shared/auth.ts";
+import { fetchWithAiQuota } from "../_shared/quota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,8 +56,9 @@ Responda SEMPRE em JSON com as chaves:
         "Plataforma ProcessAI Suite para mapeamento de processos, diagnóstico e geração de BPMN com IA, usada por consultores e empresas B2B.",
     };
 
-    const response = await fetch(
-      "https://api.openai.com/v1/chat/completions",
+    const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+    const response = await fetchWithAiQuota(client, "ai-review-config", companyId, JSON.stringify(userPayload).length,
+      `${openAiBaseUrl}/chat/completions`,
       {
         method: "POST",
         headers: {

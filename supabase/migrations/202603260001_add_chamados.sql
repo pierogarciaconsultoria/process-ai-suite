@@ -14,21 +14,21 @@ create index if not exists idx_chamados_empresa_created on public.chamados (empr
 
 alter table public.chamados enable row level security;
 
-create policy if not exists chamados_select_by_company
+create policy chamados_select_by_company
   on public.chamados
   for select
   using (
     empresa_id in (select empresa_id from public.membros where user_id = auth.uid())
   );
 
-create policy if not exists chamados_insert_by_member
+create policy chamados_insert_by_member
   on public.chamados
   for insert
   with check (
     empresa_id in (select empresa_id from public.membros where user_id = auth.uid())
   );
 
-create policy if not exists chamados_update_by_company
+create policy chamados_update_by_company
   on public.chamados
   for update
   using (
@@ -53,14 +53,14 @@ create index if not exists idx_chamado_mensagens_empresa_created on public.chama
 
 alter table public.chamado_mensagens enable row level security;
 
-create policy if not exists chamado_mensagens_select_by_company
+create policy chamado_mensagens_select_by_company
   on public.chamado_mensagens
   for select
   using (
     empresa_id in (select empresa_id from public.membros where user_id = auth.uid())
   );
 
-create policy if not exists chamado_mensagens_insert_by_member
+create policy chamado_mensagens_insert_by_member
   on public.chamado_mensagens
   for insert
   with check (
@@ -73,21 +73,21 @@ values ('chamados', 'chamados', false)
 on conflict (id) do nothing;
 
 -- Allow members of the company to read/write files under folder <empresa_id>/...
-create policy if not exists "chamados objects read by company members"
+create policy "chamados objects read by company members"
   on storage.objects for select
   using (
     bucket_id = 'chamados'
     and split_part(name, '/', 1) in (select empresa_id::text from public.membros where user_id = auth.uid())
   );
 
-create policy if not exists "chamados objects insert by company members"
+create policy "chamados objects insert by company members"
   on storage.objects for insert
   with check (
     bucket_id = 'chamados'
     and split_part(name, '/', 1) in (select empresa_id::text from public.membros where user_id = auth.uid())
   );
 
-create policy if not exists "chamados objects update by company members"
+create policy "chamados objects update by company members"
   on storage.objects for update
   using (
     bucket_id = 'chamados'
@@ -97,4 +97,3 @@ create policy if not exists "chamados objects update by company members"
     bucket_id = 'chamados'
     and split_part(name, '/', 1) in (select empresa_id::text from public.membros where user_id = auth.uid())
   );
-

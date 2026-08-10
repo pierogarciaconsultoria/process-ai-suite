@@ -40,12 +40,12 @@ before update on public.ai_configurations
 for each row
 execute function public.set_ai_configurations_updated_at();
 
-create policy if not exists ai_configurations_select_by_company
+create policy ai_configurations_select_by_company
   on public.ai_configurations
   for select
   using (company_id in (select public.user_empresa_ids()));
 
-create policy if not exists ai_configurations_insert_by_company
+create policy ai_configurations_insert_by_company
   on public.ai_configurations
   for insert
   with check (
@@ -53,7 +53,7 @@ create policy if not exists ai_configurations_insert_by_company
     and updated_by = auth.uid()
   );
 
-create policy if not exists ai_configurations_update_by_company
+create policy ai_configurations_update_by_company
   on public.ai_configurations
   for update
   using (company_id in (select public.user_empresa_ids()))
@@ -62,7 +62,7 @@ create policy if not exists ai_configurations_update_by_company
     and updated_by = auth.uid()
   );
 
-create policy if not exists ai_configurations_delete_by_company
+create policy ai_configurations_delete_by_company
   on public.ai_configurations
   for delete
   using (company_id in (select public.user_empresa_ids()));

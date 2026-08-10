@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Search, Eye, Pencil } from "lucide-react";
+import { Bot, Loader2, Plus, Search, Eye, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
@@ -109,6 +109,13 @@ const Processos = () => {
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })}
+          >
+            <Bot className="h-4 w-4 mr-2" />
+            Experiência guiada
+          </Button>
           <Button onClick={() => navigate("/processos/novo")}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Processo
@@ -231,6 +238,17 @@ const Processos = () => {
                     </TableCell>
                     <TableCell>{new Date(processo.data_criacao).toLocaleDateString("pt-BR")}</TableCell>
                     <TableCell>
+                      {processo.status === "Rascunho" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Retomar entrevista"
+                          aria-label={`Retomar entrevista de ${processo.nome}`}
+                          onClick={() => navigate(`/processos/${processo.id}/entrevista?guided=1`, { state: { guidedExperience: true } })}
+                        >
+                          <Bot className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}`)}>
                         <Eye className="h-4 w-4" />
                       </Button>

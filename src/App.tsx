@@ -31,6 +31,7 @@ const ConfigSkinIA = React.lazy(() => import("./pages/ConfigSkinIA"));
 const ConfigDocumentacaoProcesso = React.lazy(() => import("./pages/ConfigDocumentacaoProcesso"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const EntrevistaProcesso = React.lazy(() => import("./pages/EntrevistaProcesso"));
+const ProcessoResultadoGuiado = React.lazy(() => import("./pages/ProcessoResultadoGuiado"));
 
 const queryClient = new QueryClient();
 
@@ -82,6 +83,8 @@ const App = () => (
                 <Route path="/processos/novo" element={<ProcessoNovo />} />
                 <Route path="/processos/novo/formulario" element={<ProcessoFormulario />} />
                 <Route path="/processos/novo/entrevista" element={<EntrevistaProcesso />} />
+                <Route path="/processos/:id/entrevista" element={<EntrevistaProcesso />} />
+                <Route path="/processos/:id/resultado-guiado" element={<ProcessoResultadoGuiado />} />
                 <Route path="/processos/entrevista" element={<Navigate to="/processos/novo/entrevista" replace />} />
                 <Route path="/processos/diagnostico" element={<ProcessoDiagnostico />} />
                 <Route path="/processos/:id" element={<ProcessoDetalhe />} />

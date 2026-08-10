@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
+import { acquireAiQuota } from "../_shared/quota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +32,8 @@ const OPENAI_ASSISTANTS_HEADERS = (apiKey: string) => ({
 });
 
 async function openAiAssistantsRequest<T>(apiKey: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`https://api.openai.com/v1${path}`, {
+  const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+  const response = await fetch(`${openAiBaseUrl}${path}`, {
     ...init,
     headers: {
       ...OPENAI_ASSISTANTS_HEADERS(apiKey),
@@ -304,6 +306,8 @@ Orientações de preenchimento:
       )
       .slice(-30);
 
+    const quotaLease = await acquireAiQuota(client, "ai-interview", companyId);
+    try {
     const thread = await openAiAssistantsRequest<{ id: string }>(OPENAI_API_KEY, "/threads", {
       method: "POST",
       body: JSON.stringify({}),
@@ -353,6 +357,10 @@ Orientações de preenchimento:
     }
 
     return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } finally {
+      const consumedUnits = JSON.stringify({ history: sanitizedHistory, current }).length;
+      await quotaLease.complete(consumedUnits, Math.max(1, Math.ceil(consumedUnits / 200)));
+    }
   } catch (e) {
     return errorResponse(e, corsHeaders);
   }

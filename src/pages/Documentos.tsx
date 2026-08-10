@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Download, Eye, FilePlus2, FileText, GitBranch, Link as LinkIcon, RotateCcw, Send, ShieldCheck, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -287,6 +287,8 @@ function statusBadgeVariant(status: GeneratedDocumentRecord["status"]): "default
 
 export default function Documentos() {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const guidedSelectionHandled = useRef(false);
   const [companyContext, setCompanyContext] = useState<CompanyContext>(DEFAULT_COMPANY_CONTEXT);
   const [state, setState] = useState<DocumentationState | null>(null);
   const [documents, setDocuments] = useState<GeneratedDocumentRecord[]>([]);
@@ -462,6 +464,31 @@ export default function Documentos() {
     () => availableProcesses.filter((processo) => processo.status === "Aprovado"),
     [availableProcesses],
   );
+
+  useEffect(() => {
+    if (!isLoaded || guidedSelectionHandled.current) return;
+    const requestedProcessId = searchParams.get("processId");
+    if (!requestedProcessId) return;
+    guidedSelectionHandled.current = true;
+    const requestedProcess = availableProcesses.find((processo) => processo.id === requestedProcessId);
+    if (requestedProcess?.status === "Aprovado") {
+      setSourceMode("linked_process");
+      setSelectedProcessId(requestedProcessId);
+      setIsNewDocumentOpen(true);
+    } else {
+      toast({
+        title: requestedProcess ? "Processo aguardando aprovação" : "Processo não encontrado",
+        description: requestedProcess
+          ? "Aprove o processo antes de gerar um procedimento versionado. O fluxo atual de governança foi preservado."
+          : "Não foi possível localizar o processo solicitado nesta empresa.",
+        variant: "destructive",
+      });
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("processId");
+    nextParams.delete("mode");
+    setSearchParams(nextParams, { replace: true });
+  }, [availableProcesses, isLoaded, searchParams, setSearchParams, toast]);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -648,6 +675,7 @@ export default function Documentos() {
         generationConfig: activeTemplate.promptConfig,
         companyContext,
         process_id: sourceMode === "linked_process" ? selectedProcessId : null,
+        use_peter_assistant: sourceMode === "linked_process",
       };
       const { data, error } = await supabase.functions.invoke("ai-generate-document", { body: payload });
       if (error) throw error;

@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
+import { acquireAiQuota, fetchWithAiQuota } from "../_shared/quota.ts";
+import { runConfiguredAssistant, stripCodeFence } from "../_shared/openai-assistant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -188,8 +190,16 @@ serve(async (req: Request) => {
       );
     }
 
+    const usePeterAssistant = body?.use_peter_assistant === true;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (usePeterAssistant && !OPENAI_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "OPENAI_API_KEY não configurado" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (!usePeterAssistant && !LOVABLE_API_KEY) {
       return new Response(
         JSON.stringify({ error: "LOVABLE_API_KEY não configurado" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -320,7 +330,24 @@ Seja direto, executivo e orientado à melhoria. Sem enrolação. Sempre gere ins
 
     const userContent = `Dados completos do processo para diagnóstico:\n\n${JSON.stringify(processoData, null, 2)}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    if (usePeterAssistant && OPENAI_API_KEY) {
+      const lease = await acquireAiQuota(client, "ai-diagnose-process", companyId);
+      try {
+        const content = await runConfiguredAssistant(
+          OPENAI_API_KEY,
+          `${systemPrompt}\nRetorne somente JSON válido, sem markdown, seguindo integralmente a estrutura de diagnóstico solicitada.`,
+          userContent,
+        );
+        return new Response(JSON.stringify(JSON.parse(stripCodeFence(content))), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } finally {
+        await lease.complete(userContent.length, Math.max(1, Math.ceil(userContent.length / 200)));
+      }
+    }
+
+    const lovableBaseUrl = Deno.env.get("LOVABLE_BASE_URL") ?? "https://ai.gateway.lovable.dev/v1";
+    const response = await fetchWithAiQuota(client, "ai-diagnose-process", companyId, JSON.stringify(processoData).length, `${lovableBaseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,

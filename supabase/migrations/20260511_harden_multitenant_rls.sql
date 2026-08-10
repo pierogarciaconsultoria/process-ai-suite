@@ -243,7 +243,7 @@ create policy interview_sessions_delete_by_scope
     )
   );
 
-create policy if not exists generated_documents_delete_policy
+create policy generated_documents_delete_policy
   on public.generated_documents
   for delete
   using (
