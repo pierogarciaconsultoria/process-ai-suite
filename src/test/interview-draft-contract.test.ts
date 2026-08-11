@@ -33,4 +33,12 @@ describe("guided interview draft contract", () => {
     expect(interviewSource).toContain('"Salvo"');
     expect(processListSource).toContain('title="Retomar entrevista"');
   });
+
+  it("keeps guided interview as the only new-process entry point", () => {
+    expect(processListSource).toContain("Novo Processo");
+    expect(processListSource).toContain('navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })');
+    expect(processListSource).not.toContain('navigate("/processos/novo")');
+    expect(appSource).toContain('path="/processos/novo" element={<Navigate to="/processos/novo/entrevista"');
+    expect(appSource).toContain('path="/processos/novo/formulario" element={<Navigate to="/processos/novo/entrevista"');
+  });
 });

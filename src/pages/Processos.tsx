@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Loader2, Plus, Search, Eye, Pencil } from "lucide-react";
+import { Bot, Loader2, Search, Eye, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
@@ -109,15 +109,8 @@ const Processos = () => {
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })}
-          >
+          <Button onClick={() => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })}>
             <Bot className="h-4 w-4 mr-2" />
-            Experiência guiada
-          </Button>
-          <Button onClick={() => navigate("/processos/novo")}>
-            <Plus className="h-4 w-4 mr-2" />
             Novo Processo
           </Button>
         </div>
@@ -214,9 +207,9 @@ const Processos = () => {
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3 py-6">
-                      <span>Nenhum processo cadastrado ainda. Clique em Novo Processo para começar.</span>
-                      <Button onClick={() => navigate("/processos/novo")}>
-                        <Plus className="h-4 w-4 mr-2" />
+                      <span>Nenhum processo cadastrado ainda. Inicie uma experiência guiada com o Peter.</span>
+                      <Button onClick={() => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })}>
+                        <Bot className="h-4 w-4 mr-2" />
                         Novo Processo
                       </Button>
                     </div>

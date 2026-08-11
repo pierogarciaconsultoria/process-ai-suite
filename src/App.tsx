@@ -13,7 +13,6 @@ const Landing = React.lazy(() => import("./pages/Landing"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Empresas = React.lazy(() => import("./pages/Empresas"));
 const Processos = React.lazy(() => import("./pages/Processos"));
-const ProcessoNovo = React.lazy(() => import("./pages/ProcessoNovo"));
 const ProcessoFormulario = React.lazy(() => import("./pages/ProcessoFormulario"));
 const ProcessoDetalhe = React.lazy(() => import("./pages/ProcessoDetalhe"));
 const ProcessoDiagnostico = React.lazy(() => import("./pages/ProcessoDiagnostico"));
@@ -80,8 +79,8 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empresas" element={<Empresas />} />
                 <Route path="/processos" element={<Processos />} />
-                <Route path="/processos/novo" element={<ProcessoNovo />} />
-                <Route path="/processos/novo/formulario" element={<ProcessoFormulario />} />
+                <Route path="/processos/novo" element={<Navigate to="/processos/novo/entrevista" replace state={{ guidedExperience: true }} />} />
+                <Route path="/processos/novo/formulario" element={<Navigate to="/processos/novo/entrevista" replace state={{ guidedExperience: true }} />} />
                 <Route path="/processos/novo/entrevista" element={<EntrevistaProcesso />} />
                 <Route path="/processos/:id/entrevista" element={<EntrevistaProcesso />} />
                 <Route path="/processos/:id/resultado-guiado" element={<ProcessoResultadoGuiado />} />
