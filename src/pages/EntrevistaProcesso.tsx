@@ -1154,10 +1154,10 @@ function EntrevistaProcessoPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden animate-fade-in">
+      <Card className="shrink-0">
+        <CardContent className="overflow-x-auto p-3 sm:p-6">
+          <div className="flex min-w-max items-center gap-2">
             {steps.map((step, index) => {
               const isActive = index === currentStep;
               const isDone = index < currentStep;
@@ -1183,7 +1183,7 @@ function EntrevistaProcessoPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex shrink-0 items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Entrevista com IA</h1>
           <p className="text-muted-foreground">Condução guiada para mapear seu processo sem preenchimento manual.</p>
@@ -1203,15 +1203,15 @@ function EntrevistaProcessoPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardHeader className="shrink-0 pb-3">
           <div className="flex items-center justify-between">
             <CardTitle>Chat</CardTitle>
             <Progress value={progress} className="w-48" />
           </div>
         </CardHeader>
-        <CardContent>
-          <div ref={scrollRef} className="h-[420px] overflow-auto rounded-md border p-3 space-y-3">
+        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden pb-4">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border p-3 space-y-3">
             {messages.map((m, i) => (
               <div key={i} className={`p-3 rounded-md ${m.role === "assistant" ? "bg-muted" : "bg-card border"}`}>
                 <div className="text-xs text-muted-foreground mb-1">{m.role === "assistant" ? "Peter" : "Você"}</div>
@@ -1226,11 +1226,12 @@ function EntrevistaProcessoPage() {
             )}
           </div>
 
+          <div className="shrink-0">
           {stage === "selectMode" && (
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              <Button variant="outline" onClick={() => void selectMode("entrevista")}>Entrevista guiada</Button>
-              <Button variant="outline" onClick={() => void selectMode("texto")}>Colar texto</Button>
-              <Button variant="outline" onClick={() => void selectMode("anexo")}>Anexar arquivo</Button>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <Button className="shrink-0" variant="outline" onClick={() => void selectMode("entrevista")}>Entrevista guiada</Button>
+              <Button className="shrink-0" variant="outline" onClick={() => void selectMode("texto")}>Colar texto</Button>
+              <Button className="shrink-0" variant="outline" onClick={() => void selectMode("anexo")}>Anexar arquivo</Button>
             </div>
           )}
 
@@ -1240,7 +1241,7 @@ function EntrevistaProcessoPage() {
             </div>
           ))}
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-3 flex gap-2">
             <Input
               ref={inputRef}
               placeholder="Digite sua resposta…"
@@ -1260,7 +1261,7 @@ function EntrevistaProcessoPage() {
             </Button>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="mt-3 space-y-2">
             <Label>Anexo para análise (PDF, DOCX, TXT ou CSV)</Label>
             <Input
               ref={inputArquivoRef}
@@ -1310,7 +1311,7 @@ function EntrevistaProcessoPage() {
             )}
           </div>
 
-          <div className="mt-6 flex justify-between">
+          <div className="mt-3 flex justify-between">
             <Button
               variant="outline"
               onClick={() => {
@@ -1324,6 +1325,7 @@ function EntrevistaProcessoPage() {
             <Button onClick={() => applyToForm("manual")} disabled={assistantBusy}>
               {guidedExperience ? "Concluir e gerar análise" : "Aplicar no Formulário"} <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
+          </div>
           </div>
         </CardContent>
       </Card>

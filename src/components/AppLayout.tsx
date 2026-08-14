@@ -8,6 +8,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 export function AppLayout() {
   const location = useLocation();
+  const isInterviewRoute = /\/processos\/(?:novo|[^/]+)\/entrevista$/.test(location.pathname);
   const [authState, setAuthState] = useState<"loading" | "authenticated" | "anonymous">("loading");
 
   useEffect(() => {
@@ -50,13 +51,13 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="h-14 flex items-center border-b bg-card px-4">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex h-14 shrink-0 items-center border-b bg-card px-4">
             <SidebarTrigger className="mr-4" />
           </header>
-          <main className="flex-1 overflow-auto p-6">
+          <main className={`min-h-0 flex-1 p-3 sm:p-6 ${isInterviewRoute ? "overflow-hidden" : "overflow-auto"}`}>
             <Outlet />
           </main>
         </div>
