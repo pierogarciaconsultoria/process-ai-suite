@@ -1,4 +1,4 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { loginRedirectFor } from "@/lib/auth-navigation";
@@ -54,9 +54,6 @@ export function AppLayout() {
       <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex h-14 shrink-0 items-center border-b bg-card px-4">
-            <SidebarTrigger className="mr-4" />
-          </header>
           <main className={`min-h-0 flex-1 p-3 sm:p-6 ${isInterviewRoute ? "overflow-hidden" : "overflow-auto"}`}>
             <Outlet />
           </main>
