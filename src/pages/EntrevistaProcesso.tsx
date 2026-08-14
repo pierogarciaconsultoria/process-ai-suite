@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, ArrowRight, Check, Cloud, Loader2, Send, Sparkles } from "lucide-react";
-import { Label } from "@/components/ui/label";
+import { AlertTriangle, ArrowRight, Check, Cloud, Loader2, Paperclip, Send, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { useAiConfig } from "@/hooks/useAiConfig";
@@ -668,7 +667,7 @@ function EntrevistaProcessoPage() {
       setEtapaAtual(clampEtapa(response.etapa_atual, etapaAtual));
       setAguardandoConfirmacao(transition.deveAguardar);
       if (transition.podeConcluir) {
-        await applyToForm("auto", nextForm);
+        await concludeInterview(nextForm);
       } else if (response.nextQuestion) {
         await enqueueAssistantMessage(response.nextQuestion);
       } else {
@@ -755,7 +754,7 @@ function EntrevistaProcessoPage() {
 
     if (requestApply && isApplyCommand(input.trim())) {
       setRequestApply(false);
-      applyToForm("manual");
+      void concludeInterview();
       return;
     }
     setInput("");
@@ -1016,7 +1015,7 @@ function EntrevistaProcessoPage() {
     setEtapaAtual(clampEtapa(response.etapa_atual, etapaAtual));
     setAguardandoConfirmacao(transition.deveAguardar);
     setStage("aiFlow");
-    if (transition.podeConcluir) await applyToForm("auto", nextForm);
+    if (transition.podeConcluir) await concludeInterview(nextForm);
     else if (response.nextQuestion) await enqueueAssistantMessage(response.nextQuestion);
   };
 
@@ -1183,9 +1182,23 @@ function EntrevistaProcessoPage() {
 
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <CardHeader className="shrink-0 pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle>Chat</CardTitle>
-            <Progress value={progress} className="w-48" />
+            <div className="flex items-center gap-2">
+              <Progress value={progress} className="w-32 sm:w-48" />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (!confirmNavigation()) return;
+                  allowNavigationRef.current = true;
+                  navigate("/processos");
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden pb-4">
@@ -1221,6 +1234,30 @@ function EntrevistaProcessoPage() {
 
           <div className="mt-3 flex gap-2">
             <Input
+              ref={inputArquivoRef}
+              type="file"
+              accept={EXTENSOES_ACEITAS}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) void handleUploadArquivos(e.target.files);
+                e.currentTarget.value = "";
+              }}
+              disabled={assistantBusy}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => inputArquivoRef.current?.click()}
+              disabled={assistantBusy || stage === "selectMode" || stage === "askUserName" || stage === "askProcessName"}
+              aria-label="Anexar arquivo"
+              title="Anexar arquivo"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Input
               ref={inputRef}
               placeholder="Digite sua resposta…"
               value={input}
@@ -1239,28 +1276,8 @@ function EntrevistaProcessoPage() {
             </Button>
           </div>
 
-          <div className="mt-3 space-y-2">
-            <Label>Anexo para análise (PDF, DOCX, TXT ou CSV)</Label>
-            <Input
-              ref={inputArquivoRef}
-              type="file"
-              accept={EXTENSOES_ACEITAS}
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.length) void handleUploadArquivos(e.target.files);
-                e.currentTarget.value = "";
-              }}
-              disabled={assistantBusy}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => inputArquivoRef.current?.click()}
-              disabled={assistantBusy || stage === "selectMode" || stage === "askUserName" || stage === "askProcessName"}
-            >
-              Selecionar arquivos
-            </Button>
+          {(statusUpload !== "idle" || arquivosAnexados.length > 0) && (
+          <div className="mt-2 space-y-2">
             {statusUpload !== "idle" && (
               <div className={`text-sm ${statusUpload === "erro" ? "text-destructive" : "text-muted-foreground"}`} role="status">
                 {statusUpload === "erro" && `⚠️ ${erroUpload}`}
@@ -1288,28 +1305,20 @@ function EntrevistaProcessoPage() {
               </div>
             )}
           </div>
+          )}
 
-          <div className="mt-3 flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!confirmNavigation()) return;
-                allowNavigationRef.current = true;
-                navigate("/processos");
-              }}
-            >
-              Cancelar
+          <div className="mt-2 flex min-h-9 items-center justify-between gap-3">
+            {!canConcludeInterview ? (
+              <p
+                className="truncate text-xs text-muted-foreground"
+                title={`Para concluir, informe: ${completionIssues.join(", ")}.`}
+              >
+                Faltam {completionIssues.length} {completionIssues.length === 1 ? "informação" : "informações"} para concluir
+              </p>
+            ) : <span />}
+            <Button size="sm" onClick={() => void concludeInterview()} disabled={assistantBusy || !canConcludeInterview}>
+              Concluir entrevista <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <div className="flex flex-col items-end gap-1">
-              <Button onClick={() => void concludeInterview()} disabled={assistantBusy || !canConcludeInterview}>
-                Concluir entrevista <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-              {!canConcludeInterview && (
-                <p className="max-w-md text-right text-xs text-muted-foreground">
-                  Para concluir, informe: {completionIssues.join(", ")}.
-                </p>
-              )}
-            </div>
           </div>
           </div>
         </CardContent>
