@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, ArrowRight, Check, Cloud, Loader2, Send, Sparkles } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json, Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/types";
 import { useAiConfig } from "@/hooks/useAiConfig";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import {
@@ -92,6 +92,22 @@ class InterviewPageErrorBoundary extends React.Component<
   }
 }
 
+function getInterviewCompletionIssues(data: ProcessoFormData): string[] {
+  const issues: string[] = [];
+  if (!data.nomeProcesso.trim()) issues.push("nome do processo");
+  if (!data.gatilho.trim()) issues.push("gatilho de início");
+  if (!data.saidas.some((item) => item.saida.trim())) issues.push("saída principal");
+
+  const mappedSteps = data.etapas.filter((item) => item.atividade.trim());
+  if (mappedSteps.length === 0) {
+    issues.push("atividade do processo");
+  } else if (mappedSteps.some((item) => !item.responsavel.trim())) {
+    issues.push("responsável das atividades");
+  }
+
+  return issues;
+}
+
 function EntrevistaProcessoPage() {
   const ASSISTANT_MIN_DELAY_MS = 2000;
   const ASSISTANT_MAX_DELAY_MS = 3000;
@@ -145,6 +161,8 @@ function EntrevistaProcessoPage() {
     "Relatório",
   ];
   const currentStep = 1;
+  const completionIssues = useMemo(() => getInterviewCompletionIssues(form), [form]);
+  const canConcludeInterview = completionIssues.length === 0;
 
   useEffect(() => {
     return () => {
@@ -392,36 +410,6 @@ function EntrevistaProcessoPage() {
   const confirmNavigation = () => {
     if (saveStatus === "saved" && !input.trim()) return true;
     return window.confirm("Há respostas que ainda não foram sincronizadas. Deseja sair mesmo assim?");
-  };
-
-  const saveSession = async (reason: "auto" | "manual") => {
-    try {
-      const key = "process:interviewSessions";
-      const prev = JSON.parse(localStorage.getItem(key) || "[]");
-      const item = { id: sessionIdRef.current, reason, at: new Date().toISOString(), messages, form, progress };
-      const next = Array.isArray(prev) ? [...prev, item] : [item];
-      localStorage.setItem(key, JSON.stringify(next));
-    } catch (e) { void e; }
-    await persistSession(reason);
-  };
-  const persistSession = async (reason: "auto" | "manual") => {
-    try {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth?.user?.id ?? null;
-      const empresaId = routeScriptConfig.companyId ?? await resolveAccessibleCompanyId(userId);
-      const row = {
-        user_id: userId,
-        empresa_id: empresaId,
-        reason,
-        messages: withInterviewMetadata(messages) as unknown as Json,
-        form_snapshot: form as unknown as Json,
-        progress,
-        applied: reason === "manual",
-      } as unknown;
-      const sb = supabase as unknown as { from: (table: string) => { insert: (values: unknown) => Promise<unknown> } };
-      await sb.from("interview_sessions").insert(row);
-      await persistProcessDraft(form, withInterviewMetadata(messages), "Rascunho");
-    } catch (e) { void e; }
   };
 
   const progress = useMemo(() => {
@@ -781,7 +769,7 @@ function EntrevistaProcessoPage() {
     }
     if (fallback.done) {
       const completedForm = fallback.partialUpdate ? mergeFormUpdate(form, fallback.partialUpdate) : form;
-      applyToForm("auto", completedForm);
+      concludeInterview(completedForm);
       return;
     }
     await enqueueAssistantMessage(
@@ -965,43 +953,33 @@ function EntrevistaProcessoPage() {
     }
     return { done: true };
   };
-  const applyToForm = async (
-    reason: "auto" | "manual" = "manual",
-    completedForm: ProcessoFormData = form,
-  ) => {
-    if (guidedExperience) {
-      setLoading(true);
-      try {
-        const row = await persistProcessDraft(completedForm, withInterviewMetadata(messages), "Em revisão");
-        if (!row) throw new Error("Não foi possível identificar usuário e empresa para salvar o processo.");
-        localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
-        allowNavigationRef.current = true;
-        navigate(`/processos/${row.id}/resultado-guiado`, {
-          state: { processo: completedForm, autoGenerate: true },
-        });
-      } catch (error) {
-        console.error("Erro ao concluir experiência guiada:", error);
-        setMessages((current) => [
-          ...current,
-          { role: "assistant", content: "Não consegui salvar o processo com segurança. Revise sua conexão e tente concluir novamente." },
-        ]);
-      } finally {
-        setLoading(false);
-      }
+  const concludeInterview = async (completedForm: ProcessoFormData = form) => {
+    const issues = getInterviewCompletionIssues(completedForm);
+    if (issues.length > 0) {
+      await enqueueAssistantMessage(
+        `Antes de concluir, ainda precisamos registrar: ${issues.join(", ")}. Vamos completar essas informações pela conversa.`,
+      );
       return;
     }
+
+    setLoading(true);
     try {
-      localStorage.setItem("process:formPrefill", JSON.stringify(completedForm));
-      await saveSession(reason);
+      const row = await persistProcessDraft(completedForm, withInterviewMetadata(messages), "Em revisão");
+      if (!row) throw new Error("Não foi possível identificar usuário e empresa para salvar o processo.");
       localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
-    } catch (e) { void e; }
-    allowNavigationRef.current = true;
-    navigate("/processos/diagnostico", {
-      state: {
-        processo: completedForm,
-        processId: processIdRef.current,
-      },
-    });
+      allowNavigationRef.current = true;
+      navigate(`/processos/${row.id}/resultado-guiado`, {
+        state: { processo: completedForm, autoGenerate: true },
+      });
+    } catch (error) {
+      console.error("Erro ao concluir entrevista:", error);
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", content: "Não consegui salvar o processo com segurança. Revise sua conexão e tente concluir novamente." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Tesseract removido: imagens só serão habilitadas após teste real no Assistant.
@@ -1322,9 +1300,16 @@ function EntrevistaProcessoPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={() => applyToForm("manual")} disabled={assistantBusy}>
-              {guidedExperience ? "Concluir e gerar análise" : "Aplicar no Formulário"} <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button onClick={() => void concludeInterview()} disabled={assistantBusy || !canConcludeInterview}>
+                Concluir entrevista <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+              {!canConcludeInterview && (
+                <p className="max-w-md text-right text-xs text-muted-foreground">
+                  Para concluir, informe: {completionIssues.join(", ")}.
+                </p>
+              )}
+            </div>
           </div>
           </div>
         </CardContent>
