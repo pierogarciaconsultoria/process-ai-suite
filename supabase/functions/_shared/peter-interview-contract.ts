@@ -131,7 +131,7 @@ export const TIPOS_ACEITOS_MIME: Record<string, string> = {
   "image/jpg": "Imagem (JPG)",
 };
 
-export const EXTENSOES_ACEITAS = ".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg";
+export const EXTENSOES_ACEITAS = ".pdf,.docx,.txt,.csv";
 export const TAMANHO_MAX_POR_ARQUIVO_BYTES = 10 * 1024 * 1024;
 export const TAMANHO_MAX_LOTE_BYTES = 15 * 1024 * 1024;
 export const TAMANHO_MAX_IMAGEM_BASE64_CHARS = 7_000_000;

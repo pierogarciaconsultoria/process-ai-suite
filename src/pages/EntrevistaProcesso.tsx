@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, ArrowRight, Check, Cloud, Loader2, Paperclip, Send, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -152,14 +151,6 @@ function EntrevistaProcessoPage() {
   const lastSavedSignatureRef = useRef("");
   const allowNavigationRef = useRef(false);
 
-  const steps = [
-    "Novo processo",
-    "Entrevista",
-    "Diagnóstico AS IS",
-    "Processo TO BE",
-    "Relatório",
-  ];
-  const currentStep = 1;
   const completionIssues = useMemo(() => getInterviewCompletionIssues(form), [form]);
   const canConcludeInterview = completionIssues.length === 0;
 
@@ -410,57 +401,6 @@ function EntrevistaProcessoPage() {
     if (saveStatus === "saved" && !input.trim()) return true;
     return window.confirm("Há respostas que ainda não foram sincronizadas. Deseja sair mesmo assim?");
   };
-
-  const progress = useMemo(() => {
-    const keys: (keyof ProcessoFormData)[] = [
-      "nomeProcesso",
-      "area",
-      "donoProcesso",
-      "classificacao",
-      "entrevistados",
-      "objetivo",
-      "clienteProcesso",
-      "areasEnvolvidas",
-      "gatilho",
-      "entradas",
-      "etapas",
-      "decisoes",
-      "saidas",
-      "recursos",
-      "problemasTexto",
-      "riscos",
-      "oportunidadesMelhoria",
-      "indicadores",
-      "planoAcao",
-    ];
-    const arrayHasData = (key: keyof ProcessoFormData, arr: unknown[]): boolean => {
-      switch (key) {
-        case "entradas":
-          return (arr as EntradaForm[]).some((e) => e.fornecedor.trim() || e.entrada.trim());
-        case "etapas":
-          return (arr as EtapaForm[]).some((e) => e.atividade.trim() || e.responsavel.trim() || (e.ferramentaDocumento ?? "").trim());
-        case "saidas":
-          return (arr as SaidaForm[]).some((s) => s.saida.trim() || s.cliente.trim());
-        case "riscos":
-          return (arr as RiscoForm[]).some((r) => r.risco.trim() || r.consequencia.trim());
-        case "indicadores":
-          return (arr as IndicadorForm[]).some((i) => i.nome.trim() || i.meta.trim() || i.objetivo.trim() || i.formulaCalculo.trim());
-        case "planoAcao":
-          return (arr as PlanoAcao5W2H[]).some((p) => p.oque.trim() || p.porque.trim() || p.quem.trim() || p.quando.trim() || p.onde.trim() || p.como.trim() || p.custo.trim());
-        default:
-          return arr.length > 0;
-      }
-    };
-    const isFilled = (key: keyof ProcessoFormData) => {
-      const value = form[key] as unknown;
-      if (Array.isArray(value)) return arrayHasData(key, value);
-      if (typeof value === "string") return value.trim().length > 0;
-      return !!value;
-    };
-    const total = keys.length;
-    const done = keys.reduce((acc, k) => acc + (isFilled(k) ? 1 : 0), 0);
-    return Math.round((done / total) * 100);
-  }, [form]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -1132,33 +1072,21 @@ function EntrevistaProcessoPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden animate-fade-in">
-      <Card className="shrink-0">
-        <CardContent className="overflow-x-auto p-3 sm:p-6">
-          <div className="flex min-w-max items-center gap-2">
-            {steps.map((step, index) => {
-              const isActive = index === currentStep;
-              const isDone = index < currentStep;
-              return (
-                <div key={step} className="flex items-center gap-2">
-                  <div
-                    className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : isDone
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    <span className="font-semibold">{index + 1}</span>
-                    <span>{step}</span>
-                  </div>
-                  {index < steps.length - 1 && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <nav className="flex h-8 shrink-0 items-center gap-2 text-sm" aria-label="Navegação estrutural">
+        <button
+          type="button"
+          className="text-muted-foreground transition-colors hover:text-foreground"
+          onClick={() => {
+            if (!confirmNavigation()) return;
+            allowNavigationRef.current = true;
+            navigate("/processos");
+          }}
+        >
+          Processos
+        </button>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium text-foreground" aria-current="page">Entrevista</span>
+      </nav>
 
       <div className="flex shrink-0 items-start justify-between gap-3">
         <div>
@@ -1184,9 +1112,7 @@ function EntrevistaProcessoPage() {
         <CardHeader className="shrink-0 pb-3">
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Chat</CardTitle>
-            <div className="flex items-center gap-2">
-              <Progress value={progress} className="w-32 sm:w-48" />
-              <Button
+            <Button
                 type="button"
                 variant="ghost"
                 size="sm"
@@ -1198,7 +1124,6 @@ function EntrevistaProcessoPage() {
               >
                 Cancelar
               </Button>
-            </div>
           </div>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden pb-4">

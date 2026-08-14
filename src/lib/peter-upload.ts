@@ -1,7 +1,7 @@
 /**
  * Processamento de arquivos da entrevista do Peter.
- * Suporta PDF, DOCX, TXT e CSV. Imagens dependem de confirmação real do Assistant.
- * DOC legado, Excel, PowerPoint e PDF digitalizado não são suportados nesta camada.
+ * Suporta PDF (inclusive digitalizado via OCR), DOCX, TXT e CSV.
+ * DOC legado, Excel, PowerPoint e imagens avulsas não são suportados nesta camada.
  */
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import type { ArquivoProcessado } from "../../supabase/functions/_shared/peter-interview-contract";
@@ -45,12 +45,39 @@ export async function extrairTextoPdf(file: File): Promise<string> {
     }
     const finalText = pages.join("\n\n").trim();
     if (!finalText || !pages.some((page) => page.replace(/^\[Página \d+\]\s*/, "").trim())) {
-      throw new Error(`Nenhum texto encontrado em "${file.name}". PDFs digitalizados não são suportados — use texto no chat.`);
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker(["por", "eng"]);
+      const ocrPages: string[] = [];
+      try {
+        for (let index = 1; index <= pdf.numPages; index += 1) {
+          const page = await pdf.getPage(index);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          if (!context) throw new Error("Canvas indisponível para OCR.");
+          await page.render({ canvasContext: context, viewport }).promise;
+          const result = await worker.recognize(canvas);
+          const pageText = String(result.data.text || "").trim();
+          if (pageText) ocrPages.push(`[Página ${index} — OCR]\n${pageText}`);
+          canvas.width = 0;
+          canvas.height = 0;
+          if (ocrPages.join("\n\n").length >= LIMITE_TEXTO_CHARS) break;
+        }
+      } finally {
+        await worker.terminate();
+      }
+      const ocrText = ocrPages.join("\n\n").trim();
+      if (!ocrText) {
+        throw new Error(`Nenhum texto legível encontrado em "${file.name}", mesmo após OCR. Verifique a resolução do PDF ou descreva o conteúdo no chat.`);
+      }
+      return ocrText;
     }
     return finalText;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Nenhum texto")) throw error;
-    throw new Error(`Não foi possível extrair o conteúdo de "${file.name}". O PDF pode estar protegido ou digitalizado. Cole o conteúdo relevante no chat.`);
+    throw new Error(`Não foi possível extrair o conteúdo de "${file.name}". O PDF pode estar protegido ou corrompido. Tente outra cópia ou cole o conteúdo relevante no chat.`);
   }
 }
 

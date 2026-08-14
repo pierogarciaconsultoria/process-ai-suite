@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  EXTENSOES_ACEITAS,
   IMAGENS_ASSISTANT_CONFIRMADAS,
   LIMITE_TEXTO_CHARS,
   validarArquivo,
@@ -25,6 +26,7 @@ describe("Peter v5 — upload", () => {
     expect(validarArquivo(makeFile("x", "slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).erro).toContain("PowerPoint");
     expect(validarArquivo(makeFile("", "vazio.txt", "text/plain")).valido).toBe(false);
     expect(IMAGENS_ASSISTANT_CONFIRMADAS).toBe(false);
+    expect(EXTENSOES_ACEITAS).toBe(".pdf,.docx,.txt,.csv");
     expect(validarArquivo(makeFile("png", "mapa.png", "image/png")).erro).toContain("em breve");
     expect(validarLote([]).valido).toBe(true);
     const large = new File([new Uint8Array(8 * 1024 * 1024)], "large.txt", { type: "text/plain" });
