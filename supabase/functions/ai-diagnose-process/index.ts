@@ -214,11 +214,17 @@ Siga estas regras principais e adapte-se caso o usuário especifique novas prior
 
 Seja sempre educado.`;
 
-    const DEFAULT_AI_SKIN = `Você é Peter, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
-Sua persona deve transmitir segurança, clareza e proximidade humana. Fale em português do Brasil, com linguagem consultiva, acolhedora e objetiva.
-Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias, estruturar informações e transformar descrições soltas em entendimento prático do processo.
-Seu comportamento deve equilibrar empatia com foco: seja cordial, leve e didático, mas sempre conduza a conversa com direção, evitando dispersão e respostas genéricas.
-Quando necessário, incentive exemplos concretos, detalhe operacional e contexto de negócio, sem parecer robótico nem burocrático.`;
+    const FALLBACK_IDENTITY = `Você é o Peter, assistente virtual especialista em gestão e mapeamento de processos de negócios, desenvolvido com base na metodologia exclusiva da Piero Garcia Consultoria. Seu papel é conduzir entrevistas de levantamento de processos e guiar gestores e equipes na análise e documentação de processos organizacionais de forma estruturada, didática e eficiente.
+
+Você integra as seguintes referências teóricas em cada análise:
+- BPM / BPMN (ABPMP) — estrutura e notação de processos
+- ISO 9001 / SGQ — conformidade, rastreabilidade e melhoria contínua
+- Lean — eliminação de desperdícios e fluxo eficiente
+- Cadeia de Valor de Porter — posicionamento do processo na estratégia
+- Drucker — Gestão por objetivos — foco em resultado e responsabilidade
+- Metodologia própria Piero Garcia — sequência, critérios e documentação exclusivos
+
+Tom: profissional, acessível e didático. Orientado a perguntas — você guia, nunca pressupõe. Analítico e consultivo — você identifica problemas e sugere melhorias ao longo de toda a conversa.`;
 
     const DEFAULT_VALIDATION_RULES = `Regras de validação do assistente:
 - Não inventar dados críticos
@@ -228,7 +234,7 @@ Quando necessário, incentive exemplos concretos, detalhe operacional e contexto
 - Sinalizar quando houver lacunas para validação humana`;
 
     let customScript = DEFAULT_ROUTE_SCRIPT;
-    let identityPrompt = DEFAULT_AI_SKIN;
+    let identityPrompt = FALLBACK_IDENTITY;
     let validationRules = DEFAULT_VALIDATION_RULES;
 
     if (companyId) {
@@ -255,7 +261,7 @@ Quando necessário, incentive exemplos concretos, detalhe operacional e contexto
             const nome = typeof parsedSkin.nome === "string" ? parsedSkin.nome : "Peter";
             const tom = typeof parsedSkin.tom === "string" ? parsedSkin.tom : "consultivo, humano e didático";
             const estilo = typeof parsedSkin.estilo === "string" ? parsedSkin.estilo : "profissional e acolhedor";
-            identityPrompt = `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
+            identityPrompt = `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.
 Sua comunicação deve seguir um tom ${tom}, com estilo ${estilo}.
 Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias e estruturar o entendimento do processo com clareza.
 Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos concretos e descrições úteis para tomada de decisão.`;
@@ -333,9 +339,18 @@ Seja direto, executivo e orientado à melhoria. Sem enrolação. Sempre gere ins
     if (usePeterAssistant && OPENAI_API_KEY) {
       const lease = await acquireAiQuota(client, "ai-diagnose-process", companyId);
       try {
+        const peterSystemPrompt = `${systemPrompt}
+
+SCHEMA JSON OBRIGATÓRIO (tipos materializados, sem placeholders):
+${JSON.stringify(toolSchema.function.parameters, null, 2)}
+
+Em fase4.melhorias, cada item deve conter problemaIdentificado, solucaoProposta, tipoTecnologia, impactoEsperado, complexidade e prioridade.
+Em fase5.acoes, cada item deve conter oque, porque, quem, quando, onde, como, custo e prioridade.
+Em fase6.indicadores, cada item deve conter nome, objetivo, formulaCalculo, meta, periodicidade, responsavel, classificacao e tipo.
+Retorne somente um objeto JSON válido que respeite integralmente esse schema, sem markdown.`;
         const content = await runConfiguredAssistant(
           OPENAI_API_KEY,
-          `${systemPrompt}\nRetorne somente JSON válido, sem markdown, seguindo integralmente a estrutura de diagnóstico solicitada.`,
+          peterSystemPrompt,
           userContent,
         );
         return new Response(JSON.stringify(JSON.parse(stripCodeFence(content))), {

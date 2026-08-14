@@ -11,6 +11,7 @@ import type { DiagnosticoResult, ProcessoFormData } from "@/data/processo-form-t
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
+import { buildMappedProcessPayload } from "@/data/documentation-config";
 
 type GenerationState = "idle" | "loading" | "ready" | "error";
 
@@ -52,6 +53,9 @@ export default function ProcessoResultadoGuiado() {
   const [bpmnXml, setBpmnXml] = useState("");
   const [state, setState] = useState<GenerationState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [processRow, setProcessRow] = useState<Tables<"processos"> | null>(null);
+  const [generatedDocument, setGeneratedDocument] = useState<{ title: string; content_markdown: string } | null>(null);
+  const [documentLoading, setDocumentLoading] = useState<string | null>(null);
   const startedRef = useRef(false);
 
   const loadProcess = useCallback(async () => {
@@ -59,6 +63,7 @@ export default function ProcessoResultadoGuiado() {
     const { data, error } = await supabase.from("processos").select("*").eq("id", id).single();
     if (error || !data) throw error || new Error("Processo não encontrado.");
     const row = data as Tables<"processos">;
+    setProcessRow(row);
     const form = routeState?.processo ?? mapProcessRowToForm(row);
     setProcessForm(form);
     setCompanyId(row.company_id);
@@ -66,6 +71,38 @@ export default function ProcessoResultadoGuiado() {
     setDiagnosis((row.diagnostico as unknown as DiagnosticoResult | null) ?? null);
     return { row, form };
   }, [id, routeState?.processo]);
+
+  const gerarDocumento = async (documentType: "raci" | "ficha_processo" | "pop_v5") => {
+    if (!id || !processRow) return;
+    const mappedProcessData = buildMappedProcessPayload(processRow);
+    if (!mappedProcessData) return;
+    const labels = { raci: "Matriz RACI", ficha_processo: "Ficha do Processo", pop_v5: "POP — Metodologia v5" };
+    setDocumentLoading(documentType);
+    setErrorMessage(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-generate-document", {
+        body: {
+          template: { id: documentType, name: labels[documentType], type: documentType, documentType },
+          sections: [],
+          mappedProcessData,
+          manualDescription: null,
+          generationConfig: { documentType },
+          companyContext: { companyId: processRow.company_id },
+          process_id: id,
+          use_peter_assistant: true,
+        },
+      });
+      if (error || hasFunctionError(data)) throw error || new Error(data.error);
+      setGeneratedDocument({
+        title: String(data?.title || labels[documentType]),
+        content_markdown: String(data?.content_markdown || ""),
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Não foi possível gerar o documento.");
+    } finally {
+      setDocumentLoading(null);
+    }
+  };
 
   const generate = useCallback(async () => {
     if (!id) return;
@@ -165,6 +202,15 @@ export default function ProcessoResultadoGuiado() {
           <Button onClick={() => navigate(`/documentos?processId=${id}&mode=linked_process`)} disabled={!id || state === "loading"}>
             <FileText className="mr-2 h-4 w-4" /> Criar procedimento
           </Button>
+          <Button variant="outline" onClick={() => void gerarDocumento("raci")} disabled={!processRow || Boolean(documentLoading)}>
+            {documentLoading === "raci" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "📊"} Gerar Matriz RACI
+          </Button>
+          <Button variant="outline" onClick={() => void gerarDocumento("ficha_processo")} disabled={!processRow || Boolean(documentLoading)}>
+            {documentLoading === "ficha_processo" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "📌"} Gerar Ficha do Processo
+          </Button>
+          <Button variant="outline" onClick={() => void gerarDocumento("pop_v5")} disabled={!processRow || Boolean(documentLoading)}>
+            {documentLoading === "pop_v5" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "📄"} Gerar POP (metodologia v5)
+          </Button>
         </div>
       </div>
 
@@ -194,6 +240,12 @@ export default function ProcessoResultadoGuiado() {
           )}
         </TabsContent>
       </Tabs>
+      {generatedDocument && (
+        <Card>
+          <CardHeader><CardTitle>{generatedDocument.title}</CardTitle></CardHeader>
+          <CardContent><pre className="overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 text-sm leading-6">{generatedDocument.content_markdown}</pre></CardContent>
+        </Card>
+      )}
     </div>
   );
 }

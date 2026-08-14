@@ -40,6 +40,7 @@ export interface RiscoForm {
   consequencia: string;
   probabilidade: NivelRisco;
   impacto: NivelRisco;
+  _hipotese?: boolean;
 }
 
 export interface IndicadorForm {
@@ -49,6 +50,7 @@ export interface IndicadorForm {
   meta: string;
   periodicidade: string;
   responsavel: string;
+  _hipotese?: boolean;
 }
 
 export interface PlanoAcao5W2H {
@@ -59,6 +61,7 @@ export interface PlanoAcao5W2H {
   onde: string;
   como: string;
   custo: string;
+  _hipotese?: boolean;
 }
 
 export interface ProcessoFormData {
@@ -158,7 +161,7 @@ export interface Fase3Maturidade {
   maturidadeDigital: "baixa" | "media" | "alta";
   descricaoMaturidadeDigital: string;
   mediaMaturidade?: number;
-  classificacaoMaturidade?: "Baixa maturidade (analógico)" | "Média maturidade (digital básico)" | "Alta maturidade (digital estruturado)" | "Avançado (inteligente)";
+  classificacaoMaturidade?: "Inicial" | "Estruturado" | "Padronizado" | "Monitorado" | "Otimizado" | "Baixa maturidade (analógico)" | "Média maturidade (digital básico)" | "Alta maturidade (digital estruturado)" | "Avançado (inteligente)";
 }
 
 export interface MelhoriaToBe {

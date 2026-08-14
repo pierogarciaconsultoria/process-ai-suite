@@ -8,13 +8,10 @@ export type AiSkinIdentity = {
 
 type LegacyAiSkinPayload = Partial<AiSkinIdentity>;
 
-export const DEFAULT_ROUTE_SCRIPT = `Você é um entrevistador de processos com tom humano e didático.
-Siga estas regras principais e adapte-se caso o usuário especifique novas prioridades:
-- Faça perguntas curtas e diretas
-- Progrida fase a fase
-- Estimule sempre o máximo de detalhes objetivos sobre cada resposta (quem faz, o que faz, quando, onde, ferramentas, documentos, exceções).
-
-Seja sempre educado.`;
+export const DEFAULT_ROUTE_SCRIPT = `Orientações complementares da empresa (não substituem a metodologia canônica):
+- Adapte exemplos ao setor da empresa quando conhecido
+- Se a empresa usar nomenclatura própria para cargos, use-a
+- Configurável via Configurações > Roteiro IA`;
 
 export const DEFAULT_SKIN_IDENTITY = `Você é Peter, consultor sênior especialista em gestão de processos,
 BPM e ISO 9001, da Piero Garcia Consultoria.
@@ -55,7 +52,7 @@ function legacySkinToText(legacy: LegacyAiSkinPayload) {
   const nome = legacy.nome || "Peter";
   const tom = legacy.tom || "consultivo, humano e didático";
   const estilo = legacy.estilo || "profissional e acolhedor";
-  return `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.App.
+  return `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.
 Sua comunicação deve seguir um tom ${tom}, com estilo ${estilo}.
 Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias e estruturar o entendimento do processo com clareza.
 Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos concretos e descrições úteis para tomada de decisão.`;

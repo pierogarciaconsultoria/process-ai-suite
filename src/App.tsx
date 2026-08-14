@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
+import { SuperAdminRoute } from "@/components/SuperAdminRoute";
 import SupportWidget from "@/components/SupportWidget";
 const Login = React.lazy(() => import("./pages/Login"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
@@ -97,9 +98,9 @@ const App = () => (
               <Route path="/configuracoes/usuarios" element={<Usuarios />} />
               <Route path="/configuracoes/perfil" element={<ConfigPerfil />} />
               <Route path="/configuracoes/alterar-senha" element={<ConfigAlterarSenha />} />
-              <Route path="/configuracoes/roteiro-entrevista" element={<ConfigRoteiroEntrevista />} />
-              <Route path="/configuracoes/skin-ia" element={<ConfigSkinIA />} />
-              <Route path="/configuracoes/documentacao-processo" element={<ConfigDocumentacaoProcesso />} />
+              <Route path="/configuracoes/roteiro-entrevista" element={<SuperAdminRoute><ConfigRoteiroEntrevista /></SuperAdminRoute>} />
+              <Route path="/configuracoes/skin-ia" element={<SuperAdminRoute><ConfigSkinIA /></SuperAdminRoute>} />
+              <Route path="/configuracoes/documentacao-processo" element={<SuperAdminRoute><ConfigDocumentacaoProcesso /></SuperAdminRoute>} />
               <Route path="/configuracoes/chamados" element={<ConfigChamados />} />
               <Route path="/configuracoes/chamados/:id" element={<ChamadoDetalhe />} />
               <Route path="/usuarios" element={<Navigate to="/configuracoes/usuarios" replace />} />

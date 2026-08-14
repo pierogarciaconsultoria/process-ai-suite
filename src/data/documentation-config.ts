@@ -34,6 +34,9 @@ export const DOCUMENT_TYPES = [
   "Documento de Entrevista",
   "Documento consolidado do processo",
   "Documento avulso gerado por IA",
+  "raci",
+  "ficha_processo",
+  "pop_v5",
 ] as const;
 
 export const PROCEDURE_CATEGORIES = [
@@ -440,9 +443,15 @@ function parseJsonObject<T extends object>(value: Json | null | undefined, fallb
   return value && typeof value === "object" && !Array.isArray(value) ? (value as T) : fallback;
 }
 
-function createStandardSections(documentType: DocumentType): DocumentSection[] {
+export function createStandardSections(documentType: DocumentType): DocumentSection[] {
   const sectionTitles =
-    documentType === "Checklist Operacional"
+    documentType === "raci"
+      ? ["Cabeçalho", "Matriz RACI", "Pendências"]
+      : documentType === "ficha_processo"
+        ? ["Identificação", "Entradas e Saídas", "Recursos Necessários", "Indicadores", "Riscos Identificados", "Documentos Relacionados", "Nível de Maturidade"]
+        : documentType === "pop_v5"
+          ? ["1. Objetivo", "2. Campo de Aplicação", "3. Referências Normativas", "4. Definições e Siglas", "5. Responsabilidades", "6. Descrição das Atividades", "7. Pontos de Decisão", "8. Fluxograma", "9. Indicadores de Desempenho", "10. Registros e Evidências", "11. Histórico de Revisões"]
+    : documentType === "Checklist Operacional"
       ? [
           "Objetivo",
           "Pré-requisitos",
@@ -483,13 +492,30 @@ function createStandardSections(documentType: DocumentType): DocumentSection[] {
           "Histórico de revisão",
         ];
 
+  const descriptions: Partial<Record<DocumentType, string[]>> = {
+    raci: [
+      "Processo, data, versão e legenda RACI.",
+      "Tabela com atividades × responsáveis. R=Responsável, A=Aprovador, C=Consultado, I=Informado.",
+      "Atividades sem R ou A definidos — marcar como ⚠️ DEFINIR.",
+    ],
+    ficha_processo: [
+      "Nome, código, macroprocesso, classificação, área, gestor, frequência e gatilho.",
+      "Tabela SIPOC: fornecedores, entradas, saídas e clientes.",
+      "Pessoas, sistemas e documentos de referência.",
+      "Tabela: KPI, fórmula, meta, frequência e responsável.",
+      "Tabela: risco, probabilidade, impacto e controle existente.",
+      "POPs, formulários e normas vinculadas.",
+      "Inicial / Estruturado / Padronizado / Monitorado / Otimizado.",
+    ],
+  };
+
   return sectionTitles.map((title, index) => ({
     id: uuid(),
     sectionKey: title.toLowerCase().normalize("NFD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_"),
     sectionTitle: title,
-    sectionDescription: `Seção ${title} do documento.`,
+    sectionDescription: descriptions[documentType]?.[index] || `Seção ${title} do documento.`,
     sortOrder: index + 1,
-    isRequired: index < 4,
+    isRequired: documentType === "raci" ? index < 2 : documentType === "ficha_processo" ? index < 4 : documentType === "pop_v5" ? [0, 1, 4, 5, 10].includes(index) : index < 4,
     isActive: true,
     sourceType: index < 9 ? "processo_mapeado" : "hibrido",
     generatedByAI: true,

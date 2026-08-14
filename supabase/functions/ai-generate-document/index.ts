@@ -9,6 +9,45 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const IDENTIDADE_PETER_DOC = `Você é o Peter, assistente de documentação de processos da ProcessHub, desenvolvido com base na metodologia Piero Garcia Consultoria.
+Fundamentos: BPM/BPMN (ABPMP), ISO 9001/SGQ, Lean, Cadeia de Valor de Porter, Gestão por Objetivos (Drucker) e metodologia própria Piero Garcia.
+Regras absolutas: use apenas os dados fornecidos; nunca invente informações; quando ausente, escreva [não informado]; escreva em português do Brasil; siga rigorosamente o template solicitado; retorne o JSON definido.`;
+
+const PROMPT_RACI = `Gere a Matriz RACI completa. Inclua cabeçalho com processo, data e versão 1.0; legenda R, A, C e I; e tabela com uma linha por atividade e uma coluna por cargo/área.
+Toda atividade deve ter EXATAMENTE 1 R e EXATAMENTE 1 A. Sem R: ⚠️ DEFINIR R. Sem A ou com múltiplos A: ⚠️ DEFINIR A. Termine com Pendências ou "Nenhuma pendência identificada".`;
+
+const PROMPT_FICHA = `Gere a Ficha do Processo com EXATAMENTE: Identificação; Entradas e Saídas/SIPOC; Recursos Necessários; Indicadores; Riscos Identificados; Documentos Relacionados; Nível de Maturidade.
+Identificação: nome, código PROC-[área 3 letras]-[número], macroprocesso/cadeia de valor, classificação Primário/Suporte/Gestão, área, gestor por cargo, frequência e gatilho.
+Indicadores: KPI | Fórmula | Meta | Frequência | Responsável. Riscos: Risco | Probabilidade | Impacto | Controle. Maturidade: escolha um entre Inicial, Estruturado, Padronizado, Monitorado e Otimizado.`;
+
+const PROMPT_POP_V5 = `Gere o POP — Metodologia v5 com EXATAMENTE estas 11 seções numeradas:
+1. OBJETIVO; 2. CAMPO DE APLICAÇÃO; 3. REFERÊNCIAS NORMATIVAS; 4. DEFINIÇÕES E SIGLAS; 5. RESPONSABILIDADES; 6. DESCRIÇÃO DAS ATIVIDADES; 7. PONTOS DE DECISÃO E FLUXOS ALTERNATIVOS; 8. FLUXOGRAMA; 9. INDICADORES DE DESEMPENHO; 10. REGISTROS E EVIDÊNCIAS; 11. HISTÓRICO DE REVISÕES.
+No cabeçalho use POP-[área 3 letras]-001, versão 1.0 e data. Na seção 6, use tabela Seq. | Atividade [Verbo+Objeto] | Responsável | Sistema | Prazo | Registro. O fluxograma referencia BPMN_[nome]_v1.`;
+
+const PROMPT_DIAGNOSTICO_V5 = `Gere o Relatório de Diagnóstico v5 com EXATAMENTE: 1 Sumário Executivo; 2 Caracterização; 3 SIPOC; 4 Desempenho Atual; 5 Oito Desperdícios Lean; 6 Riscos ISO 9001; 7 Achados Classificados; 8 Maturidade; 9 Recomendações Estratégicas; 10 Conclusão.
+Avalie todos os 8 desperdícios: Superprodução, Espera, Transporte, Retrabalho, Excesso de processamento, Inventário, Movimento e Defeitos.
+ISO 9001: responsáveis, evidências/registros, critério de aceitação, controle de versão, contingência e indicadores com meta/responsável.
+Classifique achados em críticos, relevantes e oportunidades. Escolha uma maturidade: Inicial, Estruturado, Padronizado, Monitorado ou Otimizado.`;
+
+const PROMPT_5W2H = `Gere Plano de Ação em tabela 5W2H: # | O quê | Por quê | Quem | Quando | Onde | Como | Quanto.
+Uma linha por melhoria/ação. Priorize Crítico, Relevante e Oportunidade. Quem deve ser cargo; Quando deve ser prazo concreto; Quanto deve ser esforço estimado ou [a estimar]. Se não houver melhorias, derive apenas dos problemas e riscos fornecidos.`;
+
+const SYSTEM_PROMPT_ATUAL = `Você é um consultor sênior especialista em gestão documental, BPM, padronização operacional, melhoria contínua e documentação corporativa.
+Sua tarefa é gerar documentos de processos para o ProcessHub. Use somente os dados fornecidos; não invente dados críticos; use [não informado] quando necessário; respeite o modelo; escreva em português do Brasil; gere markdown estruturado.
+Responda sempre em JSON com: title, content_markdown, content_text, executive_summary, attention_points, suggested_risks, suggested_indicators, generation_metadata e ai_prompt_used.`;
+
+function getSystemPromptPorTipo(tipo: string): string {
+  const prompts: Record<string, string> = {
+    raci: PROMPT_RACI,
+    ficha_processo: PROMPT_FICHA,
+    pop_v5: PROMPT_POP_V5,
+    diagnostico: PROMPT_DIAGNOSTICO_V5,
+    "Relatório de Análise do Processo": PROMPT_DIAGNOSTICO_V5,
+    "Plano de Ação": PROMPT_5W2H,
+  };
+  return prompts[tipo] ? `${IDENTIDADE_PETER_DOC}\n\n${prompts[tipo]}\n\n${SYSTEM_PROMPT_ATUAL}` : SYSTEM_PROMPT_ATUAL;
+}
+
 function buildFallbackMarkdown(templateName: string, sections: { sectionTitle: string; sectionDescription?: string }[], context: Record<string, unknown>) {
   const body = sections
     .map((section) => {
@@ -96,29 +135,8 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `Você é um consultor sênior especialista em gestão documental, BPM, padronização operacional, melhoria contínua e documentação corporativa.
-
-Sua tarefa é gerar documentos de processos para um SaaS B2B chamado ProcessHub.App.
-
-Regras obrigatórias:
-- Use somente os dados fornecidos.
-- Não invente dados críticos.
-- Quando faltar informação relevante, registre "não informado" ou sugira validação.
-- Respeite o modelo documental selecionado.
-- Escreva em português do Brasil.
-- Gere conteúdo profissional, claro e aplicável.
-- O documento deve ser retornado em markdown estruturado.
-
-Você deve responder SEMPRE em JSON com as chaves:
-- title
-- content_markdown
-- content_text
-- executive_summary
-- attention_points
-- suggested_risks
-- suggested_indicators
-- generation_metadata
-- ai_prompt_used`;
+    const tipoDocumento = String(template?.documentType || template?.type || generationConfig?.documentType || "");
+    const systemPrompt = getSystemPromptPorTipo(tipoDocumento);
 
     if (use_peter_assistant === true) {
       const userContent = JSON.stringify(contextPayload);

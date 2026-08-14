@@ -9,6 +9,45 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+export function validarDadosParaBPMN(body: Record<string, unknown>): string[] {
+  const erros: string[] = [];
+  if (!String(body.nomeProcesso || "").trim()) erros.push("Nome do processo não informado (Etapa 1)");
+  if (!String(body.gatilho || "").trim()) erros.push("Gatilho de início não informado (Etapa 2)");
+  const saidas = body.saidas;
+  if (!Array.isArray(saidas) || !saidas.some((item) => item && typeof item === "object" && String((item as Record<string, unknown>).saida || "").trim())) {
+    erros.push("Saída principal não informada (Etapa 2)");
+  }
+  const etapas = body.etapas;
+  if (!Array.isArray(etapas) || etapas.length === 0) {
+    erros.push("Nenhuma atividade mapeada (Etapa 3)");
+  } else {
+    const semResponsavel = etapas.filter((item) => !item || typeof item !== "object" || !String((item as Record<string, unknown>).responsavel || "").trim());
+    if (semResponsavel.length) erros.push(`${semResponsavel.length} atividade(s) sem responsável (Etapa 3)`);
+  }
+  return erros;
+}
+
+export function validarXMLBPMN(xml: string): { valido: boolean; problemas: string[] } {
+  const problemas: string[] = [];
+  if (!xml.includes("startEvent")) problemas.push("Ausente: startEvent");
+  if (!xml.includes("endEvent")) problemas.push("Ausente: endEvent");
+  if (!xml.includes("sequenceFlow")) problemas.push("Ausente: sequenceFlow");
+  if (!xml.includes("BPMNDiagram")) problemas.push("Ausente: BPMNDiagram (sem layout visual)");
+  if (!xml.includes("BPMNShape")) problemas.push("Ausente: BPMNShape (sem coordenadas)");
+  const ids = [...xml.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+  const duplicados = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+  if (duplicados.length) problemas.push(`IDs duplicados: ${duplicados.join(", ")}`);
+  return { valido: problemas.length === 0, problemas };
+}
+
+const REGRAS_BPMN_ADICIONAIS = `REGRAS ADICIONAIS OBRIGATÓRIAS:
+- Use um Pool principal e uma Lane para cada área/departamento responsável; se houver uma única área, use uma Lane.
+- Pessoa sem sistema: bpmn:Task. Pessoa via sistema: bpmn:UserTask. Automação: bpmn:ServiceTask.
+- Decisão de caminho: bpmn:ExclusiveGateway. Atividades simultâneas: bpmn:ParallelGateway.
+- Tasks sempre em [Verbo de ação] + [Objeto], nunca substantivo isolado.
+- Exatamente 1 StartEvent por Pool e pelo menos 1 EndEvent por Pool.
+- Inclua todos os BPMNShape e BPMNEdge; layout horizontal; lanes com altura mínima 120px; tasks 100x80; gateways 50x50.`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -16,6 +55,7 @@ serve(async (req) => {
 
   try {
     const { client, user } = await authenticateRequest(req);
+    const body = await req.json();
     const {
       etapas,
       decisoes,
@@ -29,22 +69,24 @@ serve(async (req) => {
       company_id,
       process_id,
       use_peter_assistant,
-    } = await req.json();
+    } = body;
     const companyId = requireString(company_id, "company_id");
     await authorizeCompany(client, user.id, companyId);
     if (typeof process_id === "string" && process_id.trim()) {
       await authorizeProcess(client, process_id.trim(), companyId);
     }
 
+    const errosValidacao = validarDadosParaBPMN(body as Record<string, unknown>);
+    if (errosValidacao.length > 0) {
+      return new Response(JSON.stringify({
+        error: "Dados insuficientes para gerar o BPMN.",
+        detalhes: errosValidacao,
+        instrucao: "Conclua e confirme as Etapas 1, 2 e 3 da entrevista.",
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const hasEtapas = Array.isArray(etapas) && etapas.length > 0;
     const hasResumo = typeof resumo === "string" && resumo.trim().length > 0;
-
-    if (!hasEtapas && !hasResumo) {
-      return new Response(
-        JSON.stringify({ error: "Preencha pelo menos uma atividade ou um resumo textual antes de gerar o mapa." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
@@ -70,7 +112,7 @@ serve(async (req) => {
     const systemPrompt = `Você é um especialista em modelagem BPMN 2.0. Gere XML BPMN 2.0 válido e completo.
 
 REGRAS OBRIGATÓRIAS:
-1. Use namespaces corretos: bpmn, bpmndi, dc, di
+1. Use namespaces corretos: bpmn, bpmndi, dc, di e defina targetNamespace="http://processhub.app.br/bpmn"
 2. Inclua StartEvent, EndEvent, e Tasks para cada atividade
 3. Se houver decisões, use ExclusiveGateway com fluxos divergentes e convergentes
 4. Conecte tudo com SequenceFlow
@@ -81,7 +123,9 @@ REGRAS OBRIGATÓRIAS:
 9. Y base = 160 para o fluxo principal
 10. NÃO inclua \`\`\`xml ou qualquer markdown. Retorne APENAS o XML puro.
 
-${modeInstruction}`;
+    ${modeInstruction}
+
+    ${REGRAS_BPMN_ADICIONAIS}`;
 
     const userPrompt = `Processo: ${nomeProcesso || "Sem nome"}
 Gatilho: ${gatilho || "N/A"}
@@ -101,9 +145,8 @@ Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
       const lease = await acquireAiQuota(client, "ai-generate-bpmn", companyId);
       try {
         const content = stripCodeFence(await runConfiguredAssistant(OPENAI_API_KEY, systemPrompt, userPrompt));
-        if (!content.includes("<bpmn:definitions") && !content.includes("<definitions")) {
-          throw new Error("O Peter não retornou um XML BPMN válido.");
-        }
+        const validation = validarXMLBPMN(content);
+        if (!validation.valido) throw new Error(`O Peter não retornou um XML BPMN válido: ${validation.problemas.join("; ")}`);
         return new Response(JSON.stringify({ xml: content }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -156,10 +199,11 @@ Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
     content = content.replace(/```xml\s*/gi, "").replace(/```\s*/g, "").trim();
 
     // Validate it looks like BPMN XML
-    if (!content.includes("<bpmn:definitions") && !content.includes("<definitions")) {
+    const xmlValidation = validarXMLBPMN(content);
+    if (!xmlValidation.valido) {
       console.error("Generated content is not valid BPMN:", content.substring(0, 200));
       return new Response(
-        JSON.stringify({ error: "A IA não gerou um XML BPMN válido. Tente novamente." }),
+        JSON.stringify({ error: "A IA não gerou um XML BPMN válido. Tente novamente.", detalhes: xmlValidation.problemas }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -12,7 +12,7 @@ const EMPTY_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
   id="Definitions_1"
-  targetNamespace="http://bpmn.io/schema/bpmn">
+  targetNamespace="http://processhub.app.br/bpmn">
   <bpmn:process id="Process_1" isExecutable="false">
     <bpmn:startEvent id="StartEvent_1" name="Início" />
   </bpmn:process>

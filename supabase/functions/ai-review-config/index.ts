@@ -53,7 +53,7 @@ Responda SEMPRE em JSON com as chaves:
       roteiro,
       skin,
       contextoProduto:
-        "Plataforma ProcessAI Suite para mapeamento de processos, diagnóstico e geração de BPMN com IA, usada por consultores e empresas B2B.",
+        "Plataforma ProcessHub para mapeamento de processos, diagnóstico e geração de BPMN com IA, usada por consultores e empresas B2B.",
     };
 
     const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";

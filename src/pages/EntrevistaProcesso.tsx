@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, ArrowRight, Check, Cloud, Loader2, Send, Sparkles } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { useAiConfig } from "@/hooks/useAiConfig";
@@ -30,14 +29,32 @@ import {
   type PlanoAcao5W2H,
   emptyProcessoForm,
 } from "@/data/processo-form-types";
-
-type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
-type InterviewResponse = {
-  nextQuestion?: string;
-  partialUpdate?: Partial<ProcessoFormData>;
-  done?: boolean;
-};
-type InterviewStage = "askUserName" | "askProcessName" | "askDescription" | "aiFlow";
+import {
+  clampEtapa,
+  criarMensagemMetadados,
+  normalizarResposta,
+  restaurarMetadados,
+  type ChatMessage,
+  type InterviewResponse,
+  type InterviewStage,
+  type ModoEntrada,
+  type ArquivoProcessado,
+  EXTENSOES_ACEITAS,
+  LIMITE_TEXTO_CHARS,
+  validarArquivo,
+  validarLote,
+} from "../../supabase/functions/_shared/peter-interview-contract";
+import {
+  calcularTransicao,
+  combinarModo,
+  extrairCamposPorEtapa,
+  interpretarSelecaoModo,
+} from "@/lib/peter-interview-state";
+import {
+  labelVisualArquivos,
+  montarContentParaThread,
+  processarArquivo,
+} from "@/lib/peter-upload";
 
 class InterviewPageErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -92,6 +109,7 @@ function EntrevistaProcessoPage() {
   const [form, setForm] = useState<ProcessoFormData>(emptyProcessoForm);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
   const [requestApply, setRequestApply] = useState(false);
   const isApplyCommand = (text: string) => /(^|\s)(sim|aplicar|aplique|apply|yes)(\s|$)/i.test(text);
   const sessionIdRef = useRef<string>(Math.random().toString(36).slice(2) + Date.now().toString());
@@ -99,7 +117,15 @@ function EntrevistaProcessoPage() {
   const processStatusRef = useRef<ProcessoStatus>("Rascunho");
   const assistantQueueRef = useRef<Promise<void>>(Promise.resolve());
   const isMountedRef = useRef(true);
-  const [stage, setStage] = useState<InterviewStage>("askUserName");
+  const [stage, setStage] = useState<InterviewStage>("selectMode");
+  const [etapaAtual, setEtapaAtual] = useState(1);
+  const [modoEntrada, setModoEntrada] = useState<ModoEntrada>("nenhum");
+  const [aguardandoConfirmacao, setAguardandoConfirmacao] = useState(false);
+  const [conteudoPendente, setConteudoPendente] = useState<string | null>(null);
+  const [alertas, setAlertas] = useState<string[]>([]);
+  const [arquivosAnexados, setArquivosAnexados] = useState<ArquivoProcessado[]>([]);
+  const [statusUpload, setStatusUpload] = useState<"idle" | "validando" | "lendo" | "processando" | "erro">("idle");
+  const [erroUpload, setErroUpload] = useState<string | null>(null);
   const [participantName, setParticipantName] = useState("");
   const routeScriptConfig = useAiConfig("route_script");
   const [initializationError, setInitializationError] = useState<string | null>(null);
@@ -145,20 +171,26 @@ function EntrevistaProcessoPage() {
         const restoredMessages = Array.isArray(row.interview_messages)
           ? row.interview_messages as unknown as ChatMessage[]
           : [];
+        const metadata = restaurarMetadados(restoredMessages);
+        const visibleMessages = restoredMessages.filter((message) => message.role !== "system");
         processIdRef.current = row.id;
         processStatusRef.current = normalizeSavedStatus(row.status, "Rascunho");
         sessionIdRef.current = row.interview_session_id || sessionIdRef.current;
         setForm(restoredForm);
-        setMessages(restoredMessages);
+        setMessages(visibleMessages);
         setParticipantName(restoredForm.entrevistados?.trim() || "");
         if (restoredMessages.length > 0) {
-          if (!restoredForm.entrevistados.trim()) setStage("askUserName");
+          if (metadata) {
+            setStage(metadata.stage);
+            setEtapaAtual(metadata.etapa_atual);
+            setModoEntrada(metadata.modo_entrada);
+            setAguardandoConfirmacao(metadata.aguardando_confirmacao);
+          } else if (!restoredForm.entrevistados.trim()) setStage("askUserName");
           else if (!restoredForm.nomeProcesso.trim()) setStage("askProcessName");
-          else if (!restoredForm.objetivo.trim() && !restoredForm.etapas.some((item) => item.atividade.trim())) setStage("askDescription");
           else setStage("aiFlow");
           setHasInitializedConversation(true);
         }
-        lastSavedSignatureRef.current = JSON.stringify({ form: restoredForm, messages: restoredMessages });
+        lastSavedSignatureRef.current = JSON.stringify({ form: restoredForm, messages: visibleMessages });
         setSaveStatus("saved");
       } catch (error) {
         console.error("Erro ao restaurar entrevista:", error);
@@ -206,8 +238,7 @@ function EntrevistaProcessoPage() {
           "Oi, eu sou o Peter. Vou conduzir esta conversa com você para mapear o processo com clareza, leveza e sem complicação.";
         const reassurance =
           "Pode ficar à vontade para responder no seu ritmo. Meu papel aqui é entender bem o contexto, organizar as informações e transformar tudo em um mapeamento claro e útil para você.";
-        const askUserName =
-          "Antes de começarmos, como você gostaria que eu te chamasse?";
+        const askUserName = "Como você prefere começar: entrevista guiada, colar um texto livre ou anexar um arquivo?";
 
         setHasInitializedConversation(true);
         setMessages([{ role: "assistant", content: greeting }]);
@@ -280,6 +311,19 @@ function EntrevistaProcessoPage() {
     return row;
   }, [routeScriptConfig.companyId]);
 
+  const withInterviewMetadata = useCallback((snapshotMessages: ChatMessage[]) => [
+    ...snapshotMessages.filter((message) => !message._eh_metadado),
+    criarMensagemMetadados({
+      _tipo: "metadados_peter_v5",
+      etapa_atual: clampEtapa(etapaAtual, 1),
+      modo_entrada: modoEntrada,
+      aguardando_confirmacao: aguardandoConfirmacao,
+      stage,
+      conteudo_pendente: conteudoPendente ?? "",
+      atualizado_em: new Date().toISOString(),
+    }),
+  ], [aguardandoConfirmacao, conteudoPendente, etapaAtual, modoEntrada, stage]);
+
   useEffect(() => {
     if (isRestoringDraft || !hasInitializedConversation || !routeScriptConfig.companyId) return;
     if (!messages.some((message) => message.role === "user")) return;
@@ -290,7 +334,7 @@ function EntrevistaProcessoPage() {
     setSaveStatus("saving");
     const timer = window.setTimeout(() => {
       const snapshotForm = form;
-      const snapshotMessages = messages;
+      const snapshotMessages = withInterviewMetadata(messages);
       saveQueueRef.current = saveQueueRef.current
         .catch(() => undefined)
         .then(async () => {
@@ -312,7 +356,7 @@ function EntrevistaProcessoPage() {
     }, 600);
 
     return () => window.clearTimeout(timer);
-  }, [form, guidedExperience, hasInitializedConversation, isRestoringDraft, messages, navigate, persistProcessDraft, routeProcessId, routeScriptConfig.companyId]);
+  }, [form, guidedExperience, hasInitializedConversation, isRestoringDraft, messages, navigate, persistProcessDraft, routeProcessId, routeScriptConfig.companyId, withInterviewMetadata]);
 
   useEffect(() => {
     const hasUnsyncedChanges = saveStatus !== "saved" || input.trim().length > 0;
@@ -369,14 +413,14 @@ function EntrevistaProcessoPage() {
         user_id: userId,
         empresa_id: empresaId,
         reason,
-        messages: messages as unknown as Json,
+        messages: withInterviewMetadata(messages) as unknown as Json,
         form_snapshot: form as unknown as Json,
         progress,
         applied: reason === "manual",
       } as unknown;
       const sb = supabase as unknown as { from: (table: string) => { insert: (values: unknown) => Promise<unknown> } };
       await sb.from("interview_sessions").insert(row);
-      await persistProcessDraft(form, messages, "Rascunho");
+      await persistProcessDraft(form, withInterviewMetadata(messages), "Rascunho");
     } catch (e) { void e; }
   };
 
@@ -510,12 +554,14 @@ function EntrevistaProcessoPage() {
         consequencia: "Comprometimento de prazo, acúmulo de demanda e impacto na entrega final",
         probabilidade: 3,
         impacto: 4,
+        _hipotese: true,
       },
       {
         risco: "Retrabalho por falha ou ausência de informação",
         consequencia: "Correções recorrentes, perda de produtividade e aumento do tempo total do processo",
         probabilidade: 3,
         impacto: 4,
+        _hipotese: true,
       },
     ];
 
@@ -525,6 +571,7 @@ function EntrevistaProcessoPage() {
         consequencia: "Erros de atualização, perda de rastreabilidade e falhas no acompanhamento",
         probabilidade: 4,
         impacto: 4,
+        _hipotese: true,
       });
     } else {
       risks.push({
@@ -532,6 +579,7 @@ function EntrevistaProcessoPage() {
         consequencia: "Paradas no processo, baixa previsibilidade e risco operacional",
         probabilidade: 3,
         impacto: 4,
+        _hipotese: true,
       });
     }
 
@@ -546,6 +594,7 @@ function EntrevistaProcessoPage() {
       meta: "Reduzir o tempo médio de execução",
       periodicidade: "Mensal",
       responsavel: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+      _hipotese: true,
     },
     {
       nome: "Cumprimento de prazo",
@@ -554,6 +603,7 @@ function EntrevistaProcessoPage() {
       meta: "Manter pelo menos 95% das entregas dentro do prazo",
       periodicidade: "Mensal",
       responsavel: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+      _hipotese: true,
     },
     {
       nome: "Taxa de retrabalho",
@@ -562,6 +612,7 @@ function EntrevistaProcessoPage() {
       meta: "Reduzir reincidências e correções ao mínimo necessário",
       periodicidade: "Mensal",
       responsavel: currentForm.donoProcesso || currentForm.area || "Responsável pelo processo",
+      _hipotese: true,
     },
   ];
 
@@ -574,6 +625,7 @@ function EntrevistaProcessoPage() {
       onde: currentForm.area || "Área responsável",
       como: "Documentar etapas, responsáveis, critérios e pontos de controle",
       custo: "Baixo",
+      _hipotese: true,
     },
     {
       oque: "Implantar rotina de acompanhamento com indicadores",
@@ -583,12 +635,85 @@ function EntrevistaProcessoPage() {
       onde: currentForm.area || "Área responsável",
       como: "Definir indicadores, frequência de análise e responsável pelo monitoramento",
       custo: "Baixo",
+      _hipotese: true,
     },
   ];
+
+  const requestInterview = async (
+    userContent: string,
+    currentForm: ProcessoFormData,
+    historyBefore: ChatMessage[],
+    contentAlreadyInHistory = false,
+  ) => {
+    const userMsg: ChatMessage = { role: "user", content: userContent };
+    const requestHistory = contentAlreadyInHistory
+      ? historyBefore.filter((message) => !message._eh_metadado)
+      : [...historyBefore.filter((message) => !message._eh_metadado), userMsg];
+    setMessages(requestHistory);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-interview", {
+        body: {
+          history: requestHistory,
+          current: currentForm,
+          etapa_atual: etapaAtual,
+          modo_entrada: modoEntrada,
+          aguardando_confirmacao: aguardandoConfirmacao,
+          company_id: routeScriptConfig.companyId,
+          process_id: processIdRef.current,
+        },
+      });
+      const hasErrorField = (value: unknown): value is { error: string } =>
+        typeof value === "object" && value !== null && "error" in value;
+      if (error || hasErrorField(data)) {
+        handleInterviewRequestError(historyBefore, userContent);
+        return;
+      }
+      const response = normalizarResposta(data, etapaAtual, aguardandoConfirmacao);
+      const nextForm = response.partialUpdate
+        ? mergeFormUpdate(currentForm, response.partialUpdate as Partial<ProcessoFormData>)
+        : currentForm;
+      setForm(nextForm);
+      if (response.alerta) setAlertas((items) => [...items, response.alerta!]);
+      if (response.oportunidade) setAlertas((items) => [...items, response.oportunidade!]);
+      const transition = calcularTransicao(response, etapaAtual, aguardandoConfirmacao);
+      setEtapaAtual(clampEtapa(response.etapa_atual, etapaAtual));
+      setAguardandoConfirmacao(transition.deveAguardar);
+      if (transition.podeConcluir) {
+        await applyToForm("auto", nextForm);
+      } else if (response.nextQuestion) {
+        await enqueueAssistantMessage(response.nextQuestion);
+      } else {
+        await handleFallback(userContent, "Resposta incompleta da IA");
+      }
+    } catch {
+      handleInterviewRequestError(historyBefore, userContent);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectMode = async (rawSelection: string) => {
+    const selection = interpretarSelecaoModo(rawSelection);
+    if (!selection) {
+      await enqueueAssistantMessage("Escolha entrevista guiada, texto livre ou anexo para continuarmos.");
+      return;
+    }
+    setModoEntrada(selection.modo);
+    if (selection.conteudo) setConteudoPendente(selection.conteudo);
+    setInput("");
+    setStage("askUserName");
+    await enqueueAssistantMessage("Antes de começarmos, como você gostaria que eu te chamasse?");
+  };
 
   const send = async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+
+    if (stage === "selectMode") {
+      await selectMode(trimmed);
+      return;
+    }
 
     if (stage === "askUserName") {
       const userMsg: ChatMessage = { role: "user", content: trimmed };
@@ -603,57 +728,40 @@ function EntrevistaProcessoPage() {
 
     if (stage === "askProcessName") {
       const userMsg: ChatMessage = { role: "user", content: trimmed };
-      setForm((prev) => mergeFormUpdate(prev, { nomeProcesso: trimmed }));
-      setMessages((m) => [...m, userMsg]);
+      const nextForm = mergeFormUpdate(form, { nomeProcesso: trimmed });
+      const historyAfterName = [...messages, userMsg];
+      setForm(nextForm);
+      setMessages(historyAfterName);
       setInput("");
-      setStage("askDescription");
-      await enqueueAssistantMessage(
-        `${participantName ? `${participantName}, ` : ""}perfeito. Vamos trabalhar então o processo "${trimmed}". ` +
-          "Agora me conte, em um único texto, como esse processo acontece hoje na prática. Se puder, inclua as etapas, quem faz o quê, quais sistemas, ferramentas e documentos são usados, quais dores ou problemas operacionais aparecem no dia a dia, se existem regras de negócio importantes e se há exceções ou variações no caminho. Pode escrever do seu jeito. Depois eu leio com atenção e faço apenas as perguntas que realmente faltarem, combinado?",
-      );
+      if (conteudoPendente) {
+        const pending = conteudoPendente;
+        const pendingHistory = [...historyAfterName, { role: "user", content: pending } satisfies ChatMessage];
+        setMessages(pendingHistory);
+        setConteudoPendente(null);
+        setStage("aiFlow");
+        await requestInterview(pending, nextForm, pendingHistory, true);
+      } else if (modoEntrada === "entrevista") {
+        setStage("aiFlow");
+        await enqueueAssistantMessage(
+          `${participantName ? `${participantName}, ` : ""}qual é o objetivo principal do processo "${trimmed}" e qual resultado ele deve entregar?`,
+        );
+      } else {
+        setStage("awaitContent");
+        await enqueueAssistantMessage(
+          modoEntrada === "anexo"
+            ? "Perfeito. Anexe o arquivo do processo para eu analisá-lo."
+            : "Perfeito. Cole agora a descrição do processo em um único texto.",
+        );
+        if (modoEntrada === "anexo") inputArquivoRef.current?.click();
+      }
       return;
     }
 
-    if (stage === "askDescription") {
-      const previousMessages = messages;
-      const userMsg: ChatMessage = { role: "user", content: trimmed };
-      setMessages((m) => [...m, userMsg]);
+    if (stage === "awaitContent") {
       setInput("");
       setStage("aiFlow");
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke("ai-interview", {
-          body: {
-            history: [...messages, userMsg],
-            current: form,
-            company_id: routeScriptConfig.companyId,
-            process_id: processIdRef.current,
-          },
-        });
-        const hasErrorField = (d: unknown): d is { error: string } =>
-          typeof d === "object" && d !== null && "error" in d;
-        if (error || hasErrorField(data)) {
-          handleInterviewRequestError(previousMessages, trimmed);
-          return;
-        }
-        const resp = data as InterviewResponse;
-        if (resp.partialUpdate) {
-          setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
-        }
-        if (resp.done) {
-          const completedForm = resp.partialUpdate ? mergeFormUpdate(form, resp.partialUpdate) : form;
-          applyToForm("auto", completedForm);
-        } else if (resp.nextQuestion) {
-          await enqueueAssistantMessage(resp.nextQuestion);
-        } else {
-          await handleFallback(userMsg.content, "Resposta incompleta da IA");
-        }
-      } catch (e) {
-        void e;
-        handleInterviewRequestError(previousMessages, trimmed);
-      } finally {
-        setLoading(false);
-      }
+      setModoEntrada((current) => combinarModo(current, "texto_livre"));
+      await requestInterview(trimmed, form, messages);
       return;
     }
 
@@ -662,44 +770,8 @@ function EntrevistaProcessoPage() {
       applyToForm("manual");
       return;
     }
-    const previousMessages = messages;
-    const userMsg: ChatMessage = { role: "user", content: trimmed };
-    setMessages((m) => [...m, userMsg]);
     setInput("");
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-interview", {
-        body: {
-          history: [...messages, userMsg],
-          current: form,
-          company_id: routeScriptConfig.companyId,
-          process_id: processIdRef.current,
-        },
-      });
-      const hasErrorField = (d: unknown): d is { error: string } =>
-        typeof d === "object" && d !== null && "error" in d;
-      if (error || hasErrorField(data)) {
-        handleInterviewRequestError(previousMessages, trimmed);
-        return;
-      }
-      const resp = data as InterviewResponse;
-      if (resp.partialUpdate) {
-        setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
-      }
-      if (resp.done) {
-        const completedForm = resp.partialUpdate ? mergeFormUpdate(form, resp.partialUpdate) : form;
-        applyToForm("auto", completedForm);
-      } else if (resp.nextQuestion) {
-        await enqueueAssistantMessage(resp.nextQuestion);
-      } else {
-        await handleFallback(userMsg.content, "Resposta incompleta da IA");
-      }
-    } catch (e) {
-      void e;
-      handleInterviewRequestError(previousMessages, trimmed);
-    } finally {
-      setLoading(false);
-    }
+    await requestInterview(trimmed, form, messages);
   };
 
   const handleFallback = async (lastAnswer: string, detail: string) => {
@@ -730,6 +802,31 @@ function EntrevistaProcessoPage() {
   };
 
   const computeFallback = (currentForm: ProcessoFormData, answer: string): InterviewResponse => {
+    const parsedUpdate = extrairCamposPorEtapa(answer, etapaAtual, currentForm);
+    if (Object.keys(parsedUpdate).length > 0) {
+      const nextQuestions: Record<number, string> = {
+        1: "Há mais algum participante, área envolvida ou detalhe do objetivo que devemos registrar nesta etapa?",
+        2: "Quais são as entradas, saídas e o evento que inicia o processo?",
+        3: "Descreva as atividades, responsáveis, decisões, sistemas e documentos usados.",
+        4: "Quais indicadores, metas e frequências de acompanhamento existem hoje?",
+        5: "Quais problemas, causas, impactos e riscos aparecem no processo atual?",
+        6: "Quais oportunidades e ações de melhoria devem ser priorizadas?",
+      };
+      return {
+        raciocinio: "Fallback local por etapa",
+        avaliacao_comportamento: "Resposta recebida",
+        avaliacao_conteudo: "Conteúdo parcialmente estruturado",
+        isValid: true,
+        partialUpdate: parsedUpdate,
+        nextQuestion: nextQuestions[etapaAtual] ?? nextQuestions[6],
+        done: false,
+        etapa_atual: etapaAtual,
+        etapa_confirmada: false,
+        avancar_etapa: false,
+        alerta: null,
+        oportunidade: null,
+      };
+    }
     const isFilled = (key: keyof ProcessoFormData) => {
       const value = currentForm[key] as unknown;
       if (Array.isArray(value)) return hasMeaningfulArrayData(key, value);
@@ -875,7 +972,7 @@ function EntrevistaProcessoPage() {
     if (guidedExperience) {
       setLoading(true);
       try {
-        const row = await persistProcessDraft(completedForm, messages, "Em revisão");
+        const row = await persistProcessDraft(completedForm, withInterviewMetadata(messages), "Em revisão");
         if (!row) throw new Error("Não foi possível identificar usuário e empresa para salvar o processo.");
         localStorage.setItem("process:lastInterviewSessionId", sessionIdRef.current);
         allowNavigationRef.current = true;
@@ -907,95 +1004,107 @@ function EntrevistaProcessoPage() {
     });
   };
 
-  const extractFromPdf = async (file: File): Promise<string> => {
-    const mod = await import("pdfjs-dist");
-    mod.GlobalWorkerOptions.workerSrc = pdfjsWorker as string;
-    const buf = await file.arrayBuffer();
-    const loadingTask = mod.getDocument({ data: buf });
-    const pdf = await loadingTask.promise;
-    let full = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((it: unknown) => {
-          const rec = it as { str?: unknown };
-          return typeof rec.str === "string" ? rec.str : "";
-        })
-        .filter((s) => s && s.trim().length > 0)
-        .join(" ");
-      full += "\n" + pageText;
+  // Tesseract removido: imagens só serão habilitadas após teste real no Assistant.
+  // Quando habilitadas, seguem como image_url para preservar fluxogramas, setas e formas.
+  const enviarArquivosParaPeter = async (
+    arquivos: ArquivoProcessado[],
+    modoAtual: ModoEntrada,
+    historySnapshot: ChatMessage[],
+  ) => {
+    const { data, error } = await supabase.functions.invoke("ai-interview", {
+      body: {
+        history: historySnapshot,
+        arquivo_content: montarContentParaThread(arquivos, etapaAtual),
+        current: form,
+        etapa_atual: etapaAtual,
+        modo_entrada: modoAtual,
+        aguardando_confirmacao: aguardandoConfirmacao,
+        company_id: routeScriptConfig.companyId,
+        process_id: processIdRef.current,
+      },
+    });
+    const hasErrorField = (value: unknown): value is { error: string } =>
+      typeof value === "object" && value !== null && "error" in value;
+    if (error || hasErrorField(data)) throw error || new Error(data.error);
+
+    const response = normalizarResposta(data, etapaAtual, aguardandoConfirmacao);
+    const nextForm = response.partialUpdate
+      ? mergeFormUpdate(form, response.partialUpdate as Partial<ProcessoFormData>)
+      : form;
+    setForm(nextForm);
+    if (response.alerta) setAlertas((items) => [...items, response.alerta!]);
+    if (response.oportunidade) setAlertas((items) => [...items, response.oportunidade!]);
+    const transition = calcularTransicao(response, etapaAtual, aguardandoConfirmacao);
+    setEtapaAtual(clampEtapa(response.etapa_atual, etapaAtual));
+    setAguardandoConfirmacao(transition.deveAguardar);
+    setStage("aiFlow");
+    if (transition.podeConcluir) await applyToForm("auto", nextForm);
+    else if (response.nextQuestion) await enqueueAssistantMessage(response.nextQuestion);
+  };
+
+  const handleUploadArquivos = async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    setErroUpload(null);
+    setStatusUpload("validando");
+
+    for (const file of list) {
+      const validation = validarArquivo(file);
+      if (!validation.valido) {
+        setStatusUpload("erro");
+        setErroUpload(validation.erro || "Arquivo inválido.");
+        return;
+      }
     }
-    return full.trim();
-  };
+    const batchValidation = validarLote(list);
+    if (!batchValidation.valido) {
+      setStatusUpload("erro");
+      setErroUpload(batchValidation.erro || "Lote inválido.");
+      return;
+    }
 
-  const extractFromDocx = async (file: File): Promise<string> => {
-    const mammoth = await import("mammoth/mammoth.browser");
-    const buf = await file.arrayBuffer();
-    const res = await mammoth.extractRawText({ arrayBuffer: buf });
-    return String(res.value || "").trim();
-  };
+    setStatusUpload("lendo");
+    const processed: ArquivoProcessado[] = [];
+    const warnings: ChatMessage[] = [];
+    try {
+      for (const file of list) {
+        const result = await processarArquivo(file);
+        processed.push(result.arquivo);
+        if (result.avisoTruncamento) {
+          warnings.push({
+            role: "assistant",
+            content: `⚠️ "${file.name}" foi truncado em ${LIMITE_TEXTO_CHARS.toLocaleString()} caracteres. Descreva no chat as partes mais relevantes que ficaram de fora.`,
+          });
+        }
+      }
+    } catch (error) {
+      setStatusUpload("erro");
+      setErroUpload(error instanceof Error ? error.message : "Não foi possível processar os arquivos.");
+      return;
+    }
 
-  const extractFromImage = async (file: File): Promise<string> => {
-    const Tesseract = await import("tesseract.js");
-    const result = await Tesseract.recognize(file, "por+eng");
-    return String(result.data?.text || "").trim();
-  };
-
-  const analyzeFile = async (file: File) => {
+    const newMode = combinarModo(modoEntrada, "anexo");
+    const labelMessage: ChatMessage = { role: "user", content: labelVisualArquivos(processed) };
+    const historySnapshot = [
+      ...messages.filter((message) => !message._eh_metadado),
+      ...warnings,
+      labelMessage,
+    ];
+    setModoEntrada(newMode);
+    setMessages(historySnapshot);
+    setStatusUpload("processando");
     setLoading(true);
     try {
-      let text = "";
-      const name = file.name.toLowerCase();
-      if (file.type === "application/pdf" || name.endsWith(".pdf")) {
-        text = await extractFromPdf(file);
-      } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
-        text = await extractFromDocx(file);
-      } else if ((file.type.startsWith("image/")) || /\.(png|jpe?g|webp|gif)$/i.test(name)) {
-        text = await extractFromImage(file);
-      } else {
-        return;
-      }
-      const snippet = text.length > 16000 ? text.slice(0, 16000) : text;
-      const previousMessages = messages;
-      const userMsg: ChatMessage = {
-        role: "user",
-        content: `Extraí o seguinte conteúdo do arquivo anexado. Analise e use para preencher o formulário do processo, propondo objetivo, entradas, etapas, decisões e saídas quando possível:\n\n${snippet}`,
-      };
-      setMessages((m) => [...m, userMsg]);
-      const { data, error } = await supabase.functions.invoke("ai-interview", {
-        body: {
-          history: [...messages, userMsg],
-          current: form,
-          company_id: routeScriptConfig.companyId,
-          process_id: processIdRef.current,
-        },
-      });
-      const hasErrorField = (d: unknown): d is { error: string } =>
-        typeof d === "object" && d !== null && "error" in d;
-      if (error || hasErrorField(data)) {
-        setMessages([
-          ...previousMessages,
-          { role: "assistant", content: FRIENDLY_CONNECTION_ERROR },
-        ]);
-        setIsAssistantTyping(false);
-        return;
-      }
-      const resp = data as InterviewResponse;
-      if (resp.partialUpdate) setForm((prev) => mergeFormUpdate(prev, resp.partialUpdate));
-      if (resp.done) {
-        const completedForm = resp.partialUpdate ? mergeFormUpdate(form, resp.partialUpdate) : form;
-        applyToForm("auto", completedForm);
-      } else if (resp.nextQuestion) {
-        await enqueueAssistantMessage(resp.nextQuestion);
-      }
-    } catch (e) {
-      void e;
+      await enviarArquivosParaPeter(processed, newMode, historySnapshot);
+      setArquivosAnexados((current) => [...current, ...processed]);
+      setStatusUpload("idle");
+    } catch (error) {
+      console.error("Falha ao analisar arquivos:", error);
+      setStatusUpload("erro");
+      setErroUpload("Não foi possível analisar os arquivos. Tente novamente.");
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: FRIENDLY_CONNECTION_ERROR },
+        { role: "assistant", content: "Não consegui analisar o arquivo enviado. Verifique sua conexão e tente novamente." },
       ]);
-      setIsAssistantTyping(false);
     } finally {
       setLoading(false);
     }
@@ -1089,7 +1198,7 @@ function EntrevistaProcessoPage() {
             {saveStatus === "saving" ? "Salvando…" : saveStatus === "error" ? "Falha ao salvar" : "Salvo"}
           </Badge>
           <Badge variant="secondary" className="flex items-center gap-2">
-            <Cloud className="h-4 w-4" /> Progresso {progress}%
+            <Cloud className="h-4 w-4" /> Etapa {etapaAtual} de 6
           </Badge>
         </div>
       </div>
@@ -1117,6 +1226,20 @@ function EntrevistaProcessoPage() {
             )}
           </div>
 
+          {stage === "selectMode" && (
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <Button variant="outline" onClick={() => void selectMode("entrevista")}>Entrevista guiada</Button>
+              <Button variant="outline" onClick={() => void selectMode("texto")}>Colar texto</Button>
+              <Button variant="outline" onClick={() => void selectMode("anexo")}>Anexar arquivo</Button>
+            </div>
+          )}
+
+          {alertas.map((alerta, index) => (
+            <div key={`${alerta}-${index}`} className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              {alerta}
+            </div>
+          ))}
+
           <div className="mt-4 flex gap-2">
             <Input
               ref={inputRef}
@@ -1138,17 +1261,53 @@ function EntrevistaProcessoPage() {
           </div>
 
           <div className="mt-4 space-y-2">
-            <Label>Anexo para análise (PDF, DOCX, JPG/PNG)</Label>
+            <Label>Anexo para análise (PDF, DOCX, TXT ou CSV)</Label>
             <Input
+              ref={inputArquivoRef}
               type="file"
-              accept=".pdf,.docx,image/*"
+              accept={EXTENSOES_ACEITAS}
+              multiple
+              className="hidden"
               onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                if (f) void analyzeFile(f);
+                if (e.target.files?.length) void handleUploadArquivos(e.target.files);
                 e.currentTarget.value = "";
               }}
               disabled={assistantBusy}
             />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => inputArquivoRef.current?.click()}
+              disabled={assistantBusy || stage === "selectMode" || stage === "askUserName" || stage === "askProcessName"}
+            >
+              Selecionar arquivos
+            </Button>
+            {statusUpload !== "idle" && (
+              <div className={`text-sm ${statusUpload === "erro" ? "text-destructive" : "text-muted-foreground"}`} role="status">
+                {statusUpload === "erro" && `⚠️ ${erroUpload}`}
+                {statusUpload === "validando" && "Verificando arquivos..."}
+                {statusUpload === "lendo" && "Lendo arquivos..."}
+                {statusUpload === "processando" && "Peter está analisando..."}
+              </div>
+            )}
+            {arquivosAnexados.length > 0 && (
+              <div className="flex flex-wrap gap-2" role="list" aria-label="Arquivos processados">
+                {arquivosAnexados.map((arquivo, index) => (
+                  <Badge key={`${arquivo.nome}-${index}`} variant="secondary" role="listitem" className="gap-2 py-1">
+                    📎 {arquivo.nome} ({arquivo.tipoLabel}){arquivo.truncado ? " ⚠️" : ""}
+                    <button
+                      type="button"
+                      className="rounded px-1 hover:bg-muted"
+                      onClick={() => setArquivosAnexados((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                      aria-label={`Ocultar ${arquivo.nome} da lista`}
+                      title="Ocultar da lista (o arquivo já foi analisado)"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-6 flex justify-between">

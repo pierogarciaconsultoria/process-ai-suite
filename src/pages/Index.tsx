@@ -212,7 +212,7 @@ export default function Index() {
               Diagnóstico claro para decisões rápidas.
             </h2>
             <p className="text-lg text-[#004444]/70 leading-relaxed">
-              A ProcessAI Suite transforma entrevistas em diagnóstico estruturado, mostra gargalos reais e organiza melhorias
+              O ProcessHub transforma entrevistas em diagnóstico estruturado, mostra gargalos reais e organiza melhorias
               em um roteiro prático de execução.
             </p>
           </div>
@@ -257,7 +257,7 @@ export default function Index() {
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <p className="text-[#006B6B] font-semibold text-sm uppercase tracking-widest">A Solução</p>
             <h2 className="text-4xl md:text-5xl font-bold text-[#002B2B]">
-              Funcionalidades da ProcessAI Suite
+              Funcionalidades do ProcessHub
             </h2>
             <p className="text-lg text-[#004444]/70">
               Da entrevista ao relatório final, a suíte organiza o ciclo completo de melhoria de processos por empresa, com governança e rastreabilidade.
@@ -435,9 +435,9 @@ export default function Index() {
           <div className="h-6 w-6 rounded bg-[#006B6B] flex items-center justify-center">
             <Bot className="h-3 w-3 text-white" />
           </div>
-          ProcessAI Suite
+          ProcessHub
         </div>
-        © {new Date().getFullYear()} ProcessAI Suite. Todos os direitos reservados.
+        © {new Date().getFullYear()} ProcessHub. Todos os direitos reservados.
       </footer>
     </div>
   );

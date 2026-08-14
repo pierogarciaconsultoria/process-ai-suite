@@ -1,9 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, User, KeyRound, MessageSquare, Sparkles, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { isSuperAdmin } from "@/lib/permissions";
 
 const Configuracoes = () => {
   const navigate = useNavigate();
+  const { user } = useAuthUser();
+  const showRestrictedSettings = isSuperAdmin(user);
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
       <div>
@@ -67,6 +71,8 @@ const Configuracoes = () => {
             <p className="text-sm text-muted-foreground">Defina uma nova senha de acesso</p>
           </CardContent>
         </Card>
+        {showRestrictedSettings && (
+          <>
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/roteiro-entrevista")}>
           <CardHeader className="flex-row items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
@@ -100,6 +106,8 @@ const Configuracoes = () => {
             <p className="text-sm text-muted-foreground">Defina o modelo texto/anexo da documentação dos processos</p>
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
 
     </div>
