@@ -90,9 +90,21 @@ class InterviewPageErrorBoundary extends React.Component<
   }
 }
 
+function isInvalidProcessName(value: string): boolean {
+  return !value.trim() || /^(oi|olá|ola|bom dia|boa tarde|boa noite)$/i.test(value.trim());
+}
+
+function getOnboardingPrompt(stage: InterviewStage, data: ProcessoFormData): string | null {
+  if (stage === "askUserName") return "Antes de continuarmos, como você gostaria que eu te chamasse?";
+  if (stage === "askProcessName") return "Para continuar, informe o nome do processo que será mapeado. Por exemplo: Compras, Faturamento ou Atendimento ao Cliente.";
+  if (stage === "askArea") return `Qual é a área responsável pelo processo "${data.nomeProcesso}"?`;
+  if (stage === "askProcessOwner") return `Quem é o dono ou responsável principal pelo processo na área de ${data.area}?`;
+  return null;
+}
+
 function getInterviewCompletionIssues(data: ProcessoFormData): string[] {
   const issues: string[] = [];
-  if (!data.nomeProcesso.trim()) issues.push("nome do processo");
+  if (isInvalidProcessName(data.nomeProcesso)) issues.push("nome do processo");
   if (!data.gatilho.trim()) issues.push("gatilho de início");
   if (!data.saidas.some((item) => item.saida.trim())) issues.push("saída principal");
 
@@ -189,12 +201,29 @@ function EntrevistaProcessoPage() {
         setParticipantName(restoredForm.entrevistados?.trim() || "");
         if (restoredMessages.length > 0) {
           if (metadata) {
-            setStage(metadata.stage);
+            const restoredStage: InterviewStage = metadata.stage === "selectMode"
+              ? "selectMode"
+              : !restoredForm.entrevistados.trim()
+                ? "askUserName"
+                : isInvalidProcessName(restoredForm.nomeProcesso)
+                  ? "askProcessName"
+                  : !restoredForm.area.trim()
+                    ? "askArea"
+                    : !restoredForm.donoProcesso.trim()
+                      ? "askProcessOwner"
+                      : (["awaitContent", "aiFlow"].includes(metadata.stage) ? metadata.stage : "aiFlow");
+            setStage(restoredStage);
+            if (restoredStage !== metadata.stage) {
+              const recoveryPrompt = getOnboardingPrompt(restoredStage, restoredForm);
+              if (recoveryPrompt) setMessages([...visibleMessages, { role: "assistant", content: recoveryPrompt }]);
+            }
             setEtapaAtual(metadata.etapa_atual);
             setModoEntrada(metadata.modo_entrada);
             setAguardandoConfirmacao(metadata.aguardando_confirmacao);
           } else if (!restoredForm.entrevistados.trim()) setStage("askUserName");
-          else if (!restoredForm.nomeProcesso.trim()) setStage("askProcessName");
+          else if (isInvalidProcessName(restoredForm.nomeProcesso)) setStage("askProcessName");
+          else if (!restoredForm.area.trim()) setStage("askArea");
+          else if (!restoredForm.donoProcesso.trim()) setStage("askProcessOwner");
           else setStage("aiFlow");
           setHasInitializedConversation(true);
         }
@@ -633,6 +662,30 @@ function EntrevistaProcessoPage() {
     await enqueueAssistantMessage("Antes de começarmos, como você gostaria que eu te chamasse?");
   };
 
+  const continueAfterProcessOwner = async (nextForm: ProcessoFormData, history: ChatMessage[]) => {
+    if (conteudoPendente) {
+      const pending = conteudoPendente;
+      const pendingHistory = [...history, { role: "user", content: pending } satisfies ChatMessage];
+      setMessages(pendingHistory);
+      setConteudoPendente(null);
+      setStage("aiFlow");
+      await requestInterview(pending, nextForm, pendingHistory, true);
+    } else if (modoEntrada === "entrevista") {
+      setStage("aiFlow");
+      await enqueueAssistantMessage(
+        `${participantName ? `${participantName}, ` : ""}qual é o objetivo principal do processo "${nextForm.nomeProcesso}" e qual resultado ele deve entregar?`,
+      );
+    } else {
+      setStage("awaitContent");
+      await enqueueAssistantMessage(
+        modoEntrada === "anexo"
+          ? "Perfeito. Anexe o arquivo do processo para eu analisá-lo."
+          : "Perfeito. Cole agora a descrição do processo em um único texto.",
+      );
+      if (modoEntrada === "anexo") inputArquivoRef.current?.click();
+    }
+  };
+
   const send = async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -654,33 +707,44 @@ function EntrevistaProcessoPage() {
     }
 
     if (stage === "askProcessName") {
+      if (isInvalidProcessName(trimmed)) {
+        setInput("");
+        await enqueueAssistantMessage("Preciso do nome do processo que será mapeado. Por exemplo: Compras, Faturamento ou Atendimento ao Cliente.");
+        return;
+      }
       const userMsg: ChatMessage = { role: "user", content: trimmed };
       const nextForm = mergeFormUpdate(form, { nomeProcesso: trimmed });
       const historyAfterName = [...messages, userMsg];
       setForm(nextForm);
       setMessages(historyAfterName);
       setInput("");
-      if (conteudoPendente) {
-        const pending = conteudoPendente;
-        const pendingHistory = [...historyAfterName, { role: "user", content: pending } satisfies ChatMessage];
-        setMessages(pendingHistory);
-        setConteudoPendente(null);
-        setStage("aiFlow");
-        await requestInterview(pending, nextForm, pendingHistory, true);
-      } else if (modoEntrada === "entrevista") {
-        setStage("aiFlow");
-        await enqueueAssistantMessage(
-          `${participantName ? `${participantName}, ` : ""}qual é o objetivo principal do processo "${trimmed}" e qual resultado ele deve entregar?`,
-        );
-      } else {
-        setStage("awaitContent");
-        await enqueueAssistantMessage(
-          modoEntrada === "anexo"
-            ? "Perfeito. Anexe o arquivo do processo para eu analisá-lo."
-            : "Perfeito. Cole agora a descrição do processo em um único texto.",
-        );
-        if (modoEntrada === "anexo") inputArquivoRef.current?.click();
-      }
+      setStage("askArea");
+      await enqueueAssistantMessage(`Qual é a área responsável pelo processo "${trimmed}"?`);
+      return;
+    }
+
+    if (stage === "askArea") {
+      const userMsg: ChatMessage = { role: "user", content: trimmed };
+      const nextForm = mergeFormUpdate(form, { area: trimmed });
+      setForm(nextForm);
+      setMessages((current) => [...current, userMsg]);
+      setInput("");
+      setStage("askProcessOwner");
+      await enqueueAssistantMessage(`Quem é o dono ou responsável principal pelo processo na área de ${trimmed}?`);
+      return;
+    }
+
+    if (stage === "askProcessOwner") {
+      const userMsg: ChatMessage = { role: "user", content: trimmed };
+      const nextForm = mergeFormUpdate(form, {
+        donoProcesso: trimmed,
+        classificacao: inferClassification({ ...form, donoProcesso: trimmed }),
+      });
+      const historyAfterOwner = [...messages, userMsg];
+      setForm(nextForm);
+      setMessages(historyAfterOwner);
+      setInput("");
+      await continueAfterProcessOwner(nextForm, historyAfterOwner);
       return;
     }
 
@@ -1176,7 +1240,7 @@ function EntrevistaProcessoPage() {
               size="icon"
               className="shrink-0"
               onClick={() => inputArquivoRef.current?.click()}
-              disabled={assistantBusy || stage === "selectMode" || stage === "askUserName" || stage === "askProcessName"}
+              disabled={assistantBusy || stage === "selectMode" || stage === "askUserName" || stage === "askProcessName" || stage === "askArea" || stage === "askProcessOwner"}
               aria-label="Anexar arquivo"
               title="Anexar arquivo"
             >

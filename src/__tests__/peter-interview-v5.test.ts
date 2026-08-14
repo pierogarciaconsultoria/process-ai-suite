@@ -32,6 +32,11 @@ describe("Peter v5 — contrato da entrevista", () => {
       atualizado_em: new Date().toISOString(),
     });
     expect(restaurarMetadados([valid])?.etapa_atual).toBe(3);
+    const onboarding = criarMensagemMetadados({
+      ...JSON.parse(valid.content),
+      stage: "askArea",
+    });
+    expect(restaurarMetadados([onboarding])?.stage).toBe("askArea");
     expect(restaurarMetadados([{ ...valid, content: JSON.stringify({ _tipo: "x", etapa_atual: 9 }) }])).toBeNull();
   });
 

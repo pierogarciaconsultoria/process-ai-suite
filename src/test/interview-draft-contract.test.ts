@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const interviewSource = readFileSync(resolve("src/pages/EntrevistaProcesso.tsx"), "utf8");
 const processListSource = readFileSync(resolve("src/pages/Processos.tsx"), "utf8");
+const processMappingSource = readFileSync(resolve("src/lib/processos.ts"), "utf8");
 const appSource = readFileSync(resolve("src/App.tsx"), "utf8");
 
 describe("guided interview draft contract", () => {
@@ -18,6 +19,19 @@ describe("guided interview draft contract", () => {
     expect(interviewSource).toContain("mapProcessRowToForm(row)");
     expect(interviewSource).toContain("row.interview_messages");
     expect(appSource).toContain('path="/processos/:id/entrevista"');
+  });
+
+  it("collects and persists process, area and owner before the AI flow", () => {
+    expect(interviewSource).toContain('setStage("askArea")');
+    expect(interviewSource).toContain('setStage("askProcessOwner")');
+    expect(interviewSource).toContain("{ area: trimmed }");
+    expect(interviewSource).toContain("donoProcesso: trimmed");
+    expect(processMappingSource).toContain("nome: form.nomeProcesso");
+    expect(processMappingSource).toContain("area: form.area");
+    expect(processMappingSource).toContain("responsavel: form.donoProcesso");
+    expect(processMappingSource).toContain("nome: row.nome");
+    expect(processMappingSource).toContain("area: row.area");
+    expect(processMappingSource).toContain("responsavel: row.responsavel");
   });
 
   it("warns before leaving with unsynchronized or unsent data", () => {

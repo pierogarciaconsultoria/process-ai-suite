@@ -1,6 +1,6 @@
 export type ModoEntrada = "nenhum" | "entrevista" | "texto_livre" | "anexo" | "misto";
 
-export type InterviewStage = "selectMode" | "askUserName" | "askProcessName" | "awaitContent" | "aiFlow";
+export type InterviewStage = "selectMode" | "askUserName" | "askProcessName" | "askArea" | "askProcessOwner" | "awaitContent" | "aiFlow";
 
 export interface InterviewResponse {
   raciocinio?: string;
@@ -34,7 +34,7 @@ export interface ChatMessage {
 }
 
 const MODOS: ModoEntrada[] = ["nenhum", "entrevista", "texto_livre", "anexo", "misto"];
-const STAGES: InterviewStage[] = ["selectMode", "askUserName", "askProcessName", "awaitContent", "aiFlow"];
+const STAGES: InterviewStage[] = ["selectMode", "askUserName", "askProcessName", "askArea", "askProcessOwner", "awaitContent", "aiFlow"];
 
 export function clampEtapa(value: unknown, fallback: number): number {
   const safeFallback = typeof fallback === "number" && Number.isFinite(fallback) ? Math.trunc(fallback) : 1;
