@@ -44,7 +44,9 @@ export async function extrairTextoPdf(file: File): Promise<string> {
       pages.push(`[Página ${index}]\n${text}`);
     }
     const finalText = pages.join("\n\n").trim();
-    if (!finalText || !pages.some((page) => page.replace(/^\[Página \d+\]\s*/, "").trim())) {
+    const hasSelectableText = Boolean(finalText) && pages.some((page) => page.replace(/^\[Página \d+\]\s*/, "").trim().length > 0);
+    if (!hasSelectableText) {
+      console.warn(`[Peter upload] PDF.js não encontrou texto selecionável em "${file.name}"; iniciando OCR.`);
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker(["por", "eng"]);
       const ocrPages: string[] = [];
@@ -70,10 +72,12 @@ export async function extrairTextoPdf(file: File): Promise<string> {
       }
       const ocrText = ocrPages.join("\n\n").trim();
       if (!ocrText) {
-        throw new Error(`Nenhum texto legível encontrado em "${file.name}", mesmo após OCR. Verifique a resolução do PDF ou descreva o conteúdo no chat.`);
+        throw new Error(`O PDF "${file.name}" não contém texto selecionável e o OCR não encontrou conteúdo legível. Tente outra cópia com melhor resolução ou cole o conteúdo no chat.`);
       }
+      console.info(`[Peter upload] OCR extraiu ${ocrText.length} caracteres de "${file.name}".`);
       return ocrText;
     }
+    console.info(`[Peter upload] PDF.js extraiu ${finalText.length} caracteres de "${file.name}".`);
     return finalText;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Nenhum texto")) throw error;
@@ -148,7 +152,7 @@ export type ContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string; detail: "high" } };
 
-export function montarContentParaThread(arquivos: ArquivoProcessado[], etapaAtual: number): ContentPart[] {
+export function montarContentParaThread(arquivos: ArquivoProcessado[], _etapaAtual: number): ContentPart[] {
   const parts: ContentPart[] = [];
   for (const file of arquivos) {
     if (file.modoEnvio === "image_url" && file.base64) {
@@ -165,7 +169,7 @@ export function montarContentParaThread(arquivos: ArquivoProcessado[], etapaAtua
   const instruction = arquivos.length > 1 ? `Recebi ${arquivos.length} arquivos: ${names}.` : `Recebi o arquivo ${names}.`;
   parts.push({
     type: "text",
-    text: `${instruction} Estamos na Etapa ${etapaAtual} de 6. Extraia as informações seguindo a tabela por etapa. Em partialUpdate, inclua todos os campos identificados. Em nextQuestion, apresente um resumo conciso (máximo 3 linhas) seguido de até duas perguntas sobre as principais lacunas. Não inclua base64 nem conteúdo bruto do arquivo em nextQuestion.`,
+    text: `${instruction} Analise agora o conteúdo deste arquivo e extraia todas as informações sobre o processo seguindo as 6 etapas da metodologia. Apresente o resumo estruturado com ✅ para cada informação identificada e ❓ para as lacunas. Não peça para o usuário descrever o processo em texto — use o arquivo como fonte principal.`,
   });
   return parts;
 }

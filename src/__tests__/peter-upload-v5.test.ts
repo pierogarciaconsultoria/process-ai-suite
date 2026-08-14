@@ -57,8 +57,9 @@ describe("Peter v5 — upload", () => {
     const parts = montarContentParaThread([file], 3);
     expect(parts[0]).toMatchObject({ type: "text" });
     expect((parts[0] as { text: string }).text).toContain("confirme se ainda reflete");
-    expect((parts.at(-1) as { text: string }).text).toContain("máximo 3 linhas");
-    expect((parts.at(-1) as { text: string }).text).toContain("até duas perguntas");
+    expect((parts.at(-1) as { text: string }).text).toContain("Analise agora o conteúdo deste arquivo");
+    expect((parts.at(-1) as { text: string }).text).toContain("✅ para cada informação identificada e ❓ para as lacunas");
+    expect((parts.at(-1) as { text: string }).text).toContain("Não peça para o usuário descrever o processo em texto");
     expect((parts.at(-1) as { text: string }).text).not.toContain("base64,");
     expect(labelVisualArquivos([file])).toBe("📎 pop.txt (Texto (TXT))");
   });
