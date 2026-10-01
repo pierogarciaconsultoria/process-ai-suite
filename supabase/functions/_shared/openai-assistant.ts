@@ -1,67 +1,96 @@
-type AssistantMessage = {
-  role?: string;
-  content?: Array<{ type?: string; text?: { value?: string } }>;
-};
-
-export async function runConfiguredAssistant(
-  apiKey: string,
-  instructions: string,
-  userContent: string,
-): Promise<string> {
-  const assistantId = Deno.env.get("OPENAI_ASSISTANT_ID");
-  if (!assistantId) throw new Error("OPENAI_ASSISTANT_ID não configurado.");
+export async function callResponsesAPI(params: {
+  systemPrompt: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string | Array<any> }>;
+  responseSchema: object;
+  openaiApiKey: string;
+}): Promise<object> {
+  const { systemPrompt, messages, responseSchema, openaiApiKey } = params;
   const baseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
-  const headers = {
-    Authorization: `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-    "OpenAI-Beta": "assistants=v2",
-  };
-  const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: { ...headers, ...(init?.headers ?? {}) },
-    });
-    if (!response.ok) throw new Error(`OpenAI Assistant error ${response.status}: ${await response.text()}`);
-    return await response.json() as T;
-  };
 
-  const thread = await request<{ id: string }>("/threads", { method: "POST", body: "{}" });
-  await request(`/threads/${thread.id}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ role: "user", content: userContent }),
-  });
-  const run = await request<{ id: string }>(`/threads/${thread.id}/runs`, {
-    method: "POST",
-    body: JSON.stringify({ assistant_id: assistantId, additional_instructions: instructions }),
-  });
+  const input: any[] = [];
 
-  const startedAt = Date.now();
-  let completed = false;
-  while (Date.now() - startedAt < 60_000) {
-    const status = await request<{ status: string; last_error?: { message?: string } }>(
-      `/threads/${thread.id}/runs/${run.id}`,
-      { method: "GET" },
-    );
-    if (status.status === "completed") {
-      completed = true;
-      break;
-    }
-    if (["failed", "cancelled", "expired", "incomplete", "requires_action"].includes(status.status)) {
-      throw new Error(status.last_error?.message || `Assistant encerrado com status ${status.status}.`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 750));
+  if (typeof systemPrompt === "string" && systemPrompt.trim().length > 0) {
+    input.push({ role: "system", content: systemPrompt });
   }
-  if (!completed) throw new Error("Tempo limite excedido ao aguardar o Assistant.");
 
-  const messages = await request<{ data: AssistantMessage[] }>(`/threads/${thread.id}/messages?order=desc&limit=20`);
-  const assistantMessage = messages.data.find((message) => message.role === "assistant");
-  const content = assistantMessage?.content
-    ?.filter((item) => item.type === "text")
-    .map((item) => item.text?.value || "")
-    .join("\n")
-    .trim();
-  if (!content) throw new Error("O Assistant não retornou conteúdo.");
-  return content;
+  for (const msg of messages) {
+    if (!msg) continue;
+    if (msg.role !== "user" && msg.role !== "assistant") continue;
+
+    if (typeof msg.content === "string") {
+      if (!msg.content.trim()) continue;
+      input.push({ role: msg.role, content: msg.content });
+      continue;
+    }
+
+    if (Array.isArray(msg.content)) {
+      if (msg.content.length === 0) continue;
+      input.push({ role: msg.role, content: msg.content });
+    }
+  }
+
+  const body = {
+    model: "gpt-4o",
+    input,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "InterviewResponse",
+        strict: true,
+        schema: responseSchema,
+      },
+    },
+  };
+
+  const response = await fetch(`${baseUrl}/responses`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status !== 200) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `OpenAI Responses API error ${response.status}${text ? `: ${text}` : ""}`
+    );
+  }
+
+  const data = await response.json();
+
+  let rawText = "";
+  if (Array.isArray(data?.output)) {
+    for (const item of data.output) {
+      if (item?.type === "message" && Array.isArray(item?.content)) {
+        for (const part of item.content) {
+          if (part?.type === "output_text" && typeof part?.text === "string") {
+            rawText = part.text;
+            break;
+          }
+        }
+        if (rawText) break;
+      }
+    }
+  }
+  if (!rawText && typeof data?.output_text === "string") rawText = data.output_text;
+  if (!rawText && typeof data?.content === "string") rawText = data.content;
+
+  if (!rawText) {
+    try {
+      return JSON.parse(JSON.stringify(data));
+    } catch {
+      throw new Error("OpenAI Responses API retornou resposta sem texto parseável.");
+    }
+  }
+
+  const cleaned = stripCodeFence(rawText);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    throw new Error(`Não foi possível parsear JSON da resposta: ${cleaned.slice(0, 500)}`);
+  }
 }
 
 export function stripCodeFence(content: string): string {

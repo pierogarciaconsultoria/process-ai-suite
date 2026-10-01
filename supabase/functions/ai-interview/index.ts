@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 import { acquireAiQuota } from "../_shared/quota.ts";
 import { clampEtapa, normalizarResposta, TAMANHO_MAX_IMAGEM_BASE64_CHARS } from "../_shared/peter-interview-contract.ts";
+import { callResponsesAPI } from "../_shared/openai-assistant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,23 +59,6 @@ function validateFileContent(value: unknown): Response | null {
     ? uploadErrorResponse("Payload total de arquivo_content excede o limite", 400)
     : null;
 }
-
-type OpenAIThreadMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content?: Array<{
-    type?: string;
-    text?: {
-      value?: string;
-    };
-  }>;
-};
-
-const OPENAI_ASSISTANTS_HEADERS = (apiKey: string) => ({
-  Authorization: `Bearer ${apiKey}`,
-  "Content-Type": "application/json",
-  "OpenAI-Beta": "assistants=v2",
-});
 
 const SCHEMA_RESPOSTA = `
 FORMATO OBRIGATÓRIO DE RESPOSTA (JSON puro, sem markdown):
@@ -417,62 +401,6 @@ Campos permitidos em partialUpdate: nomeProcesso, area, donoProcesso, classifica
 O campo done só pode ser true depois da confirmação da Etapa 6.`;
 }
 
-async function openAiAssistantsRequest<T>(apiKey: string, path: string, init?: RequestInit): Promise<T> {
-  const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
-  const response = await fetch(`${openAiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      ...OPENAI_ASSISTANTS_HEADERS(apiKey),
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`OpenAI Assistants API error ${response.status}: ${text}`);
-  }
-
-  return (await response.json()) as T;
-}
-
-async function pollRunUntilCompleted(apiKey: string, threadId: string, runId: string) {
-  const startedAt = Date.now();
-  const timeoutMs = 60_000;
-  const intervalMs = 1_000;
-
-  while (Date.now() - startedAt < timeoutMs) {
-    const run = await openAiAssistantsRequest<{
-      status: string;
-      last_error?: { message?: string };
-    }>(apiKey, `/threads/${threadId}/runs/${runId}`, { method: "GET" });
-
-    if (run.status === "completed") return;
-
-    if (["failed", "cancelled", "expired", "incomplete"].includes(run.status)) {
-      throw new Error(run.last_error?.message || `Run encerrado com status ${run.status}`);
-    }
-
-    if (run.status === "requires_action") {
-      throw new Error("O Assistant solicitou tool calls não suportadas pela ai-interview.");
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-
-  throw new Error("Tempo limite excedido ao aguardar resposta do Assistant.");
-}
-
-function extractAssistantText(messages: OpenAIThreadMessage[]) {
-  const assistantMessage = messages.find((message) => message.role === "assistant");
-  if (!assistantMessage?.content?.length) return "";
-
-  return assistantMessage.content
-    .filter((item) => item?.type === "text")
-    .map((item) => item.text?.value || "")
-    .join("\n")
-    .trim();
-}
-
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -493,17 +421,9 @@ serve(async (req: Request) => {
     if (processId) await authorizeProcess(client, processId, companyId);
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const OPENAI_ASSISTANT_ID = Deno.env.get("OPENAI_ASSISTANT_ID");
 
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: "OPENAI_API_KEY não configurado" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!OPENAI_ASSISTANT_ID) {
-      return new Response(JSON.stringify({ error: "OPENAI_ASSISTANT_ID não configurado" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -611,61 +531,43 @@ Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos
 
     const quotaLease = await acquireAiQuota(client, "ai-interview", companyId);
     try {
-    const thread = await openAiAssistantsRequest<{ id: string }>(OPENAI_API_KEY, "/threads", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
+    const messagesForResponses: Array<{ role: 'user' | 'assistant'; content: string | FileContentPart[] }> =
+      [...sanitizedHistory];
 
-    for (const message of sanitizedHistory) {
-      await openAiAssistantsRequest(OPENAI_API_KEY, `/threads/${thread.id}/messages`, {
-        method: "POST",
-        body: JSON.stringify({
-          role: message.role,
-          content: message.content,
-        }),
-      });
-    }
-
-    // O conteúdo multimodal é uma mensagem adicional, após todo o histórico textual.
     if (Array.isArray(arquivoContent) && arquivoContent.length > 0) {
-      await openAiAssistantsRequest(OPENAI_API_KEY, `/threads/${thread.id}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ role: "user", content: arquivoContent as FileContentPart[] }),
-      });
+      messagesForResponses.push({ role: 'user', content: arquivoContent as FileContentPart[] });
     }
 
-    const run = await openAiAssistantsRequest<{ id: string }>(OPENAI_API_KEY, `/threads/${thread.id}/runs`, {
-      method: "POST",
-      body: JSON.stringify({
-        assistant_id: OPENAI_ASSISTANT_ID,
-        additional_instructions: systemPrompt,
-      }),
+    const responseSchema12 = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        raciocinio:               { type: "string"  },
+        avaliacao_comportamento:  { type: "string"  },
+        avaliacao_conteudo:       { type: "string"  },
+        isValid:                  { type: "boolean" },
+        nextQuestion:             { type: "string"  },
+        partialUpdate:            { type: "object", additionalProperties: true },
+        done:                     { type: "boolean" },
+        etapa_atual:              { type: "integer", minimum: 1, maximum: 6 },
+        etapa_confirmada:         { type: "boolean" },
+        avancar_etapa:            { type: "boolean" },
+        alerta:                   { type: ["string", "null"] },
+        oportunidade:             { type: ["string", "null"] },
+      },
+      required: [
+        "raciocinio", "avaliacao_comportamento", "avaliacao_conteudo",
+        "isValid", "nextQuestion", "partialUpdate", "done",
+        "etapa_atual", "etapa_confirmada", "avancar_etapa", "alerta", "oportunidade",
+      ],
+    };
+
+    const parsed = await callResponsesAPI({
+      systemPrompt,
+      messages: messagesForResponses,
+      responseSchema: responseSchema12,
+      openaiApiKey: OPENAI_API_KEY,
     });
-
-    await pollRunUntilCompleted(OPENAI_API_KEY, thread.id, run.id);
-
-    const messages = await openAiAssistantsRequest<{ data: OpenAIThreadMessage[] }>(
-      OPENAI_API_KEY,
-      `/threads/${thread.id}/messages?order=desc&limit=20`,
-      { method: "GET" },
-    );
-
-    let content = extractAssistantText(messages.data || []);
-    content = content
-      .replace(/```json\s*/gi, "")
-      .replace(/```\s*/g, "")
-      .trim();
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      parsed = {
-        nextQuestion: content || "Descreva brevemente o objetivo do processo.",
-        partialUpdate: {},
-        done: false,
-      };
-    }
 
     const normalized = normalizarResposta(parsed, etapaAtual, aguardandoConfirmacao);
     return new Response(JSON.stringify(normalized), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
