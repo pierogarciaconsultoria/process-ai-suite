@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { moderarEntrada } from "@/lib/peter-moderation";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -605,6 +606,15 @@ function EntrevistaProcessoPage() {
     const requestHistory = contentAlreadyInHistory
       ? historyBefore.filter((message) => !message._eh_metadado)
       : [...historyBefore.filter((message) => !message._eh_metadado), userMsg];
+    // Moderação client-side
+    if (!contentAlreadyInHistory) {
+      const _mod = moderarEntrada(userContent);
+      if (_mod.blocked) {
+        setMessages((prev) => [...prev, { role: "assistant" as const, content: _mod.reason ?? "Por favor, use linguagem profissional." }]);
+        setLoading(false);
+        return;
+      }
+    }
     setMessages(requestHistory);
     setLoading(true);
     try {

@@ -5,6 +5,7 @@ import { acquireAiQuota } from "../_shared/quota.ts";
 import { clampEtapa, normalizarResposta, TAMANHO_MAX_IMAGEM_BASE64_CHARS } from "../_shared/peter-interview-contract.ts";
 import { callResponsesAPI } from "../_shared/openai-assistant.ts";
 
+import { checkModeration, moderationResponse } from "../_shared/moderation.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -416,6 +417,11 @@ serve(async (req: Request) => {
     const modoEntrada = typeof body?.modo_entrada === "string" ? body.modo_entrada : "entrevista";
     const aguardandoConfirmacao = body?.aguardando_confirmacao === true;
     const companyId = requireString(body?.company_id, "company_id");
+
+    // Moderação server-side: verifica última mensagem do usuário
+    const _lastMsg = (history as Array<{role: string; content: unknown}>).filter((m) => m.role === "user").pop()?.content ?? "";
+    const _mod = checkModeration(typeof _lastMsg === "string" ? _lastMsg : "");
+    if (_mod.blocked) return moderationResponse();
     const processId = typeof body?.process_id === "string" && body.process_id.trim() ? body.process_id.trim() : null;
     await authorizeCompany(client, user.id, companyId);
     if (processId) await authorizeProcess(client, processId, companyId);
