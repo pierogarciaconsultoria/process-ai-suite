@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { emptyProcessoForm } from "@/data/processo-form-types";
 import {
   clampEtapa,
@@ -14,6 +16,14 @@ import {
 } from "@/lib/peter-interview-state";
 
 describe("Peter v5 — contrato da entrevista", () => {
+  it("não aplica partialUpdate quando a resposta é inválida", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/pages/EntrevistaProcesso.tsx"), "utf8");
+    const guards = source.match(/response\.isValid === false/g) ?? [];
+    expect(guards).toHaveLength(2);
+    expect(source.indexOf("response.isValid === false")).toBeLessThan(source.indexOf("mergeFormUpdate(currentForm, response.partialUpdate"));
+    expect(source.lastIndexOf("response.isValid === false")).toBeLessThan(source.indexOf("mergeFormUpdate(form, response.partialUpdate"));
+  });
+
   it("limita etapas e impede conclusão fora da confirmação final", () => {
     expect(clampEtapa(99, 1)).toBe(6);
     const response = normalizarResposta({ done: true, etapa_atual: 6, etapa_confirmada: true }, 5, false);

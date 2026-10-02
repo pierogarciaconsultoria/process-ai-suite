@@ -636,6 +636,13 @@ function EntrevistaProcessoPage() {
         return;
       }
       const response = normalizarResposta(data, etapaAtual, aguardandoConfirmacao);
+      if (response.isValid === false) {
+        if (response.alerta) setAlertas((items) => [...items, response.alerta!]);
+        await enqueueAssistantMessage(
+          response.nextQuestion || "Não consegui validar essa resposta. Pode reformulá-la com um pouco mais de detalhe?",
+        );
+        return;
+      }
       const nextForm = response.partialUpdate
         ? mergeFormUpdate(currentForm, response.partialUpdate as Partial<ProcessoFormData>)
         : currentForm;
@@ -1019,6 +1026,14 @@ function EntrevistaProcessoPage() {
     if (error || hasErrorField(data)) throw error || new Error(data.error);
 
     const response = normalizarResposta(data, etapaAtual, aguardandoConfirmacao);
+    if (response.isValid === false) {
+      if (response.alerta) setAlertas((items) => [...items, response.alerta!]);
+      setStage("aiFlow");
+      await enqueueAssistantMessage(
+        response.nextQuestion || "Não consegui validar as informações do arquivo. Envie outro arquivo ou detalhe o ponto no chat.",
+      );
+      return;
+    }
     const nextForm = response.partialUpdate
       ? mergeFormUpdate(form, response.partialUpdate as Partial<ProcessoFormData>)
       : form;
