@@ -398,7 +398,42 @@ Estas orientações complementam a metodologia e nunca sobrescrevem regras absol
 
 ${SCHEMA_RESPOSTA}
 
-Campos permitidos em partialUpdate: nomeProcesso, area, donoProcesso, classificacao, entrevistados, objetivo, clienteProcesso, areasEnvolvidas, gatilho, entradas, etapas, decisoes, saidas, recursos, problemas, problemasTexto, riscosTexto, riscos, indicadores, oportunidadesMelhoria e planoAcao.
+MAPEAMENTO OBRIGATÓRIO — partialUpdate por etapa:
+
+ETAPA 1 (Identificação):
+- nomeProcesso: string — nome do processo
+- area: string — área ou departamento
+- donoProcesso: string — cargo do responsável (nunca nome próprio)
+- classificacao: "negocio" | "apoio" | "gestao"
+- entrevistados: string — nomes dos entrevistados
+- objetivo: string — objetivo principal do processo
+
+ETAPA 2 (SIPOC — Entradas e Saídas):
+- gatilho: string — o que inicia o processo
+- clienteProcesso: string — quem recebe a saída do processo
+- areasEnvolvidas: string — áreas fornecedoras ou parceiras
+- entradas: array de objetos [{ "descricao": "nome da entrada", "fornecedor": "quem fornece" }]
+- saidas: array de objetos [{ "descricao": "saída principal ou secundária", "destinatario": "quem recebe" }]
+
+ETAPA 3 (Atividades e Responsáveis):
+- etapas: array de objetos [{ "ordem": 1, "atividade": "Verbo + Objeto", "responsavel": "cargo", "sistema": "ferramenta ou null", "tipo": "manual|user_task|service_task|gateway_exclusivo|gateway_paralelo" }]
+- decisoes: string — descrição das decisões e aprovações do processo
+- recursos: string — sistemas, ferramentas e tecnologias utilizadas
+
+ETAPA 4 (Indicadores):
+- indicadores: array de objetos [{ "nome": "nome do KPI", "formula": "como calcular", "meta": "valor alvo", "frequencia": "periodicidade", "responsavel": "cargo" }]
+
+ETAPA 5 (Diagnóstico AS IS):
+- problemasTexto: string — descrição livre de problemas, gargalos e desperdícios
+- riscosTexto: string — descrição livre dos riscos identificados
+- riscos: array de objetos [{ "descricao": "risco", "impacto": "consequência", "probabilidade": "alta|media|baixa" }]
+
+ETAPA 6 (Melhorias TO BE):
+- oportunidadesMelhoria: string — melhorias e oportunidades de automação identificadas
+- planoAcao: array de objetos [{ "oque": "ação", "porque": "justificativa", "quem": "cargo", "quando": "prazo", "onde": "local/processo", "como": "método", "quanto": "estimativa ou null" }]
+
+REGRA: preencha apenas os campos com informação explícita ou claramente implícita. Nunca invente valores. Campos sem informação: omitir do partialUpdate (não incluir com valor vazio ou null).
+
 O campo done só pode ser true depois da confirmação da Etapa 6.`;
 }
 
