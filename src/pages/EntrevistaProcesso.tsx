@@ -20,6 +20,7 @@ import {
   restaurarMensagens,
   type MensagemEntrevista,
 } from "@/lib/entrevista-roteiro";
+import { statusPelaEntrevista } from "@/lib/ciclo-processo";
 import { moderarEntrada } from "@/lib/peter-moderation";
 import { labelVisualArquivos, montarPartesArquivo, processarArquivo } from "@/lib/peter-upload";
 import {
@@ -160,7 +161,7 @@ function EntrevistaProcessoPage() {
   const [erro, setErro] = useState<{ mensagem: string; repetir?: () => void } | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const processIdRef = useRef<string | null>(routeProcessId ?? routeState?.processId ?? null);
-  const statusRef = useRef<ProcessoStatus>("Rascunho");
+  const statusRef = useRef<ProcessoStatus>("Em entrevista");
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -251,7 +252,7 @@ function EntrevistaProcessoPage() {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth.user?.id;
       if (!userId || !companyId) throw new Error("Usuário ou empresa não identificados para salvar.");
-      const statusFinal = status ?? statusRef.current;
+      const statusFinal = status ?? statusPelaEntrevista(estadoAtual, statusRef.current);
       const comum = { form: formAtual, userId, status: statusFinal, interviewMessages: mensagensAtuais, entrevistaRoteiro: estadoAtual };
 
       if (processIdRef.current) {
@@ -441,7 +442,7 @@ function EntrevistaProcessoPage() {
     if (!estado) return;
     setPendente("Salvando o processo…");
     try {
-      await persistir(form, mensagens, estado, "Em revisão");
+      await persistir(form, mensagens, estado);
       navigate(`/processos/${processIdRef.current}/resultado-guiado`, { state: { processo: form, autoGenerate: true } });
     } catch {
       setErro({ mensagem: "Não consegui salvar o processo. Verifique sua conexão e tente novamente." });

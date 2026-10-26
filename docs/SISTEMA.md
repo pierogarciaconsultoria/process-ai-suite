@@ -168,13 +168,19 @@ Objetivo:
 - registrar o mapeamento completo do processo
 - manter entrevista, formulario, diagnostico e estado BPMN no mesmo registro
 
-Status de processo:
+Ciclo de vida do processo (`src/lib/ciclo-processo.ts`):
 
-- `Rascunho`
-- `Em revisão`
-- `Aprovado`
-- `Publicado`
-- `Obsoleto`
+1. `Em entrevista`: levantamento com o Peter em andamento
+2. `Diagnosticado`: Etapa 5 da entrevista confirmada (diagnostico AS IS validado)
+3. `Melhorias aprovadas`: Etapa 6 confirmada (plano de melhoria aprovado)
+4. `Implementado`: marcado manualmente na tela do processo quando as melhorias foram implantadas; grava `implementado_em` e libera a geracao de documentacao
+5. `Obsoleto`: processo fora de uso; nao aceita nova documentacao
+
+Regras:
+
+- a entrevista avanca o status automaticamente e nunca o faz regredir
+- `Implementado` pode voltar para `Melhorias aprovadas` ou ir para `Obsoleto`, sempre com confirmacao
+- `processos_status_check` restringe o campo aos cinco valores; a migration `202610270001_ciclo_de_vida_processos.sql` converteu os status antigos (`Rascunho`, `Em revisão`, `Aprovado`, `Publicado`)
 
 Entradas do modulo:
 
@@ -304,9 +310,9 @@ Modos de origem:
 Regras atuais:
 
 - ao vincular processo, a origem e a tabela `processos`
-- a selecao considera processos com status `Aprovado`
-- se nao houver processo aprovado, a UI exibe:
-  - `Nenhum processo aprovado encontrado. Aprove um processo antes de vincular.`
+- a selecao considera processos com status `Implementado`
+- se nao houver processo implementado, a UI exibe:
+  - `Nenhum processo implementado encontrado. Marque um processo como implementado antes de vincular.`
 
 Capacidades:
 

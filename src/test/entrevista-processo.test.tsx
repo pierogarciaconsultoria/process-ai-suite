@@ -108,6 +108,7 @@ describe("Entrevista guiada — tela", () => {
     expect(screen.getAllByText("Etapa 1 de 6 — Identificação e contexto")).toHaveLength(2);
     await waitFor(() => expect(mocks.inserts).toHaveLength(1));
     expect(mocks.inserts[0].entrevista_roteiro).toMatchObject({ etapaAtual: 1 });
+    expect(mocks.inserts[0].status).toBe("Em entrevista");
 
     responder("Ana, analista financeira");
     expect(await screen.findByText(/Qual é o nome do processo que vamos mapear\?/)).toBeInTheDocument();

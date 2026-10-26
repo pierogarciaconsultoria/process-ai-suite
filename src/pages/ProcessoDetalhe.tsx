@@ -3,9 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Download, FileText, GitBranch, Loader2, MessageSquare, Pencil } from "lucide-react";
+import { CicloProcesso } from "@/components/processo/CicloProcesso";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
+import { atualizacaoDaAcao, podeGerarDocumentacao, type AcaoCiclo } from "@/lib/ciclo-processo";
 import { montarRelatorio } from "@/lib/relatorio-processo";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -24,6 +27,7 @@ function imprimirComTitulo(titulo: string) {
 const ProcessoDetalhe = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [processo, setProcesso] = useState<Tables<"processos"> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -72,6 +76,27 @@ const ProcessoDetalhe = () => {
 
   const relatorio = useMemo(() => (processo ? montarRelatorio(processo) : null), [processo]);
   const entrevistaEmAndamento = relatorio?.entrevista ? !relatorio.entrevista.concluida : false;
+  const documentacaoLiberada = podeGerarDocumentacao(processo?.status);
+
+  const executarAcao = async (acao: AcaoCiclo) => {
+    if (!processo) return;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("processos")
+        .update({ ...atualizacaoDaAcao(acao, new Date().toISOString(), processo.mapa_aprovado_em), updated_by: auth.user?.id ?? null })
+        .eq("id", processo.id)
+        .eq("company_id", processo.company_id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      setProcesso(data);
+      toast({ title: `Processo agora está "${data.status}".` });
+    } catch (error) {
+      console.error("Erro ao atualizar o ciclo do processo:", error);
+      toast({ title: "Não foi possível atualizar o processo", description: "Verifique sua conexão e tente novamente.", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -94,7 +119,12 @@ const ProcessoDetalhe = () => {
                 <GitBranch className="mr-2 h-4 w-4" /> Gerar mapa AS IS
               </Button>
             )}
-            <Button variant="outline" onClick={() => navigate(`/documentos?processId=${id}&mode=linked_process`)}>
+            <Button
+              variant="outline"
+              disabled={!documentacaoLiberada}
+              title={documentacaoLiberada ? undefined : "A documentação é liberada quando o processo é marcado como implementado."}
+              onClick={() => navigate(`/documentos?processId=${id}&mode=linked_process`)}
+            >
               <FileText className="mr-2 h-4 w-4" /> Criar procedimento
             </Button>
             <Button variant="outline" onClick={() => navigate(`/processos/${id}/editar`)}>
@@ -118,7 +148,10 @@ const ProcessoDetalhe = () => {
           </CardContent>
         </Card>
       ) : (
-        <RelatorioProcesso relatorio={relatorio} />
+        <>
+          <CicloProcesso status={processo!.status} onAcao={executarAcao} />
+          <RelatorioProcesso relatorio={relatorio} />
+        </>
       )}
     </div>
   );

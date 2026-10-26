@@ -10,15 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bot, Loader2, Search, Eye, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
-import { mapProcessRowToListItem, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
-
-const statusColors: Record<string, string> = {
-  Rascunho: "bg-muted text-muted-foreground",
-  "Em revisão": "bg-warning text-warning-foreground",
-  Aprovado: "bg-primary text-primary-foreground",
-  Publicado: "bg-success text-success-foreground",
-  Obsoleto: "bg-secondary text-secondary-foreground",
-};
+import { mapProcessRowToListItem, PROCESSO_STATUS, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
+import { entrevistaEmAberto, STATUS_CORES } from "@/lib/ciclo-processo";
 
 const criticidadeColors: Record<string, string> = {
   Baixa: "bg-success/20 text-success border-success/30",
@@ -132,7 +125,7 @@ const Processos = () => {
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Área</Label>
                 <Select value={areaFilter} onValueChange={setAreaFilter}>
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="w-[190px]">
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
                   <SelectContent>
@@ -169,11 +162,9 @@ const Processos = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="Rascunho">Rascunho</SelectItem>
-                    <SelectItem value="Em revisão">Em revisão</SelectItem>
-                    <SelectItem value="Aprovado">Aprovado</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                    <SelectItem value="Obsoleto">Obsoleto</SelectItem>
+                    {PROCESSO_STATUS.map((status) => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -222,7 +213,7 @@ const Processos = () => {
                     <TableCell>{processo.area}</TableCell>
                     <TableCell>{processo.responsavel}</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[processo.status]}>{processo.status}</Badge>
+                      <Badge className={STATUS_CORES[processo.status]}>{processo.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={criticidadeColors[processo.criticidade]}>
@@ -231,7 +222,7 @@ const Processos = () => {
                     </TableCell>
                     <TableCell>{new Date(processo.data_criacao).toLocaleDateString("pt-BR")}</TableCell>
                     <TableCell>
-                      {processo.status === "Rascunho" && (
+                      {entrevistaEmAberto(processo.status) && (
                         <Button
                           variant="ghost"
                           size="icon"

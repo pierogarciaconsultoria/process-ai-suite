@@ -939,6 +939,7 @@ export type Database = {
           etapas: Json
           gatilho: string
           id: string
+          implementado_em: string | null
           indicadores: Json
           interview_messages: Json
           interview_session_id: string | null
@@ -982,6 +983,7 @@ export type Database = {
           etapas?: Json
           gatilho?: string
           id?: string
+          implementado_em?: string | null
           indicadores?: Json
           interview_messages?: Json
           interview_session_id?: string | null
@@ -1025,6 +1027,7 @@ export type Database = {
           etapas?: Json
           gatilho?: string
           id?: string
+          implementado_em?: string | null
           indicadores?: Json
           interview_messages?: Json
           interview_session_id?: string | null

@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
+import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
 import {
   buildMappedProcessPayload,
   formatRevision,
@@ -63,7 +64,7 @@ const OPERATIONAL_DOCUMENT_STATUSES = [
   "Obsoleto",
 ] as const;
 
-const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo aprovado encontrado. Aprove um processo antes de vincular.";
+const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo implementado encontrado. Marque um processo como implementado antes de vincular.";
 
 type DbGeneratedDocument = Tables<"generated_documents">;
 
@@ -461,7 +462,7 @@ export default function Documentos() {
   );
 
   const approvedProcesses = useMemo(
-    () => availableProcesses.filter((processo) => processo.status === "Aprovado"),
+    () => availableProcesses.filter((processo) => podeGerarDocumentacao(processo.status)),
     [availableProcesses],
   );
 
@@ -471,15 +472,15 @@ export default function Documentos() {
     if (!requestedProcessId) return;
     guidedSelectionHandled.current = true;
     const requestedProcess = availableProcesses.find((processo) => processo.id === requestedProcessId);
-    if (requestedProcess?.status === "Aprovado") {
+    if (podeGerarDocumentacao(requestedProcess?.status)) {
       setSourceMode("linked_process");
       setSelectedProcessId(requestedProcessId);
       setIsNewDocumentOpen(true);
     } else {
       toast({
-        title: requestedProcess ? "Processo aguardando aprovação" : "Processo não encontrado",
+        title: requestedProcess ? "Processo ainda não implementado" : "Processo não encontrado",
         description: requestedProcess
-          ? "Aprove o processo antes de gerar um procedimento versionado. O fluxo atual de governança foi preservado."
+          ? "A documentação é gerada depois que as melhorias do processo são implantadas. Marque o processo como implementado na tela do processo."
           : "Não foi possível localizar o processo solicitado nesta empresa.",
         variant: "destructive",
       });
@@ -584,7 +585,7 @@ export default function Documentos() {
   const newerApprovedRevision = useMemo(() => {
     if (!viewingDoc || viewingDoc.sourceMode !== "linked_process" || !viewingDoc.processId) return null;
     const currentProcess = processRows.find((item) => item.id === viewingDoc.processId);
-    if (!currentProcess || currentProcess.status !== "Aprovado" || !currentProcess.mapa_revisao) return null;
+    if (!currentProcess || !podeGerarDocumentacao(currentProcess.status) || !currentProcess.mapa_revisao) return null;
     if (parseRevision(currentProcess.mapa_revisao) <= parseRevision(viewingDoc.linkedMapRevision)) return null;
     return currentProcess.mapa_revisao;
   }, [processRows, viewingDoc]);
@@ -592,7 +593,7 @@ export default function Documentos() {
   const getNewerApprovedRevision = (doc: GeneratedDocumentRecord) => {
     if (doc.sourceMode !== "linked_process" || !doc.processId) return null;
     const currentProcess = processRows.find((item) => item.id === doc.processId);
-    if (!currentProcess || currentProcess.status !== "Aprovado" || !currentProcess.mapa_revisao) return null;
+    if (!currentProcess || !podeGerarDocumentacao(currentProcess.status) || !currentProcess.mapa_revisao) return null;
     if (parseRevision(currentProcess.mapa_revisao) <= parseRevision(doc.linkedMapRevision)) return null;
     return currentProcess.mapa_revisao;
   };
@@ -609,7 +610,7 @@ export default function Documentos() {
 
     if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo aprovado",
+        title: "Nenhum processo implementado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
@@ -715,7 +716,7 @@ export default function Documentos() {
     if (!activeTemplate || !preview) return;
     if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo aprovado",
+        title: "Nenhum processo implementado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
@@ -881,7 +882,7 @@ export default function Documentos() {
 
     if (reviewSourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo aprovado",
+        title: "Nenhum processo implementado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });

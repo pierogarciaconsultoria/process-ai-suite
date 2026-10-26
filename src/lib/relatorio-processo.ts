@@ -1,5 +1,6 @@
 import type { Tables } from "@/integrations/supabase/types";
 import type { IndicadorForm } from "@/data/processo-form-types";
+import { normalizarStatus } from "@/lib/ciclo-processo";
 import { mapProcessRowToForm } from "@/lib/processos";
 import {
   normalizarDiagnostico,
@@ -128,7 +129,7 @@ export function montarRelatorio(row: Tables<"processos">): RelatorioProcesso {
     dono: form.donoProcesso,
     entrevistados: form.entrevistados,
     dataMapeamento: form.data,
-    status: row.status,
+    status: normalizarStatus(row.status),
     revisao: row.mapa_revisao,
     objetivo: form.objetivo,
     ficha: itens(estado, [
