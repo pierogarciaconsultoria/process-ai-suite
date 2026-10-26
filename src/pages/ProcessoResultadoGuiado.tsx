@@ -12,11 +12,56 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
 import { buildMappedProcessPayload } from "@/data/documentation-config";
+import { DiagnosticoView, PlanoView } from "@/components/entrevista/AnaliseRoteiro";
+import {
+  normalizarDiagnostico,
+  normalizarPlano,
+  type DiagnosticoRoteiro,
+  type PlanoMelhoriaRoteiro,
+} from "../../supabase/functions/_shared/roteiro-analise";
+import { ROTEIRO_PADRAO } from "../../supabase/functions/_shared/roteiro-entrevista";
+import { sanitizarEstado } from "../../supabase/functions/_shared/roteiro-peter";
 
 type GenerationState = "idle" | "loading" | "ready" | "error";
 
 const hasFunctionError = (value: unknown): value is { error: string } =>
   typeof value === "object" && value !== null && "error" in value;
+
+interface AnalisesEntrevista {
+  diagnostico: DiagnosticoRoteiro | null;
+  plano: PlanoMelhoriaRoteiro | null;
+}
+
+// Diagnóstico e plano validados pelo entrevistado na entrevista guiada, se houver.
+function analisesDaEntrevista(row: Tables<"processos">): AnalisesEntrevista | null {
+  if (!row.entrevista_roteiro) return null;
+  try {
+    const estado = sanitizarEstado(ROTEIRO_PADRAO, row.entrevista_roteiro);
+    const diagnostico = normalizarDiagnostico(estado.analises.diagnostico_as_is);
+    return diagnostico ? { diagnostico, plano: normalizarPlano(estado.analises.plano_melhoria) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function RelatorioEntrevista({ analises }: { analises: AnalisesEntrevista }) {
+  return (
+    <div className="space-y-4">
+      {analises.diagnostico && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Diagnóstico do processo (AS IS)</CardTitle></CardHeader>
+          <CardContent><DiagnosticoView diagnostico={analises.diagnostico} /></CardContent>
+        </Card>
+      )}
+      {analises.plano && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Plano de melhoria</CardTitle></CardHeader>
+          <CardContent><PlanoView plano={analises.plano} /></CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
 
 function ReportContent({ diagnosis }: { diagnosis: DiagnosticoResult }) {
   const entries = Object.entries(diagnosis as unknown as Record<string, unknown>);
@@ -50,6 +95,7 @@ export default function ProcessoResultadoGuiado() {
   const [processForm, setProcessForm] = useState<ProcessoFormData | null>(routeState?.processo ?? null);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [diagnosis, setDiagnosis] = useState<DiagnosticoResult | null>(null);
+  const [analisesEntrevista, setAnalisesEntrevista] = useState<AnalisesEntrevista | null>(null);
   const [bpmnXml, setBpmnXml] = useState("");
   const [state, setState] = useState<GenerationState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,7 +115,9 @@ export default function ProcessoResultadoGuiado() {
     setCompanyId(row.company_id);
     setBpmnXml(row.bpmn_as_is || "");
     setDiagnosis((row.diagnostico as unknown as DiagnosticoResult | null) ?? null);
-    return { row, form };
+    const analises = analisesDaEntrevista(row);
+    setAnalisesEntrevista(analises);
+    return { row, form, analises };
   }, [id, routeState?.processo]);
 
   const gerarDocumento = async (documentType: "raci" | "ficha_processo" | "pop_v5") => {
@@ -109,11 +157,14 @@ export default function ProcessoResultadoGuiado() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const { row, form } = await loadProcess();
+      const { row, form, analises } = await loadProcess();
       const [diagnosisResult, bpmnResult] = await Promise.allSettled([
-        supabase.functions.invoke("ai-diagnose-process", {
-          body: { company_id: row.company_id, process_id: id, processoData: form, use_peter_assistant: true },
-        }),
+        // Vindo da entrevista guiada, o diagnóstico já foi feito e validado lá.
+        analises
+          ? Promise.resolve(null)
+          : supabase.functions.invoke("ai-diagnose-process", {
+            body: { company_id: row.company_id, process_id: id, processoData: form, use_peter_assistant: true },
+          }),
         supabase.functions.invoke("ai-generate-bpmn", {
           body: {
             company_id: row.company_id,
@@ -134,7 +185,9 @@ export default function ProcessoResultadoGuiado() {
       const update: { diagnostico?: Json; bpmn_as_is?: string; updated_by?: string } = {};
       const failures: string[] = [];
 
-      if (diagnosisResult.status === "fulfilled" && !diagnosisResult.value.error && !hasFunctionError(diagnosisResult.value.data)) {
+      if (analises) {
+        // Nada a gerar: o relatório usa o diagnóstico da entrevista.
+      } else if (diagnosisResult.status === "fulfilled" && diagnosisResult.value && !diagnosisResult.value.error && !hasFunctionError(diagnosisResult.value.data)) {
         const nextDiagnosis = diagnosisResult.value.data as DiagnosticoResult;
         setDiagnosis(nextDiagnosis);
         update.diagnostico = nextDiagnosis as unknown as Json;
@@ -230,7 +283,7 @@ export default function ProcessoResultadoGuiado() {
           <TabsTrigger value="map">Mapa do Processo AS IS</TabsTrigger>
         </TabsList>
         <TabsContent value="report">
-          {diagnosis ? <ReportContent diagnosis={diagnosis} /> : <Card><CardContent className="py-10 text-center text-muted-foreground">O relatório ainda não foi gerado.</CardContent></Card>}
+          {analisesEntrevista ? <RelatorioEntrevista analises={analisesEntrevista} /> : diagnosis ? <ReportContent diagnosis={diagnosis} /> : <Card><CardContent className="py-10 text-center text-muted-foreground">O relatório ainda não foi gerado.</CardContent></Card>}
         </TabsContent>
         <TabsContent value="map">
           {bpmnXml && processForm && companyId ? (

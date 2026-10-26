@@ -5,12 +5,21 @@
 import { HttpError } from "./authorization-core.ts";
 import type { AcaoIA, CampoFormulario, EtapaRoteiro, PerguntaRoteiro, Roteiro } from "./roteiro-entrevista.ts";
 import {
+  INSTRUCOES_POR_ACAO,
+  SCHEMA_POR_ACAO,
+  camposDoPlano,
+  normalizarAnalises,
+  normalizarDiagnostico,
+  normalizarPlano,
+} from "./roteiro-analise.ts";
+import {
   MAX_APROFUNDAMENTOS,
   aplicarRespostasExtraidas,
   concluirAcao,
   confirmarEtapa,
   corrigirResposta,
   perguntaAplicavel,
+  reabrirAnalise,
   progresso,
   proximoPasso,
   registrarResposta,
@@ -40,6 +49,8 @@ export interface ResultadoTurno {
   campos: CamposExtraidos;
   alerta: string | null;
   oportunidade: string | null;
+  // Análise produzida neste turno; o conteúdo fica em estado.analises.
+  analise?: AcaoIA;
 }
 
 // ─── Estado vindo do cliente ─────────────────────────────────────────────────
@@ -88,6 +99,13 @@ export function sanitizarEstado(roteiro: Roteiro, raw: unknown): EstadoRoteiro {
   const acoesConcluidas = (Array.isArray(raw.acoesConcluidas) ? raw.acoesConcluidas : [])
     .filter((acao, indice, lista): acao is AcaoIA => acoesValidas.has(acao as AcaoIA) && lista.indexOf(acao) === indice);
 
+  const observacoes: Record<number, string[]> = {};
+  for (const [numero, valor] of Object.entries(isRecord(raw.observacoes) ? raw.observacoes : {})) {
+    const etapa = Number(numero);
+    if (!roteiro.etapas.some((item) => item.numero === etapa && item.acaoIA) || !Array.isArray(valor)) continue;
+    observacoes[etapa] = valor.filter((item): item is string => typeof item === "string").slice(-10).map((item) => item.slice(0, MAX_TEXTO_RESPOSTA));
+  }
+
   return {
     versaoRoteiro: roteiro.versao,
     etapaAtual,
@@ -95,6 +113,8 @@ export function sanitizarEstado(roteiro: Roteiro, raw: unknown): EstadoRoteiro {
     aprofundamentos,
     acoesConcluidas,
     etapasConfirmadas: Array.from({ length: etapaAtual - 1 }, (_, indice) => indice + 1),
+    observacoes,
+    analises: normalizarAnalises(raw.analises),
   };
 }
 
@@ -153,7 +173,8 @@ export function textoDoPasso(roteiro: Roteiro, estado: EstadoRoteiro, passo: Pas
       return TEXTO_ACAO[passo.acao!];
     case "confirmar_etapa": {
       const etapa = roteiro.etapas.find((item) => item.numero === passo.etapa!.numero)!;
-      return `${resumoEtapa(roteiro, estado, etapa.numero)}\n\n${etapa.textoConfirmacao}`;
+      // Nas etapas com análise, o que se confirma é a análise, exibida à parte.
+      return etapa.acaoIA ? etapa.textoConfirmacao : `${resumoEtapa(roteiro, estado, etapa.numero)}\n\n${etapa.textoConfirmacao}`;
     }
     case "concluido":
       return "Entrevista concluída! Obrigado pelo seu tempo. Já tenho tudo para gerar o relatório e o mapa do processo.";
@@ -273,6 +294,7 @@ export function schemaAvaliacao(pergunta: PerguntaRoteiro) {
 export function schemaConfirmacao(etapa: EtapaRoteiro) {
   const properties = {
     confirmou: { type: "boolean" },
+    pedeAjuste: { type: "boolean" },
     comentario: { type: "string" },
     correcoes: {
       type: "array",
@@ -403,21 +425,24 @@ export function promptConfirmacao(
   const passo = proximoPasso(roteiro, estado);
   if (passo.tipo !== "confirmar_etapa") throw new HttpError(409, "A entrevista não está aguardando confirmação.");
   const { etapa } = passo;
+  const apresentado = etapa.acaoIA
+    ? `Análise apresentada (gerada por você a partir das respostas):\n${JSON.stringify(estado.analises[etapa.acaoIA] ?? null)}`
+    : `Resumo apresentado:\n${resumoEtapa(roteiro, estado, etapa.numero)}`;
 
   return `${cabecalho(persona)}
 
 ## SUA TAREFA AGORA
-O entrevistado acabou de ver o resumo da ${progresso(roteiro, estado).rotulo} e respondeu à pergunta: "${etapa.textoConfirmacao}"
+O entrevistado acabou de ver o fechamento da ${progresso(roteiro, estado).rotulo} e respondeu à pergunta: "${etapa.textoConfirmacao}"
 
-Resumo apresentado:
-${resumoEtapa(roteiro, estado, etapa.numero)}
+${apresentado}
 
 Perguntas desta etapa (para as correções):
 ${etapa.perguntas.map((pergunta) => `- ${pergunta.id} (${pergunta.rotulo})`).join("\n")}
 
 ## COMO RESPONDER (JSON)
-- "confirmou": true somente se o entrevistado aprovou o resumo sem pedir mudanças.
-- "comentario": se confirmou, uma frase curta de transição; se pediu ajustes, diga em uma frase o que foi ajustado.
+- "confirmou": true somente se o entrevistado aprovou sem pedir mudanças.
+- "pedeAjuste": true se o entrevistado pediu para corrigir, retirar ou acrescentar algo${etapa.acaoIA ? " na análise" : ""}. False se apenas aprovou ou fez uma pergunta.
+- "comentario": se confirmou, uma frase curta de transição; se pediu ajustes, diga em uma frase o que será ajustado; se fez uma pergunta, responda-a brevemente.
 - "correcoes": para cada item que o entrevistado corrigiu ou completou, o id da pergunta e o novo "texto" completo daquela resposta (para e3.atividades, a lista inteira, uma atividade por linha). "valor": "sim"/"nao" se a correção muda uma resposta de sim/não; senão null. Lista vazia se não houve correção.
 - "campos": se houve correção, o valor COMPLETO e atualizado dos campos afetados; null nos demais.
 
@@ -517,12 +542,16 @@ export function aplicarAvaliacao(roteiro: Roteiro, estado: EstadoRoteiro, raw: u
   };
 }
 
-export function aplicarConfirmacao(roteiro: Roteiro, estado: EstadoRoteiro, raw: unknown): ResultadoTurno {
+export function aplicarConfirmacao(roteiro: Roteiro, estado: EstadoRoteiro, raw: unknown, respostaUsuario: string): ResultadoTurno {
   const passoAtual = proximoPasso(roteiro, estado);
   if (passoAtual.tipo !== "confirmar_etapa") throw new HttpError(409, "A entrevista não está aguardando confirmação.");
   const r = isRecord(raw) ? raw : {};
   const campos = filtrarCampos(r.campos, camposDaEtapa(passoAtual.etapa));
   const correcoes = (Array.isArray(r.correcoes) ? r.correcoes : []).filter(isRecord);
+  const pedeAjuste = r.pedeAjuste === true || correcoes.length > 0;
+
+  // Ajuste numa etapa com análise: a análise é refeita considerando o pedido.
+  const base = passoAtual.etapa.acaoIA && pedeAjuste ? reabrirAnalise(roteiro, estado, respostaUsuario) : estado;
 
   // Com correção, o resumo é reapresentado; se a correção tornar aplicável uma
   // pergunta condicional (ex.: passou a existir aprovação), o motor a faz primeiro.
@@ -532,9 +561,9 @@ export function aplicarConfirmacao(roteiro: Roteiro, estado: EstadoRoteiro, raw:
       texto: textoLimpo(item.texto).slice(0, MAX_TEXTO_RESPOSTA * 4),
       valor: textoOuNull(item.valor) ?? undefined,
     }),
-    estado,
+    base,
   );
-  const confirmou = r.confirmou === true && correcoes.length === 0;
+  const confirmou = r.confirmou === true && !pedeAjuste;
   const novoEstado = confirmou ? confirmarEtapa(roteiro, corrigido) : corrigido;
   const passo = descreverPasso(roteiro, novoEstado);
 
@@ -585,20 +614,38 @@ export function iniciarTurno(roteiro: Roteiro, estado: EstadoRoteiro): Resultado
   return { estado, passo, mensagem: textoDoPasso(roteiro, estado, passo, 0), campos: {}, alerta: null, oportunidade: null };
 }
 
-export function concluirAcaoTurno(roteiro: Roteiro, estado: EstadoRoteiro, acao: unknown): ResultadoTurno {
-  const passoAtual = proximoPasso(roteiro, estado);
-  if (passoAtual.tipo !== "acao_ia" || passoAtual.acao !== acao) {
-    throw new HttpError(409, "Essa análise não é o passo atual da entrevista.");
-  }
-  const novoEstado = concluirAcao(roteiro, estado, passoAtual.acao);
+// ─── Análises da IA (diagnóstico e plano) ───────────────────────────────────
+
+function acaoPendente(roteiro: Roteiro, estado: EstadoRoteiro): AcaoIA {
+  const passo = proximoPasso(roteiro, estado);
+  if (passo.tipo !== "acao_ia") throw new HttpError(409, "A entrevista não está aguardando uma análise.");
+  return passo.acao;
+}
+
+export function promptAnalise(persona: PersonaPeter, roteiro: Roteiro, estado: EstadoRoteiro): string {
+  return `${cabecalho(persona)}\n\n${INSTRUCOES_POR_ACAO[acaoPendente(roteiro, estado)](roteiro, estado)}`;
+}
+
+export function schemaAnalise(roteiro: Roteiro, estado: EstadoRoteiro): object {
+  return SCHEMA_POR_ACAO[acaoPendente(roteiro, estado)];
+}
+
+export function aplicarAnalise(roteiro: Roteiro, estado: EstadoRoteiro, raw: unknown): ResultadoTurno {
+  const acao = acaoPendente(roteiro, estado);
+  const diagnostico = acao === "diagnostico_as_is" ? normalizarDiagnostico(raw) : null;
+  const plano = acao === "plano_melhoria" ? normalizarPlano(raw) : null;
+  if (!diagnostico && !plano) throw new HttpError(502, "A análise do Peter veio incompleta. Tente novamente.");
+
+  const novoEstado = concluirAcao(roteiro, estado, acao, diagnostico ?? plano);
   const passo = descreverPasso(roteiro, novoEstado);
   return {
     estado: novoEstado,
     passo,
     mensagem: textoDoPasso(roteiro, novoEstado, passo, novoEstado.etapaAtual),
-    campos: {},
+    campos: plano ? camposDoPlano(plano) : {},
     alerta: null,
     oportunidade: null,
+    analise: acao,
   };
 }
 

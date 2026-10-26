@@ -9,9 +9,6 @@ verify_jwt = true
 [functions.ai-generate-bpmn]
 verify_jwt = true
 
-[functions.ai-interview]
-verify_jwt = true
-
 [functions.ai-interview-roteiro]
 verify_jwt = true
 

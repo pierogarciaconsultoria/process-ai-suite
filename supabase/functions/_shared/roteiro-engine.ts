@@ -21,6 +21,10 @@ export interface EstadoRoteiro {
   aprofundamentos: Record<string, number>;
   acoesConcluidas: AcaoIA[];
   etapasConfirmadas: number[];
+  // Ajustes pedidos pelo entrevistado ao revisar uma análise da IA, por etapa.
+  observacoes: Record<number, string[]>;
+  // Resultado de cada análise da IA; o formato é definido em roteiro-analise.ts.
+  analises: Partial<Record<AcaoIA, unknown>>;
 }
 
 export type PassoRoteiro =
@@ -54,11 +58,13 @@ export function iniciarRoteiro(roteiro: Roteiro): EstadoRoteiro {
     aprofundamentos: {},
     acoesConcluidas: [],
     etapasConfirmadas: [],
+    observacoes: {},
+    analises: {},
   };
 }
 
 function normalizarValor(valor: string | undefined): string | undefined {
-  const limpo = valor?.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const limpo = valor?.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return limpo || undefined;
 }
 
@@ -216,12 +222,31 @@ export function aplicarRespostasExtraidas(
   return { ...estado, respostas };
 }
 
-export function concluirAcao(roteiro: Roteiro, estado: EstadoRoteiro, acao: AcaoIA): EstadoRoteiro {
+export function concluirAcao(roteiro: Roteiro, estado: EstadoRoteiro, acao: AcaoIA, resultado?: unknown): EstadoRoteiro {
   const passo = proximoPasso(roteiro, estado);
   if (passo.tipo !== "acao_ia" || passo.acao !== acao) {
     throw new Error(`A ação ${acao} não é o passo atual do roteiro.`);
   }
-  return { ...estado, acoesConcluidas: [...estado.acoesConcluidas, acao] };
+  return {
+    ...estado,
+    acoesConcluidas: [...estado.acoesConcluidas, acao],
+    ...(resultado !== undefined ? { analises: { ...estado.analises, [acao]: resultado } } : {}),
+  };
+}
+
+// O entrevistado pediu ajustes no diagnóstico ou no plano: a análise volta a ser o
+// passo atual e será refeita considerando a observação.
+export function reabrirAnalise(roteiro: Roteiro, estado: EstadoRoteiro, observacao: string): EstadoRoteiro {
+  const passo = proximoPasso(roteiro, estado);
+  const acao = passo.tipo === "confirmar_etapa" ? passo.etapa.acaoIA : undefined;
+  if (!acao) throw new Error(`A etapa ${estado.etapaAtual} não tem análise para refazer.`);
+  const numero = estado.etapaAtual;
+  const texto = observacao.trim();
+  return {
+    ...estado,
+    acoesConcluidas: estado.acoesConcluidas.filter((item) => item !== acao),
+    observacoes: texto ? { ...estado.observacoes, [numero]: [...(estado.observacoes[numero] ?? []), texto] } : estado.observacoes,
+  };
 }
 
 export function confirmarEtapa(roteiro: Roteiro, estado: EstadoRoteiro): EstadoRoteiro {

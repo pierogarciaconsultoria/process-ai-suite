@@ -9,14 +9,16 @@ import { iniciarRoteiro, proximoPasso } from "../_shared/roteiro-engine.ts";
 import {
   aplicarAvaliacao,
   aplicarConfirmacao,
+  aplicarAnalise,
   aplicarExtracao,
-  concluirAcaoTurno,
   iniciarTurno,
+  promptAnalise,
   promptAvaliacao,
   promptConfirmacao,
   promptExtracao,
   sanitizarEstado,
   sanitizarHistorico,
+  schemaAnalise,
   schemaAvaliacao,
   schemaConfirmacao,
   schemaExtracao,
@@ -63,15 +65,11 @@ serve(async (req: Request) => {
       return jsonResponse(iniciarTurno(roteiro, iniciarRoteiro(roteiro)));
     }
 
-    const estado = sanitizarEstado(roteiro, body?.estado);
-
-    if (operacao === "concluir_acao") {
-      return jsonResponse(concluirAcaoTurno(roteiro, estado, body?.acao));
-    }
-
-    if (operacao !== "responder" && operacao !== "extrair") {
+    if (operacao !== "responder" && operacao !== "extrair" && operacao !== "analisar") {
       throw new HttpError(400, "Operação inválida.");
     }
+
+    const estado = sanitizarEstado(roteiro, body?.estado);
 
     const resposta = typeof body?.resposta === "string" ? body.resposta.trim() : "";
     if (operacao === "responder" && !resposta) throw new HttpError(400, "Resposta vazia.");
@@ -88,6 +86,16 @@ serve(async (req: Request) => {
     const quotaLease = await acquireAiQuota(client, "ai-interview-roteiro", companyId);
     let consumo = JSON.stringify(historico).length + resposta.length;
     try {
+      if (operacao === "analisar") {
+        const raw = await callResponsesAPI({
+          systemPrompt: promptAnalise(persona, roteiro, estado),
+          messages: [{ role: "user", content: "Gere a análise com base nas informações coletadas." }],
+          responseSchema: schemaAnalise(roteiro, estado),
+          openaiApiKey: OPENAI_API_KEY,
+        });
+        return jsonResponse(aplicarAnalise(roteiro, estado, raw));
+      }
+
       if (operacao === "extrair") {
         const origem = body?.origem === "anexo" ? "anexo" : "texto_livre";
         const partes = validarArquivo(body?.arquivo_content ?? (resposta ? [{ type: "text", text: resposta }] : []));
@@ -121,7 +129,7 @@ serve(async (req: Request) => {
           responseSchema: schemaConfirmacao(passo.etapa),
           openaiApiKey: OPENAI_API_KEY,
         });
-        return jsonResponse(aplicarConfirmacao(roteiro, estado, raw));
+        return jsonResponse(aplicarConfirmacao(roteiro, estado, raw, resposta));
       }
 
       throw new HttpError(409, "A entrevista não está aguardando uma resposta neste momento.");

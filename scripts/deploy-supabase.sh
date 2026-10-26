@@ -30,7 +30,6 @@ supabase functions deploy org-invite --project-ref "$REF"
 supabase functions deploy ai-fill-process --project-ref "$REF"
 supabase functions deploy ai-diagnose-process --project-ref "$REF"
 supabase functions deploy ai-generate-bpmn --project-ref "$REF"
-supabase functions deploy ai-interview --project-ref "$REF"
 supabase functions deploy ai-interview-roteiro --project-ref "$REF"
 supabase functions deploy ai-helpcenter --project-ref "$REF"
 

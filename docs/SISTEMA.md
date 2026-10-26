@@ -211,22 +211,30 @@ Agente:
 
 - Peter, configuravel por empresa
 
+Principio: o codigo conduz o roteiro; o Peter avalia cada resposta e faz as analises.
+
+Roteiro (`supabase/functions/_shared/roteiro-entrevista.ts`):
+
+- 35 perguntas nas 6 etapas da metodologia v5 (`supabase/config/system_prompt_peter_v5.md`)
+- cada pergunta define rotulo, criterio de resposta suficiente, campos do `ProcessoFormData` que alimenta, se e obrigatoria, condicao e repeticao
+
+Motor (`roteiro-engine.ts`, funcoes puras):
+
+- uma pergunta por vez, progresso "Etapa x de 6" e confirmacao ao fim de cada etapa
+- perguntas condicionais (ex.: aprovador so se houver aprovacao) e repeticao (atividades)
+- no maximo 2 aprofundamentos por pergunta; depois registra lacuna e segue
+- etapa 5 gera o diagnostico AS IS e etapa 6 o plano de melhoria antes da confirmacao; pedido de ajuste refaz a analise
+
 Fluxo:
 
-1. pagina resolve empresa ativa
-2. `useAiConfig("route_script")` carrega configuracao de IA da empresa
-3. a conversa inicia com acolhimento, coleta do nome da pessoa e do nome do processo
-4. o usuario fornece um "textao" inicial do processo
-5. a edge `ai-interview` responde com JSON estruturado
-6. `partialUpdate` atualiza o `ProcessoFormData`
-7. o estado e persistido em `interview_sessions` e `processos`
+1. o usuario escolhe entrevista guiada, colar um texto ou anexar arquivo
+2. texto e anexos passam pela operacao `extrair`, que preenche as perguntas respondidas pelo material
+3. cada resposta passa pela operacao `responder` da edge `ai-interview-roteiro`
+4. diagnostico e plano usam a operacao `analisar` (`roteiro-analise.ts`: Lean, ISO 9001, maturidade Inicial a Otimizado, 5W2H)
+5. a cada turno, formulario, mensagens e estado do roteiro sao salvos em `processos` (`entrevista_roteiro`, `interview_messages`)
+6. ao concluir, o processo vai para "Em revisao" e a pagina de resultado gera o mapa BPMN AS IS
 
-Blindagens atuais:
-
-- fallback para defaults de IA quando `useAiConfig` falha
-- protecao de inicializacao quando nao ha empresa ativa
-- `ErrorBoundary` local
-- tratamento de erro amigavel para falhas da edge function
+Persona: identidade, regras e orientacoes da empresa vem de `ai_configurations` (`_shared/peter-persona.ts`); as regras absolutas do roteiro prevalecem sobre as orientacoes da empresa.
 
 ### 5.5 Configuracao de IA
 
@@ -248,7 +256,7 @@ Uso:
 
 Consumidores:
 
-- `ai-interview`
+- `ai-interview-roteiro`
 - `ai-fill-process`
 - `ai-diagnose-process`
 - telas de configuracao de roteiro e skin
@@ -380,8 +388,8 @@ Funcionamento:
 
 ### IA para processos
 
-- `ai-interview`
-  - conduz a entrevista estruturada e devolve JSON com `partialUpdate`
+- `ai-interview-roteiro`
+  - conduz a entrevista guiada: operacoes `iniciar`, `responder`, `extrair` e `analisar`
 - `ai-fill-process`
   - preenche dados do formulario a partir de descricao
 - `ai-diagnose-process`
@@ -885,12 +893,11 @@ Observacao importante:
 
 ### 9.3 Mapeamento de processo via entrevista
 
-1. usuario acessa entrevista
-2. IA coleta contexto e respostas
-3. snapshots vao para `interview_sessions`
-4. rascunho operacional vai para `processos`
-5. usuario pode aplicar no formulario
-6. diagnostico e BPMN complementam o registro
+1. usuario acessa entrevista e escolhe o modo de entrada
+2. o roteiro conduz as 6 etapas; o Peter avalia cada resposta
+3. a cada turno, o processo e salvo em `processos`, incluindo `entrevista_roteiro`
+4. etapas 5 e 6 geram diagnostico e plano, validados pelo entrevistado
+5. ao concluir, a pagina de resultado mostra o relatorio e gera o mapa BPMN AS IS
 
 ### 9.4 Mapeamento via formulario
 
@@ -998,6 +1005,8 @@ Backend e banco:
 - `supabase/functions/org-invite/index.ts`
 - `supabase/functions/org-accept-invite/index.ts`
 - `supabase/functions/org-members/index.ts`
-- `supabase/functions/ai-interview/index.ts`
+- `supabase/functions/ai-interview-roteiro/index.ts`
+- `supabase/functions/_shared/roteiro-entrevista.ts`
+- `supabase/functions/_shared/roteiro-engine.ts`
 - `supabase/functions/ai-generate-document/index.ts`
 - `supabase/functions/ai-helpcenter/index.ts`

@@ -108,6 +108,8 @@ export function buildProcessInsertPayload(args: {
   diagnostico?: DiagnosticoResult | null;
   currentRevision?: string;
   currentApprovedAt?: string | null;
+  // Só é gravado quando informado, para outras telas não apagarem a entrevista ao salvar.
+  entrevistaRoteiro?: unknown;
 }): TablesInsert<"processos"> {
   const {
     form,
@@ -119,6 +121,7 @@ export function buildProcessInsertPayload(args: {
     diagnostico = null,
     currentRevision = "Rev.00",
     currentApprovedAt = null,
+    entrevistaRoteiro,
   } = args;
 
   return {
@@ -157,6 +160,7 @@ export function buildProcessInsertPayload(args: {
     mapa_aprovado_em: currentApprovedAt,
     created_by: userId,
     updated_by: userId,
+    ...(entrevistaRoteiro !== undefined ? { entrevista_roteiro: entrevistaRoteiro as Json } : {}),
   };
 }
 
@@ -169,6 +173,7 @@ export function buildProcessUpdatePayload(args: {
   diagnostico?: DiagnosticoResult | null;
   currentRevision?: string;
   currentApprovedAt?: string | null;
+  entrevistaRoteiro?: unknown;
 }): TablesUpdate<"processos"> {
   const insertPayload = buildProcessInsertPayload({
     ...args,

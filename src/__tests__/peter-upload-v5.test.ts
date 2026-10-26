@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   EXTENSOES_ACEITAS,
   IMAGENS_ASSISTANT_CONFIRMADAS,
@@ -12,7 +10,7 @@ import {
 import {
   detectarTipoConteudo,
   labelVisualArquivos,
-  montarContentParaThread,
+  montarPartesArquivo,
   processarArquivo,
 } from "@/lib/peter-upload";
 
@@ -46,7 +44,7 @@ describe("Peter v5 — upload", () => {
     expect(long.arquivo.tamanhoTextoOriginal).toBe(LIMITE_TEXTO_CHARS + 1);
   });
 
-  it("detecta procedimentos e monta instrução final segura", () => {
+  it("detecta procedimentos e monta as partes sem instruções embutidas", () => {
     expect(detectarTipoConteudo("Procedimento Operacional Padrão")).toBe("pop");
     expect(detectarTipoConteudo("atividade, responsável e fluxo")).toBe("processo");
     expect(detectarTipoConteudo("relatório trimestral")).toBe("generico");
@@ -54,45 +52,19 @@ describe("Peter v5 — upload", () => {
       nome: "pop.txt", tipo: "text/plain", tipoLabel: "Texto (TXT)", tamanhoBytes: 10,
       textoExtraido: "Procedimento operacional", modoEnvio: "texto_extraido", truncado: false,
     };
-    const parts = montarContentParaThread([file], 3);
-    expect(parts[0]).toMatchObject({ type: "text" });
-    expect((parts[0] as { text: string }).text).toContain("confirme se ainda reflete");
-    expect((parts.at(-1) as { text: string }).text).toContain("Analise agora o conteúdo deste arquivo");
-    expect((parts.at(-1) as { text: string }).text).toContain("✅ para cada informação identificada e ❓ para as lacunas");
-    expect((parts.at(-1) as { text: string }).text).toContain("Não peça para o usuário descrever o processo em texto");
-    expect((parts.at(-1) as { text: string }).text).not.toContain("base64,");
+    const parts = montarPartesArquivo([file]);
+    expect(parts).toHaveLength(1);
+    expect((parts[0] as { text: string }).text).toContain("Procedimento existente");
+    expect((parts[0] as { text: string }).text).toContain("Procedimento operacional");
     expect(labelVisualArquivos([file])).toBe("📎 pop.txt (Texto (TXT))");
   });
 
-  it("consolida múltiplos arquivos e mantém a instrução por último", () => {
+  it("gera uma parte por arquivo", () => {
     const files: ArquivoProcessado[] = ["a.txt", "b.csv"].map((nome) => ({
       nome, tipo: "text/plain", tipoLabel: "Texto", tamanhoBytes: 1,
       textoExtraido: "processo", modoEnvio: "texto_extraido", truncado: false,
     }));
-    const parts = montarContentParaThread(files, 2);
-    expect(parts).toHaveLength(3);
-    expect((parts.at(-1) as { text: string }).text).toContain("Recebi 2 arquivos");
+    expect(montarPartesArquivo(files)).toHaveLength(2);
     expect(labelVisualArquivos(files)).toContain("2 arquivos");
-  });
-
-  it("protege arquivo_content e o insere após o histórico no Thread", () => {
-    const source = readFileSync(resolve(process.cwd(), "supabase/functions/ai-interview/index.ts"), "utf8");
-    expect(source).toContain("function uploadErrorResponse");
-    expect(source).toContain('JSON.stringify({ error: message })');
-    expect(source).toContain('arquivo_content não pode estar vazio');
-    expect(source).toContain('Parte text não pode estar vazia');
-    expect(source).toContain("dataUrlRegex");
-    expect(source).toContain("Máximo de 12 partes por envio");
-    expect(source.indexOf("for (const message of sanitizedHistory)")).toBeLessThan(source.indexOf("if (Array.isArray(arquivoContent)"));
-  });
-
-  it("usa ref dedicado, snapshot único e registra falha no chat", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/pages/EntrevistaProcesso.tsx"), "utf8");
-    expect(source).toContain("const inputArquivoRef = useRef<HTMLInputElement>(null)");
-    expect(source).toContain("...warnings,");
-    expect(source).toContain("labelMessage,");
-    expect(source).toContain("enviarArquivosParaPeter(processed, newMode, historySnapshot)");
-    expect(source).toContain("Não consegui analisar o arquivo enviado");
-    expect(source).toContain("setArquivosAnexados((current) => [...current, ...processed])");
   });
 });

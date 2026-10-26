@@ -9,20 +9,23 @@ import {
   type EstadoRoteiro,
 } from "../../supabase/functions/_shared/roteiro-engine";
 import {
+  aplicarAnalise,
   aplicarAvaliacao,
   aplicarConfirmacao,
   aplicarExtracao,
-  concluirAcaoTurno,
   filtrarCampos,
   iniciarTurno,
+  promptAnalise,
   promptAvaliacao,
   sanitizarEstado,
   sanitizarHistorico,
+  schemaAnalise,
   schemaAvaliacao,
   schemaConfirmacao,
   schemaExtracao,
   validarArquivo,
 } from "../../supabase/functions/_shared/roteiro-peter";
+import { SCHEMA_DIAGNOSTICO, SCHEMA_PLANO } from "../../supabase/functions/_shared/roteiro-analise";
 
 const roteiro = ROTEIRO_PADRAO;
 const persona = { identidade: "Você é o Peter.", regras: "- Seja claro.", orientacoesEmpresa: "- Nenhuma." };
@@ -86,6 +89,8 @@ describe("Peter no roteiro — schemas", () => {
       for (const pergunta of etapa.perguntas) verificarStrict(schemaAvaliacao(pergunta));
     }
     verificarStrict(schemaExtracao(roteiro));
+    verificarStrict(SCHEMA_DIAGNOSTICO);
+    verificarStrict(SCHEMA_PLANO);
   });
 
   it("restringe o valor às opções da pergunta", () => {
@@ -170,7 +175,7 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("confirma a etapa e anuncia a seguinte", () => {
-    const turno = aplicarConfirmacao(roteiro, ateConfirmacao(1), { confirmou: true, comentario: "Ótimo!", correcoes: [], campos: {} });
+    const turno = aplicarConfirmacao(roteiro, ateConfirmacao(1), { confirmou: true, pedeAjuste: false, comentario: "Ótimo!", correcoes: [], campos: {} }, "Está correto");
     expect(turno.estado.etapaAtual).toBe(2);
     expect(turno.mensagem).toContain("Etapa 2 de 6");
     expect(turno.passo.pergunta?.id).toBe("e2.gatilho");
@@ -179,10 +184,11 @@ describe("Peter no roteiro — turnos", () => {
   it("aplica a correção e reapresenta o resumo atualizado em vez de avançar", () => {
     const turno = aplicarConfirmacao(roteiro, ateConfirmacao(1), {
       confirmou: true,
+      pedeAjuste: true,
       comentario: "Ajustei a área.",
       correcoes: [{ perguntaId: "e1.area", texto: "Financeiro", valor: null }],
       campos: { area: "Financeiro" },
-    });
+    }, "A área é Financeiro");
     expect(turno.estado.etapaAtual).toBe(1);
     expect(turno.passo.tipo).toBe("confirmar_etapa");
     expect(turno.mensagem).toContain("✅ **Área:** Financeiro");
@@ -208,23 +214,12 @@ describe("Peter no roteiro — turnos", () => {
     }
     const turno = aplicarConfirmacao(roteiro, estado, {
       confirmou: false,
+      pedeAjuste: true,
       comentario: "Entendi, existe aprovação.",
       correcoes: [{ perguntaId: "e3.aprovacoes", texto: "Sim, o pedido é aprovado pelo gerente", valor: "sim" }],
       campos: {},
-    });
+    }, "Na verdade o gerente aprova o pedido");
     expect(turno.passo.pergunta?.id).toBe("e3.aprovador");
-  });
-
-  it("conclui a análise da IA e passa para a confirmação da etapa", () => {
-    let estado = ateConfirmacao(4);
-    estado = confirmarEtapa(roteiro, estado);
-    while (proximoPasso(roteiro, estado).tipo === "pergunta") {
-      estado = aplicarAvaliacao(roteiro, estado, avaliacao()).estado;
-    }
-    expect(() => concluirAcaoTurno(roteiro, estado, "plano_melhoria")).toThrow();
-    const turno = concluirAcaoTurno(roteiro, estado, "diagnostico_as_is");
-    expect(turno.passo.tipo).toBe("confirmar_etapa");
-    expect(turno.mensagem).toContain("Esse diagnóstico reflete a realidade");
   });
 
   it("extrai respostas de texto livre sem reabrir etapas confirmadas", () => {
@@ -280,5 +275,114 @@ describe("Peter no roteiro — saneamento", () => {
     expect(() => validarArquivo([])).toThrow();
     expect(() => validarArquivo([{ type: "image_url", image_url: { url: "https://exemplo.com/a.png" } }])).toThrow();
     expect(() => validarArquivo([{ type: "file", data: "x" }])).toThrow();
+  });
+});
+
+const diagnosticoValido = {
+  resumo: "Processo manual e dependente do gerente.",
+  pontosFortes: ["Gatilho claro"],
+  achados: [
+    { prioridade: "critico", descricao: "Aprovação sem substituto", impacto: "Fila parada nas férias", causaProvavel: "Centralização", fundamento: "Lean — Espera" },
+    { prioridade: "invalida", descricao: "descartado", impacto: "", causaProvavel: "", fundamento: "" },
+  ],
+  desperdiciosLean: [{ tipo: "Espera", evidencia: "Pedidos aguardam o gerente" }, { tipo: "Inexistente", evidencia: "x" }],
+  riscosIso: [{ risco: "Indicador sem meta", evidencia: "Não há meta de prazo" }],
+  maturidade: { nivel: "Inicial", justificativa: "Informal" },
+  lacunas: ["Volume mensal"],
+};
+
+const planoValido = {
+  resumoToBe: "Aprovação com alçada e substituto.",
+  melhorias: [{ titulo: "Definir alçada", problema: "Aprovação centralizada", solucao: "Alçada por valor", beneficio: "Menos espera", prioridade: "Alta" }],
+  planoAcao: [{ oque: "Publicar política de alçada", porque: "Reduzir espera", quem: "Gerente financeiro", quando: "30 dias", onde: "Financeiro", como: "Reunião e documento", custo: "Baixo" }],
+};
+
+// Etapa 5 com as perguntas respondidas: o próximo passo é a análise.
+function ateDiagnostico(): EstadoRoteiro {
+  let estado = confirmarEtapa(roteiro, ateConfirmacao(4));
+  while (proximoPasso(roteiro, estado).tipo === "pergunta") {
+    estado = aplicarAvaliacao(roteiro, estado, avaliacao()).estado;
+  }
+  return estado;
+}
+
+describe("Peter no roteiro — análises", () => {
+  it("gera o diagnóstico, guarda no estado e pede a validação", () => {
+    const estado = ateDiagnostico();
+    expect(JSON.stringify(schemaAnalise(roteiro, estado))).toContain("Superprodução");
+    const prompt = promptAnalise(persona, roteiro, estado);
+    expect(prompt).toContain("ETAPA 5: DIAGNÓSTICO AS IS");
+    expect(prompt).toContain("- Dificuldades e gargalos: resposta");
+
+    const turno = aplicarAnalise(roteiro, estado, diagnosticoValido);
+    expect(turno.analise).toBe("diagnostico_as_is");
+    expect(turno.passo.tipo).toBe("confirmar_etapa");
+    expect(turno.mensagem).toBe("Esse diagnóstico reflete a realidade do processo? O que você corrigiria ou acrescentaria?");
+    const salvo = turno.estado.analises.diagnostico_as_is as typeof diagnosticoValido;
+    expect(salvo.achados).toHaveLength(1);
+    expect(salvo.desperdiciosLean).toEqual([{ tipo: "Espera", evidencia: "Pedidos aguardam o gerente" }]);
+  });
+
+  it("recusa análise incompleta sem avançar", () => {
+    expect(() => aplicarAnalise(roteiro, ateDiagnostico(), { resumo: "", maturidade: { nivel: "Lendário" } })).toThrow(/incompleta/);
+  });
+
+  it("refaz o diagnóstico com o ajuste pedido pelo entrevistado", () => {
+    const comDiagnostico = aplicarAnalise(roteiro, ateDiagnostico(), diagnosticoValido).estado;
+    const turno = aplicarConfirmacao(roteiro, comDiagnostico, {
+      confirmou: false,
+      pedeAjuste: true,
+      comentario: "Vou ajustar o diagnóstico.",
+      correcoes: [],
+      campos: {},
+    }, "O gerente tem substituto, sim: o coordenador.");
+    expect(turno.passo.tipo).toBe("acao_ia");
+    expect(turno.estado.observacoes[5]).toEqual(["O gerente tem substituto, sim: o coordenador."]);
+    const prompt = promptAnalise(persona, roteiro, turno.estado);
+    expect(prompt).toContain("O gerente tem substituto, sim: o coordenador.");
+    expect(prompt).toContain("Aprovação sem substituto");
+  });
+
+  it("responde a uma dúvida sem refazer a análise", () => {
+    const comDiagnostico = aplicarAnalise(roteiro, ateDiagnostico(), diagnosticoValido).estado;
+    const turno = aplicarConfirmacao(roteiro, comDiagnostico, {
+      confirmou: false,
+      pedeAjuste: false,
+      comentario: "Espera é quando o trabalho fica parado aguardando algo.",
+      correcoes: [],
+      campos: {},
+    }, "O que é desperdício de espera?");
+    expect(turno.passo.tipo).toBe("confirmar_etapa");
+    expect(turno.estado.acoesConcluidas).toContain("diagnostico_as_is");
+    expect(turno.mensagem).toMatch(/^Espera é quando/);
+  });
+
+  it("gera o plano com base no diagnóstico e preenche o 5W2H do processo", () => {
+    let estado = aplicarAnalise(roteiro, ateDiagnostico(), diagnosticoValido).estado;
+    estado = confirmarEtapa(roteiro, estado);
+    while (proximoPasso(roteiro, estado).tipo === "pergunta") {
+      estado = aplicarAvaliacao(roteiro, estado, avaliacao()).estado;
+    }
+    expect(promptAnalise(persona, roteiro, estado)).toContain("Aprovação sem substituto");
+
+    const turno = aplicarAnalise(roteiro, estado, planoValido);
+    expect(turno.analise).toBe("plano_melhoria");
+    expect(turno.campos.planoAcao).toEqual(planoValido.planoAcao);
+    expect(turno.campos.oportunidadesMelhoria).toBe("• Definir alçada (Alta): Alçada por valor");
+
+    const fim = aplicarConfirmacao(roteiro, turno.estado, { confirmou: true, pedeAjuste: false, comentario: "", correcoes: [], campos: {} }, "Aprovado");
+    expect(fim.passo.tipo).toBe("concluido");
+  });
+
+  it("mantém observações e análises válidas ao receber o estado do cliente", () => {
+    const comDiagnostico = aplicarAnalise(roteiro, ateDiagnostico(), diagnosticoValido).estado;
+    const vindoDoCliente = JSON.parse(JSON.stringify({
+      ...comDiagnostico,
+      observacoes: { 5: ["ajuste"], 2: ["etapa sem análise"] },
+      analises: { ...comDiagnostico.analises, plano_melhoria: { resumoToBe: "" } },
+    }));
+    const estado = sanitizarEstado(roteiro, vindoDoCliente);
+    expect(estado.observacoes).toEqual({ 5: ["ajuste"] });
+    expect(Object.keys(estado.analises)).toEqual(["diagnostico_as_is"]);
   });
 });

@@ -83,7 +83,7 @@ const functions = {
   "ai-fill-process": { valid: { company_id: companyA, descricao: "Descrição integrada do processo" }, cross: { company_id: companyB, descricao: "Descrição integrada do processo" } },
   "ai-diagnose-process": { valid: { company_id: companyA, process_id: processA, processoData: { nome: "A" } }, cross: { company_id: companyB, process_id: processB, processoData: {} }, missing: { company_id: companyA, process_id: missingProcess, processoData: {} } },
   "ai-generate-bpmn": { valid: { company_id: companyA, process_id: processA, resumo: "Fluxo" }, cross: { company_id: companyB, process_id: processB, resumo: "Fluxo" }, missing: { company_id: companyA, process_id: missingProcess, resumo: "Fluxo" } },
-  "ai-interview": { valid: { company_id: companyA, process_id: processA, history: [], current: {} }, cross: { company_id: companyB, process_id: processB, history: [], current: {} }, missing: { company_id: companyA, process_id: missingProcess, history: [], current: {} } },
+  "ai-interview-roteiro": { valid: { operacao: "iniciar", company_id: companyA, process_id: processA }, cross: { operacao: "iniciar", company_id: companyB, process_id: processB }, missing: { operacao: "iniciar", company_id: companyA, process_id: missingProcess } },
   "ai-helpcenter": { valid: { history: [], page: "/" }, invalid: { history: "invalid", page: "/" } },
   "ai-review-config": { valid: { company_id: companyA, roteiro: "Roteiro" }, cross: { company_id: companyB, roteiro: "Roteiro" } },
   "ai-summarize-process": { valid: { company_id: companyA, process_id: processA, processoData: {} }, cross: { company_id: companyB, process_id: processB, processoData: {} }, missing: { company_id: companyA, process_id: missingProcess, processoData: {} } },
