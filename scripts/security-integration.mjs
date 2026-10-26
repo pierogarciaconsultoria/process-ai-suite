@@ -112,6 +112,27 @@ for (const [name, cases] of Object.entries(functions)) {
   const response = await invoke(name, users["owner-a"].token, cases.valid);
   assert.equal(response.status, 200, `${name} authorized success: ${await response.text()}`);
 }
+
+// Ciclo de vida: processos nascem "Em entrevista" e os status antigos são recusados.
+const seeded = await admin.from("processos").select("status").eq("id", processA).single();
+expectNoError(seeded, "read seeded status");
+assert.equal(seeded.data.status, "Em entrevista", "default process status");
+const legacyStatus = await users["owner-a"].client.from("processos").update({ status: "Rascunho", updated_by: users["owner-a"].id }).eq("id", processA);
+assert(legacyStatus.error, "legacy status must be rejected by processos_status_check");
+
+// Entrevista guiada: um turno completo passa pela edge function e pelo provedor de IA.
+const roteiroCase = functions["ai-interview-roteiro"].valid;
+const started = await (await invoke("ai-interview-roteiro", users["owner-a"].token, roteiroCase)).json();
+assert.equal(started.passo.pergunta.id, "e1.entrevistado", "interview starts at the first question");
+const callsBeforeTurn = await mockCount();
+const turn = await invoke("ai-interview-roteiro", users["analista-a"].token, {
+  ...roteiroCase, operacao: "responder", estado: started.estado, resposta: "Ana, analista financeira", current: {}, history: [],
+});
+assert.equal(turn.status, 200, `interview turn: ${await turn.clone().text()}`);
+assert.equal((await turn.json()).passo.pergunta.id, "e1.nome", "a sufficient answer advances the script");
+assert.equal(await mockCount(), callsBeforeTurn + 1, "one interview turn makes exactly one AI call");
+const wrongStep = await invoke("ai-interview-roteiro", users["owner-a"].token, { ...roteiroCase, operacao: "analisar", estado: started.estado });
+assert.equal(wrongStep.status, 409, "analysis is refused when it is not the current step");
 for (const role of ["owner-a", "admin-a", "gestor-a"]) {
   assert.equal((await invoke("ai-review-config", users[role].token, functions["ai-review-config"].valid)).status, 200, `review allowed for ${role}`);
 }
