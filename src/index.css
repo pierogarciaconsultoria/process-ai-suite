@@ -106,6 +106,13 @@
   .no-print {
     display: none !important;
   }
+  /* Menu lateral (desktop) do componente Sidebar. */
+  .group.peer[data-side] {
+    display: none !important;
+  }
+  @page {
+    margin: 16mm 14mm;
+  }
   body {
     background: white !important;
     -webkit-print-color-adjust: exact;

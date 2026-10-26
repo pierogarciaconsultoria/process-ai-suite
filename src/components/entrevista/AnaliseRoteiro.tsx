@@ -12,9 +12,10 @@ const PRIORIDADES: Array<{ chave: PrioridadeAchado; titulo: string; classe: stri
   { chave: "oportunidade", titulo: "🟢 Oportunidade", classe: "border-emerald-300 bg-emerald-50 text-emerald-900" },
 ];
 
-function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+// `junto`: mantém título e conteúdo na mesma página do PDF.
+function Secao({ titulo, junto = false, children }: { titulo: string; junto?: boolean; children: React.ReactNode }) {
   return (
-    <section className="space-y-2">
+    <section className={`space-y-2 ${junto ? "print:break-inside-avoid" : ""}`}>
       <h3 className="text-sm font-semibold text-foreground">{titulo}</h3>
       {children}
     </section>
@@ -49,7 +50,7 @@ export function DiagnosticoView({ diagnostico }: { diagnostico: DiagnosticoRotei
               diagnostico.achados
                 .filter((achado) => achado.prioridade === chave)
                 .map((achado, indice) => (
-                  <div key={`${chave}-${indice}`} className={`rounded-md border p-3 text-sm ${classe}`}>
+                  <div key={`${chave}-${indice}`} className={`rounded-md border p-3 text-sm print:break-inside-avoid ${classe}`}>
                     <div className="font-medium">{titulo} — {achado.descricao}</div>
                     {achado.impacto && <div className="mt-1">Impacto: {achado.impacto}</div>}
                     {achado.causaProvavel && <div>Causa provável: {achado.causaProvavel}</div>}
@@ -101,7 +102,7 @@ export function PlanoView({ plano }: { plano: PlanoMelhoriaRoteiro }) {
         <Secao titulo="Melhorias propostas">
           <div className="space-y-2">
             {plano.melhorias.map((melhoria, indice) => (
-              <div key={indice} className="rounded-md border p-3 text-sm">
+              <div key={indice} className="rounded-md border p-3 text-sm print:break-inside-avoid">
                 <div className="flex flex-wrap items-center gap-2 font-medium">
                   {melhoria.titulo}
                   <Badge variant={melhoria.prioridade === "Alta" ? "default" : "secondary"}>{melhoria.prioridade}</Badge>
@@ -116,9 +117,9 @@ export function PlanoView({ plano }: { plano: PlanoMelhoriaRoteiro }) {
       )}
 
       {plano.planoAcao.length > 0 && (
-        <Secao titulo="Plano de ação (5W2H)">
-          <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-[720px] text-xs">
+        <Secao titulo="Plano de ação (5W2H)" junto>
+          <div className="overflow-x-auto rounded-md border print:overflow-visible">
+            <Table className="min-w-[720px] text-xs print:min-w-0">
               <TableHeader>
                 <TableRow>
                   <TableHead>O quê</TableHead>
@@ -132,7 +133,7 @@ export function PlanoView({ plano }: { plano: PlanoMelhoriaRoteiro }) {
               </TableHeader>
               <TableBody>
                 {plano.planoAcao.map((acao, indice) => (
-                  <TableRow key={indice}>
+                  <TableRow key={indice} className="print:break-inside-avoid">
                     <TableCell className="font-medium">{acao.oque}</TableCell>
                     <TableCell>{acao.porque}</TableCell>
                     <TableCell>{acao.quem}</TableCell>
