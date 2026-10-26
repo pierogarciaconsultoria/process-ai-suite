@@ -12,6 +12,9 @@ verify_jwt = true
 [functions.ai-interview]
 verify_jwt = true
 
+[functions.ai-interview-roteiro]
+verify_jwt = true
+
 [functions.ai-helpcenter]
 verify_jwt = true
 

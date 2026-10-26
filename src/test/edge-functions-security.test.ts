@@ -7,6 +7,7 @@ const functions = [
   "ai-diagnose-process",
   "ai-generate-bpmn",
   "ai-interview",
+  "ai-interview-roteiro",
   "ai-helpcenter",
   "ai-review-config",
   "ai-summarize-process",
