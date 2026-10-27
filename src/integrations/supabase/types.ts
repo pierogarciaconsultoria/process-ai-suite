@@ -934,6 +934,7 @@ export type Database = {
           decisoes: string
           diagnostico: Json | null
           entradas: Json
+          entrevista_roteiro: Json | null
           entrevistados: string
           etapas: Json
           gatilho: string
@@ -976,6 +977,7 @@ export type Database = {
           decisoes?: string
           diagnostico?: Json | null
           entradas?: Json
+          entrevista_roteiro?: Json | null
           entrevistados?: string
           etapas?: Json
           gatilho?: string
@@ -1018,6 +1020,7 @@ export type Database = {
           decisoes?: string
           diagnostico?: Json | null
           entradas?: Json
+          entrevista_roteiro?: Json | null
           entrevistados?: string
           etapas?: Json
           gatilho?: string
