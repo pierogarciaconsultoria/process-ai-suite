@@ -10,16 +10,9 @@ import type {
   SaidaForm,
 } from "@/data/processo-form-types";
 import { emptyProcessoForm } from "@/data/processo-form-types";
+import { normalizarStatus, type ProcessoStatus } from "@/lib/ciclo-processo";
 
-export const PROCESSO_STATUS = [
-  "Rascunho",
-  "Em revisão",
-  "Aprovado",
-  "Publicado",
-  "Obsoleto",
-] as const;
-
-export type ProcessoStatus = (typeof PROCESSO_STATUS)[number];
+export { PROCESSO_STATUS, type ProcessoStatus } from "@/lib/ciclo-processo";
 export type ProcessoCriticidade = "Baixa" | "Média" | "Alta" | "Crítica";
 export type ProcessoRow = Tables<"processos">;
 
@@ -90,7 +83,7 @@ export function mapProcessRowToListItem(row: ProcessoRow): ProcessoListItem {
     nome: row.nome,
     area: row.area,
     responsavel: row.responsavel,
-    status: row.status as ProcessoStatus,
+    status: normalizarStatus(row.status),
     criticidade: (row.criticidade as ProcessoCriticidade) || "Baixa",
     data_criacao: row.created_at,
     mapa_revisao: row.mapa_revisao,
@@ -108,17 +101,20 @@ export function buildProcessInsertPayload(args: {
   diagnostico?: DiagnosticoResult | null;
   currentRevision?: string;
   currentApprovedAt?: string | null;
+  // Só é gravado quando informado, para outras telas não apagarem a entrevista ao salvar.
+  entrevistaRoteiro?: unknown;
 }): TablesInsert<"processos"> {
   const {
     form,
     companyId,
     userId,
-    status = "Rascunho",
+    status = "Em entrevista",
     interviewMessages = [],
     interviewSessionId = null,
     diagnostico = null,
     currentRevision = "Rev.00",
     currentApprovedAt = null,
+    entrevistaRoteiro,
   } = args;
 
   return {
@@ -157,6 +153,7 @@ export function buildProcessInsertPayload(args: {
     mapa_aprovado_em: currentApprovedAt,
     created_by: userId,
     updated_by: userId,
+    ...(entrevistaRoteiro !== undefined ? { entrevista_roteiro: entrevistaRoteiro as Json } : {}),
   };
 }
 
@@ -169,6 +166,7 @@ export function buildProcessUpdatePayload(args: {
   diagnostico?: DiagnosticoResult | null;
   currentRevision?: string;
   currentApprovedAt?: string | null;
+  entrevistaRoteiro?: unknown;
 }): TablesUpdate<"processos"> {
   const insertPayload = buildProcessInsertPayload({
     ...args,
@@ -178,9 +176,6 @@ export function buildProcessUpdatePayload(args: {
   return updatePayload;
 }
 
-export function normalizeSavedStatus(currentStatus: string | null | undefined, fallback: ProcessoStatus = "Rascunho"): ProcessoStatus {
-  if (currentStatus && PROCESSO_STATUS.includes(currentStatus as ProcessoStatus)) {
-    return currentStatus as ProcessoStatus;
-  }
-  return fallback;
+export function normalizeSavedStatus(currentStatus: string | null | undefined, fallback: ProcessoStatus = "Em entrevista"): ProcessoStatus {
+  return normalizarStatus(currentStatus, fallback);
 }

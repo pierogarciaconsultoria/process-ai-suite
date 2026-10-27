@@ -934,10 +934,12 @@ export type Database = {
           decisoes: string
           diagnostico: Json | null
           entradas: Json
+          entrevista_roteiro: Json | null
           entrevistados: string
           etapas: Json
           gatilho: string
           id: string
+          implementado_em: string | null
           indicadores: Json
           interview_messages: Json
           interview_session_id: string | null
@@ -976,10 +978,12 @@ export type Database = {
           decisoes?: string
           diagnostico?: Json | null
           entradas?: Json
+          entrevista_roteiro?: Json | null
           entrevistados?: string
           etapas?: Json
           gatilho?: string
           id?: string
+          implementado_em?: string | null
           indicadores?: Json
           interview_messages?: Json
           interview_session_id?: string | null
@@ -1018,10 +1022,12 @@ export type Database = {
           decisoes?: string
           diagnostico?: Json | null
           entradas?: Json
+          entrevista_roteiro?: Json | null
           entrevistados?: string
           etapas?: Json
           gatilho?: string
           id?: string
+          implementado_em?: string | null
           indicadores?: Json
           interview_messages?: Json
           interview_session_id?: string | null

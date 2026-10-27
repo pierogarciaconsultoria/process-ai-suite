@@ -59,7 +59,52 @@ export async function callResponsesAPI(params: {
   }
 
   const data = await response.json();
+  const rawText = extractOutputText(data);
 
+  if (!rawText) {
+    try {
+      return JSON.parse(JSON.stringify(data));
+    } catch {
+      throw new Error("OpenAI Responses API retornou resposta sem texto parseável.");
+    }
+  }
+
+  const cleaned = stripCodeFence(rawText);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    throw new Error(`Não foi possível parsear JSON da resposta: ${cleaned.slice(0, 500)}`);
+  }
+}
+
+// Usado por diagnóstico, BPMN e documentos: resposta em texto livre via Responses API.
+// Mantém a assinatura da antiga implementação sobre a Assistants API.
+export async function runConfiguredAssistant(
+  openaiApiKey: string,
+  instructions: string,
+  userContent: string,
+): Promise<string> {
+  const baseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+  const response = await fetch(`${baseUrl}/responses`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: "gpt-4o", instructions, input: userContent }),
+  });
+
+  if (response.status !== 200) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`OpenAI Responses API error ${response.status}${text ? `: ${text}` : ""}`);
+  }
+
+  const content = extractOutputText(await response.json()).trim();
+  if (!content) throw new Error("A OpenAI não retornou conteúdo.");
+  return content;
+}
+
+function extractOutputText(data: any): string {
   let rawText = "";
   if (Array.isArray(data?.output)) {
     for (const item of data.output) {
@@ -76,21 +121,7 @@ export async function callResponsesAPI(params: {
   }
   if (!rawText && typeof data?.output_text === "string") rawText = data.output_text;
   if (!rawText && typeof data?.content === "string") rawText = data.content;
-
-  if (!rawText) {
-    try {
-      return JSON.parse(JSON.stringify(data));
-    } catch {
-      throw new Error("OpenAI Responses API retornou resposta sem texto parseável.");
-    }
-  }
-
-  const cleaned = stripCodeFence(rawText);
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    throw new Error(`Não foi possível parsear JSON da resposta: ${cleaned.slice(0, 500)}`);
-  }
+  return rawText;
 }
 
 export function stripCodeFence(content: string): string {

@@ -46,6 +46,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, TablesInsert } from "@/integrations/supabase/types";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
+import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
 import {
   buildMappedProcessPayload,
   createEmptyManualDescription,
@@ -72,7 +73,7 @@ import {
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 const LEGACY_TEMPLATE_KEY = "process:docTemplate";
-const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo aprovado encontrado. Aprove um processo antes de vincular.";
+const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo implementado encontrado. Marque um processo como implementado antes de vincular.";
 
 type CompanyContext = {
   companyId: string | null;
@@ -384,7 +385,7 @@ export default function DocumentationWorkspace() {
   }, [activeTemplate]);
 
   const approvedProcessRows = useMemo(
-    () => processRows.filter((processo) => processo.status === "Aprovado"),
+    () => processRows.filter((processo) => podeGerarDocumentacao(processo.status)),
     [processRows],
   );
 
@@ -683,7 +684,7 @@ export default function DocumentationWorkspace() {
     if (!activeTemplate) return;
     if (documentOrigin === "mapped_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo aprovado",
+        title: "Nenhum processo implementado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
@@ -754,7 +755,7 @@ export default function DocumentationWorkspace() {
     if (!activeTemplate || !preview) return;
     if (documentOrigin === "mapped_process" && !mappedProcessPayload) {
       toast({
-        title: "Nenhum processo aprovado",
+        title: "Nenhum processo implementado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });

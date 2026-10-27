@@ -78,7 +78,7 @@ const SupportWidget = () => {
 
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="no-print fixed bottom-6 right-6 z-50">
         <Button size="icon" className="h-14 w-14 rounded-full shadow-lg" onClick={() => setOpen((v) => !v)}>
           <MessageCircle className="h-6 w-6" />
         </Button>

@@ -152,25 +152,20 @@ export type ContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string; detail: "high" } };
 
-export function montarContentParaThread(arquivos: ArquivoProcessado[], _etapaAtual: number): ContentPart[] {
+// Partes dos arquivos para a extração do roteiro; as instruções vêm do prompt do servidor.
+export function montarPartesArquivo(arquivos: ArquivoProcessado[]): ContentPart[] {
   const parts: ContentPart[] = [];
   for (const file of arquivos) {
     if (file.modoEnvio === "image_url" && file.base64) {
       parts.push({ type: "image_url", image_url: { url: `data:${file.tipo};base64,${file.base64}`, detail: "high" } });
     } else if (file.modoEnvio === "texto_extraido" && file.textoExtraido) {
       const prefix = detectarTipoConteudo(file.textoExtraido) === "pop"
-        ? `[Procedimento existente: "${file.nome}" — confirme se ainda reflete como o processo funciona hoje]`
+        ? `[Procedimento existente: "${file.nome}" — pode estar desatualizado em relação ao processo atual]`
         : `[${file.tipoLabel}: "${file.nome}"]`;
-      const truncation = file.truncado ? `\n[Nota: texto truncado em ${LIMITE_TEXTO_CHARS.toLocaleString()} caracteres${file.tamanhoTextoOriginal ? ` de ${file.tamanhoTextoOriginal.toLocaleString()} originais` : ""}]` : "";
+      const truncation = file.truncado ? `\n[Nota: texto truncado em ${LIMITE_TEXTO_CHARS.toLocaleString()} caracteres]` : "";
       parts.push({ type: "text", text: `${prefix}${truncation}\n${file.textoExtraido}` });
     }
   }
-  const names = arquivos.map((file) => `"${file.nome}"`).join(", ");
-  const instruction = arquivos.length > 1 ? `Recebi ${arquivos.length} arquivos: ${names}.` : `Recebi o arquivo ${names}.`;
-  parts.push({
-    type: "text",
-    text: `${instruction} Analise agora o conteúdo deste arquivo e extraia todas as informações sobre o processo seguindo as 6 etapas da metodologia. Apresente o resumo estruturado com ✅ para cada informação identificada e ❓ para as lacunas. Não peça para o usuário descrever o processo em texto — use o arquivo como fonte principal.`,
-  });
   return parts;
 }
 

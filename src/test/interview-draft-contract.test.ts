@@ -8,24 +8,26 @@ const processMappingSource = readFileSync(resolve("src/lib/processos.ts"), "utf8
 const appSource = readFileSync(resolve("src/App.tsx"), "utf8");
 
 describe("guided interview draft contract", () => {
-  it("persists interview snapshots after user responses", () => {
-    expect(interviewSource).toContain('messages.some((message) => message.role === "user")');
-    expect(interviewSource).toContain("persistProcessDraft(snapshotForm, snapshotMessages, \"Rascunho\")");
-    expect(interviewSource).toContain("saveQueueRef.current = saveQueueRef.current");
+  it("persists the form, the messages and the script state after each turn", () => {
+    expect(interviewSource).toContain("void persistir(proximoForm, proximasMensagens, turno.estado)");
+    expect(interviewSource).toContain("entrevistaRoteiro: estadoAtual");
+    expect(interviewSource).toContain("saveQueueRef.current = tarefa.then(");
+    expect(processMappingSource).toContain("entrevista_roteiro: entrevistaRoteiro as Json");
   });
 
-  it("restores the form and message history from a persisted process", () => {
-    expect(interviewSource).toContain('supabase.from("processos").select("*").eq("id", processId).single()');
+  it("only writes the script state when it is provided", () => {
+    expect(processMappingSource).toContain("...(entrevistaRoteiro !== undefined ? { entrevista_roteiro: entrevistaRoteiro as Json } : {})");
+  });
+
+  it("restores the form, the messages and the script state from a persisted process", () => {
+    expect(interviewSource).toContain('supabase.from("processos").select("*").eq("id", processIdRef.current).single()');
     expect(interviewSource).toContain("mapProcessRowToForm(row)");
-    expect(interviewSource).toContain("row.interview_messages");
+    expect(interviewSource).toContain("sanitizarEstado(ROTEIRO_PADRAO, row.entrevista_roteiro)");
+    expect(interviewSource).toContain("restaurarMensagens(row.interview_messages)");
     expect(appSource).toContain('path="/processos/:id/entrevista"');
   });
 
-  it("collects and persists process, area and owner before the AI flow", () => {
-    expect(interviewSource).toContain('setStage("askArea")');
-    expect(interviewSource).toContain('setStage("askProcessOwner")');
-    expect(interviewSource).toContain("{ area: trimmed }");
-    expect(interviewSource).toContain("donoProcesso: trimmed");
+  it("maps identification fields between the form and the table", () => {
     expect(processMappingSource).toContain("nome: form.nomeProcesso");
     expect(processMappingSource).toContain("area: form.area");
     expect(processMappingSource).toContain("responsavel: form.donoProcesso");
@@ -34,11 +36,9 @@ describe("guided interview draft contract", () => {
     expect(processMappingSource).toContain("responsavel: row.responsavel");
   });
 
-  it("warns before leaving with unsynchronized or unsent data", () => {
+  it("warns before leaving with unsaved data or a pending request", () => {
     expect(interviewSource).toContain('window.addEventListener("beforeunload", beforeUnload)');
-    expect(interviewSource).toContain('window.addEventListener("popstate", handlePopState)');
-    expect(interviewSource).toContain('document.addEventListener("click", captureLink, true)');
-    expect(interviewSource).toContain("Há respostas que ainda não foram sincronizadas");
+    expect(interviewSource).toContain("Há informações que ainda não foram salvas");
   });
 
   it("exposes save state and a resume action", () => {

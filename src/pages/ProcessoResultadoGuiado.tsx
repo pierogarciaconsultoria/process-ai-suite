@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, ArrowLeft, CheckCircle2, FileText, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, Loader2, RefreshCw } from "lucide-react";
 import BPMNCanvas from "@/components/BPMNCanvas";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,11 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
 import { buildMappedProcessPayload } from "@/data/documentation-config";
+import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
+import { montarRelatorio } from "@/lib/relatorio-processo";
+import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
+
+const DOCUMENTACAO_BLOQUEADA = "A documentação é liberada quando o processo é marcado como implementado, na tela do processo.";
 
 type GenerationState = "idle" | "loading" | "ready" | "error";
 
@@ -54,6 +59,7 @@ export default function ProcessoResultadoGuiado() {
   const [state, setState] = useState<GenerationState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [processRow, setProcessRow] = useState<Tables<"processos"> | null>(null);
+  const documentacaoLiberada = podeGerarDocumentacao(processRow?.status);
   const [generatedDocument, setGeneratedDocument] = useState<{ title: string; content_markdown: string } | null>(null);
   const [documentLoading, setDocumentLoading] = useState<string | null>(null);
   const startedRef = useRef(false);
@@ -69,7 +75,9 @@ export default function ProcessoResultadoGuiado() {
     setCompanyId(row.company_id);
     setBpmnXml(row.bpmn_as_is || "");
     setDiagnosis((row.diagnostico as unknown as DiagnosticoResult | null) ?? null);
-    return { row, form };
+    // Vindo da entrevista guiada, o diagnóstico já foi feito e validado lá.
+    const diagnosticoDaEntrevista = Boolean(montarRelatorio(row).diagnostico);
+    return { row, form, diagnosticoDaEntrevista };
   }, [id, routeState?.processo]);
 
   const gerarDocumento = async (documentType: "raci" | "ficha_processo" | "pop_v5") => {
@@ -109,11 +117,13 @@ export default function ProcessoResultadoGuiado() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const { row, form } = await loadProcess();
+      const { row, form, diagnosticoDaEntrevista } = await loadProcess();
       const [diagnosisResult, bpmnResult] = await Promise.allSettled([
-        supabase.functions.invoke("ai-diagnose-process", {
-          body: { company_id: row.company_id, process_id: id, processoData: form, use_peter_assistant: true },
-        }),
+        diagnosticoDaEntrevista
+          ? Promise.resolve(null)
+          : supabase.functions.invoke("ai-diagnose-process", {
+            body: { company_id: row.company_id, process_id: id, processoData: form, use_peter_assistant: true },
+          }),
         supabase.functions.invoke("ai-generate-bpmn", {
           body: {
             company_id: row.company_id,
@@ -134,7 +144,9 @@ export default function ProcessoResultadoGuiado() {
       const update: { diagnostico?: Json; bpmn_as_is?: string; updated_by?: string } = {};
       const failures: string[] = [];
 
-      if (diagnosisResult.status === "fulfilled" && !diagnosisResult.value.error && !hasFunctionError(diagnosisResult.value.data)) {
+      if (diagnosticoDaEntrevista) {
+        // Nada a gerar: o relatório usa o diagnóstico da entrevista.
+      } else if (diagnosisResult.status === "fulfilled" && diagnosisResult.value && !diagnosisResult.value.error && !hasFunctionError(diagnosisResult.value.data)) {
         const nextDiagnosis = diagnosisResult.value.data as DiagnosticoResult;
         setDiagnosis(nextDiagnosis);
         update.diagnostico = nextDiagnosis as unknown as Json;
@@ -196,19 +208,23 @@ export default function ProcessoResultadoGuiado() {
           </div>
           <h1 className="text-2xl font-bold">{processForm?.nomeProcesso || "Resultado do processo"}</h1>
           <p className="text-muted-foreground">Relatório e mapa AS IS produzidos a partir da entrevista com Peter.</p>
+          {processRow && !documentacaoLiberada && <p className="mt-1 text-sm text-muted-foreground">{DOCUMENTACAO_BLOQUEADA}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate("/processos")}><ArrowLeft className="mr-2 h-4 w-4" /> Processos</Button>
-          <Button onClick={() => navigate(`/documentos?processId=${id}&mode=linked_process`)} disabled={!id || state === "loading"}>
+          <Button variant="outline" onClick={() => navigate(`/processos/${id}`)} disabled={!id || state === "loading"}>
+            <Download className="mr-2 h-4 w-4" /> Relatório em PDF
+          </Button>
+          <Button onClick={() => navigate(`/documentos?processId=${id}&mode=linked_process`)} disabled={!id || state === "loading" || !documentacaoLiberada} title={documentacaoLiberada ? undefined : DOCUMENTACAO_BLOQUEADA}>
             <FileText className="mr-2 h-4 w-4" /> Criar procedimento
           </Button>
-          <Button variant="outline" onClick={() => void gerarDocumento("raci")} disabled={!processRow || Boolean(documentLoading)}>
+          <Button variant="outline" onClick={() => void gerarDocumento("raci")} disabled={!processRow || Boolean(documentLoading) || !documentacaoLiberada} title={documentacaoLiberada ? undefined : DOCUMENTACAO_BLOQUEADA}>
             {documentLoading === "raci" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "📊"} Gerar Matriz RACI
           </Button>
-          <Button variant="outline" onClick={() => void gerarDocumento("ficha_processo")} disabled={!processRow || Boolean(documentLoading)}>
+          <Button variant="outline" onClick={() => void gerarDocumento("ficha_processo")} disabled={!processRow || Boolean(documentLoading) || !documentacaoLiberada} title={documentacaoLiberada ? undefined : DOCUMENTACAO_BLOQUEADA}>
             {documentLoading === "ficha_processo" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "📌"} Gerar Ficha do Processo
           </Button>
-          <Button variant="outline" onClick={() => void gerarDocumento("pop_v5")} disabled={!processRow || Boolean(documentLoading)}>
+          <Button variant="outline" onClick={() => void gerarDocumento("pop_v5")} disabled={!processRow || Boolean(documentLoading) || !documentacaoLiberada} title={documentacaoLiberada ? undefined : DOCUMENTACAO_BLOQUEADA}>
             {documentLoading === "pop_v5" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "📄"} Gerar POP (metodologia v5)
           </Button>
         </div>
@@ -230,7 +246,12 @@ export default function ProcessoResultadoGuiado() {
           <TabsTrigger value="map">Mapa do Processo AS IS</TabsTrigger>
         </TabsList>
         <TabsContent value="report">
-          {diagnosis ? <ReportContent diagnosis={diagnosis} /> : <Card><CardContent className="py-10 text-center text-muted-foreground">O relatório ainda não foi gerado.</CardContent></Card>}
+          {processRow ? (
+            <div className="space-y-4">
+              <RelatorioProcesso relatorio={montarRelatorio({ ...processRow, bpmn_as_is: bpmnXml || processRow.bpmn_as_is })} />
+              {diagnosis && !montarRelatorio(processRow).diagnostico && <ReportContent diagnosis={diagnosis} />}
+            </div>
+          ) : diagnosis ? <ReportContent diagnosis={diagnosis} /> : <Card><CardContent className="py-10 text-center text-muted-foreground">O relatório ainda não foi gerado.</CardContent></Card>}
         </TabsContent>
         <TabsContent value="map">
           {bpmnXml && processForm && companyId ? (

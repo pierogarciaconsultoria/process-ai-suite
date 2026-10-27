@@ -41,6 +41,7 @@ import {
   type ChatMessage,
   type ProcessoStatus,
 } from "@/lib/processos";
+import { promoverStatus } from "@/lib/ciclo-processo";
 
 // ── Phase / Tab structure ──
 
@@ -172,7 +173,7 @@ const ProcessoFormulario = () => {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [currentProcessId, setCurrentProcessId] = useState<string | null>(id ?? prefillState?.processId ?? null);
-  const [currentStatus, setCurrentStatus] = useState<ProcessoStatus>("Rascunho");
+  const [currentStatus, setCurrentStatus] = useState<ProcessoStatus>("Em entrevista");
   const [currentRevision, setCurrentRevision] = useState("Rev.00");
   const [currentApprovedAt, setCurrentApprovedAt] = useState<string | null>(null);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -474,7 +475,7 @@ const ProcessoFormulario = () => {
     if (isDiagnosing) return;
     setIsDiagnosing(true);
     try {
-      const savedProcess = await saveProcessRecord({ status: "Em revisão" });
+      const savedProcess = await saveProcessRecord({ status: promoverStatus(currentStatus, "Diagnosticado") });
       const { data, error } = await supabase.functions.invoke("ai-diagnose-process", { 
         body: { 
           processoData: form,
@@ -484,7 +485,7 @@ const ProcessoFormulario = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      const diagnosedProcess = await saveProcessRecord({ status: "Em revisão", diagnostico: data });
+      const diagnosedProcess = await saveProcessRecord({ status: promoverStatus(currentStatus, "Diagnosticado"), diagnostico: data });
       navigate("/processos/diagnostico", {
         state: {
           diagnostico: data,
@@ -499,7 +500,7 @@ const ProcessoFormulario = () => {
     } finally {
       setIsDiagnosing(false);
     }
-  }, [companyId, form, isDiagnosing, navigate, saveProcessRecord, toast]);
+  }, [companyId, currentStatus, form, isDiagnosing, navigate, saveProcessRecord, toast]);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
