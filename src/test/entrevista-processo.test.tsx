@@ -170,6 +170,27 @@ describe("Entrevista guiada — tela", () => {
     expect(screen.getByPlaceholderText("Digite sua resposta…")).toBeInTheDocument();
   });
 
+  it("guarda o .bpmn anexado como mapa AS IS do processo", async () => {
+    mocks.invoke.mockImplementation(servidor());
+    const { container } = renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Entrevista guiada" }));
+    await screen.findByText(/Para começar, qual é o seu nome e o seu cargo\?/);
+    await waitFor(() => expect(mocks.inserts).toHaveLength(1));
+
+    const xml = `<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI">
+      <process id="p"><startEvent id="s" name="Pedido" /><task id="t" name="Registrar pedido" /><sequenceFlow id="f" sourceRef="s" targetRef="t" /></process>
+      <bpmndi:BPMNDiagram id="d"><bpmndi:BPMNPlane id="pl" bpmnElement="p"><bpmndi:BPMNShape id="sh" bpmnElement="t" /></bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+    </definitions>`;
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File([xml], "compras.bpmn", { type: "" })] } });
+
+    expect(await screen.findByText(/Anotei o processo e a área\./)).toBeInTheDocument();
+    await waitFor(() => expect(mocks.updates).toHaveLength(1));
+    expect(mocks.updates[0].bpmn_as_is).toBe(xml);
+    expect(mocks.updates[0].interview_messages).toContainEqual({ role: "user", content: "📎 compras.bpmn (Diagrama BPMN)", mapaAnexado: true });
+    expect(mocks.invoke.mock.calls.at(-1)![1].body).toMatchObject({ operacao: "extrair", origem: "anexo" });
+  });
+
   it("mostra o erro, devolve o texto ao campo e não avança quando o servidor falha", async () => {
     mocks.invoke.mockResolvedValue({ data: { error: "Limite de IA excedido." }, error: null });
     renderizar();

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { emptyProcessoForm } from "@/data/processo-form-types";
 import {
   historicoParaPeter,
+  mapaVeioDoAnexo,
   mensagensDoTurno,
   mesclarCampos,
   restaurarMensagens,
@@ -62,6 +63,11 @@ describe("Entrevista guiada — cliente", () => {
     ]);
     expect(mensagens).toHaveLength(4);
     expect(mensagens[3]).toEqual({ role: "assistant", tipo: "analise", acao: "diagnostico_as_is", content: "{}" });
+    expect(mapaVeioDoAnexo(mensagens)).toBe(false);
+    const comMapa = restaurarMensagens([{ role: "user", content: "📎 compras.bpmn (Diagrama BPMN)", mapaAnexado: true }, { role: "user", content: "x", mapaAnexado: "sim" }]);
+    expect(comMapa).toEqual([{ role: "user", content: "📎 compras.bpmn (Diagrama BPMN)", mapaAnexado: true }, { role: "user", content: "x" }]);
+    expect(mapaVeioDoAnexo(comMapa)).toBe(true);
+    expect(historicoParaPeter(comMapa)[0]).toEqual({ role: "user", content: "📎 compras.bpmn (Diagrama BPMN)" });
     expect(historicoParaPeter(mensagens)).toEqual([
       { role: "assistant", content: "Pergunta" },
       { role: "user", content: "Resposta" },

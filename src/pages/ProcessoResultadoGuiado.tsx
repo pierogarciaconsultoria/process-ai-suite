@@ -11,6 +11,7 @@ import type { DiagnosticoResult, ProcessoFormData } from "@/data/processo-form-t
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
+import { mapaVeioDoAnexo, restaurarMensagens } from "@/lib/entrevista-roteiro";
 import { buildMappedProcessPayload } from "@/data/documentation-config";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
 import { montarRelatorio } from "@/lib/relatorio-processo";
@@ -55,6 +56,7 @@ export default function ProcessoResultadoGuiado() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [diagnosis, setDiagnosis] = useState<DiagnosticoResult | null>(null);
   const [bpmnXml, setBpmnXml] = useState("");
+  const [mapaAnexado, setMapaAnexado] = useState(false);
   const [state, setState] = useState<GenerationState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [processRow, setProcessRow] = useState<Tables<"processos"> | null>(null);
@@ -72,11 +74,14 @@ export default function ProcessoResultadoGuiado() {
     const form = routeState?.processo ?? mapProcessRowToForm(row);
     setProcessForm(form);
     setCompanyId(row.company_id);
-    setBpmnXml(row.bpmn_as_is || "");
+    setBpmnXml(form.bpmnAsIs || "");
     setDiagnosis((row.diagnostico as unknown as DiagnosticoResult | null) ?? null);
     // Vindo da entrevista guiada, o diagnóstico já foi feito e validado lá.
     const diagnosticoDaEntrevista = Boolean(montarRelatorio(row).diagnostico);
-    return { row, form, diagnosticoDaEntrevista };
+    // Um diagrama anexado na entrevista é o mapa AS IS do processo: a IA não o redesenha.
+    const mapaDoAnexo = Boolean(form.bpmnAsIs) && mapaVeioDoAnexo(restaurarMensagens(row.interview_messages));
+    setMapaAnexado(mapaDoAnexo);
+    return { row, form, diagnosticoDaEntrevista, mapaDoAnexo };
   }, [id, routeState?.processo]);
 
   const gerarDocumento = async (documentType: "raci" | "ficha_processo" | "pop_v5") => {
@@ -116,28 +121,30 @@ export default function ProcessoResultadoGuiado() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const { row, form, diagnosticoDaEntrevista } = await loadProcess();
+      const { row, form, diagnosticoDaEntrevista, mapaDoAnexo } = await loadProcess();
       const [diagnosisResult, bpmnResult] = await Promise.allSettled([
         diagnosticoDaEntrevista
           ? Promise.resolve(null)
           : supabase.functions.invoke("ai-diagnose-process", {
             body: { company_id: row.company_id, process_id: id, processoData: form, use_peter_assistant: true },
           }),
-        supabase.functions.invoke("ai-generate-bpmn", {
-          body: {
-            company_id: row.company_id,
-            process_id: id,
-            nomeProcesso: form.nomeProcesso,
-            etapas: form.etapas,
-            decisoes: form.decisoes,
-            gatilho: form.gatilho,
-            entradas: form.entradas,
-            saidas: form.saidas,
-            resumo: form.objetivo || form.problemasTexto,
-            mode: "as-is",
-            use_peter_assistant: true,
-          },
-        }),
+        mapaDoAnexo
+          ? Promise.resolve(null)
+          : supabase.functions.invoke("ai-generate-bpmn", {
+            body: {
+              company_id: row.company_id,
+              process_id: id,
+              nomeProcesso: form.nomeProcesso,
+              etapas: form.etapas,
+              decisoes: form.decisoes,
+              gatilho: form.gatilho,
+              entradas: form.entradas,
+              saidas: form.saidas,
+              resumo: form.objetivo || form.problemasTexto,
+              mode: "as-is",
+              use_peter_assistant: true,
+            },
+          }),
       ]);
 
       const update: { diagnostico?: Json; bpmn_as_is?: string; updated_by?: string } = {};
@@ -153,7 +160,9 @@ export default function ProcessoResultadoGuiado() {
         failures.push("relatório");
       }
 
-      if (bpmnResult.status === "fulfilled" && !bpmnResult.value.error && !hasFunctionError(bpmnResult.value.data)) {
+      if (mapaDoAnexo) {
+        // Nada a gerar: o mapa é o diagrama anexado na entrevista.
+      } else if (bpmnResult.status === "fulfilled" && bpmnResult.value && !bpmnResult.value.error && !hasFunctionError(bpmnResult.value.data)) {
         const xml = String(bpmnResult.value.data?.xml || "");
         if (xml) {
           setBpmnXml(xml);
@@ -230,7 +239,7 @@ export default function ProcessoResultadoGuiado() {
       </div>
 
       {state === "loading" && (
-        <Card><CardContent className="flex items-center gap-3 py-8"><Loader2 className="h-5 w-5 animate-spin" /><div><p className="font-medium">Peter está concluindo o trabalho</p><p className="text-sm text-muted-foreground">Gerando relatório e mapa BPMN AS IS. Não feche esta página.</p></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-3 py-8"><Loader2 className="h-5 w-5 animate-spin" /><div><p className="font-medium">Peter está concluindo o trabalho</p><p className="text-sm text-muted-foreground">{mapaAnexado ? "Gerando o relatório." : "Gerando relatório e mapa BPMN AS IS."} Não feche esta página.</p></div></CardContent></Card>
       )}
 
       {state === "error" && (
@@ -254,7 +263,7 @@ export default function ProcessoResultadoGuiado() {
         </TabsContent>
         <TabsContent value="map">
           {bpmnXml && processForm && companyId ? (
-            <Card><CardContent className="pt-6"><BPMNCanvas xml={bpmnXml} onChange={() => undefined} readOnly formData={processForm} mode="as-is" companyId={companyId} processId={id} /></CardContent></Card>
+            <Card><CardContent className="pt-6">{mapaAnexado && <p className="mb-3 text-sm text-muted-foreground">Mapa do diagrama BPMN anexado na entrevista.</p>}<BPMNCanvas xml={bpmnXml} onChange={() => undefined} readOnly formData={processForm} mode="as-is" companyId={companyId} processId={id} /></CardContent></Card>
           ) : (
             <Card><CardContent className="py-10 text-center text-muted-foreground">O mapa BPMN AS IS ainda não foi gerado.</CardContent></Card>
           )}

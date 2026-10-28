@@ -17,7 +17,7 @@ import {
   TIPOS_WORD,
   ehArquivoBpmn,
 } from "../../supabase/functions/_shared/peter-interview-contract";
-import { bpmnParaTexto } from "./peter-bpmn";
+import { bpmnParaTexto, temDesenhoBpmn } from "./peter-bpmn";
 
 // Erro com mensagem pronta para o usuário: chega à tela sem ser trocado pelo genérico.
 class ErroLeituraArquivo extends Error {}
@@ -116,6 +116,16 @@ export async function extrairTextoPlano(file: File): Promise<string> {
   return file.type === "text/csv"
     ? text.split("\n").map((line) => line.split(",").join(" | ")).join("\n")
     : text;
+}
+
+// Diagrama anexado que vira o mapa AS IS: o último .bpmn com desenho que não seja um TO BE.
+export async function mapaAsIsDosAnexos(files: File[]): Promise<string | null> {
+  for (const file of [...files].reverse()) {
+    if (!ehArquivoBpmn(file) || /(^|[^a-z])to[\s_-]?be([^a-z]|$)/i.test(file.name)) continue;
+    const xml = await extrairTextoPlano(file);
+    if (temDesenhoBpmn(xml)) return xml;
+  }
+  return null;
 }
 
 export async function extrairTextoBpmn(file: File): Promise<string> {
