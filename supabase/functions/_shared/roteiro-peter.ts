@@ -23,6 +23,7 @@ import {
   progresso,
   proximoPasso,
   registrarResposta,
+  repeticaoPendente,
   type EstadoRoteiro,
   type OrigemResposta,
   type ProgressoRoteiro,
@@ -61,6 +62,22 @@ function todasPerguntas(roteiro: Roteiro): PerguntaRoteiro[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function etapasEmAberto(roteiro: Roteiro, estado: EstadoRoteiro): EtapaRoteiro[] {
+  return roteiro.etapas.filter((etapa) => etapa.numero >= estado.etapaAtual);
+}
+
+// Perguntas da etapa em andamento e das seguintes que ainda podem receber resposta:
+// o que um texto, um anexo ou uma resposta mais completa pode adiantar.
+export function perguntasEmAberto(roteiro: Roteiro, estado: EstadoRoteiro, exceto?: string): PerguntaRoteiro[] {
+  return etapasEmAberto(roteiro, estado)
+    .flatMap((etapa) => etapa.perguntas)
+    .filter((pergunta) => {
+      if (pergunta.id === exceto) return false;
+      const resposta = estado.respostas[pergunta.id];
+      return !resposta || repeticaoPendente(pergunta, resposta);
+    });
 }
 
 export function sanitizarEstado(roteiro: Roteiro, raw: unknown): EstadoRoteiro {
@@ -166,8 +183,12 @@ const TEXTO_ACAO: Record<AcaoIA, string> = {
 export function textoDoPasso(roteiro: Roteiro, estado: EstadoRoteiro, passo: PassoCliente, etapaAnterior: number): string {
   switch (passo.tipo) {
     case "pergunta": {
-      const abertura = passo.etapa && passo.etapa.numero !== etapaAnterior ? `**${passo.progresso.rotulo}**\n\n` : "";
-      return `${abertura}${passo.pergunta!.texto}`;
+      const novaEtapa = Boolean(passo.etapa) && passo.etapa!.numero !== etapaAnterior;
+      const abertura = novaEtapa ? `**${passo.progresso.rotulo}**\n\n` : "";
+      // Atividades adiantadas em etapas anteriores: mostra o que já foi anotado antes de pedir a próxima.
+      const anotadas = novaEtapa ? estado.respostas[passo.pergunta!.id]?.textos ?? [] : [];
+      const jaAnotado = anotadas.length > 0 ? `Até aqui anotei:\n${anotadas.map((texto, indice) => `${indice + 1}. ${texto}`).join("\n")}\n\n` : "";
+      return `${abertura}${jaAnotado}${passo.pergunta!.texto}`;
     }
     case "acao_ia":
       return TEXTO_ACAO[passo.acao!];
@@ -260,6 +281,15 @@ function camposDoRoteiro(roteiro: Roteiro): CampoFormulario[] {
   return camposUnicos(todasPerguntas(roteiro).flatMap((pergunta) => pergunta.campos));
 }
 
+// Campos que ainda podem mudar: os de etapas já confirmadas não são reabertos.
+function camposEmAberto(roteiro: Roteiro, estado: EstadoRoteiro): CampoFormulario[] {
+  return camposUnicos(etapasEmAberto(roteiro, estado).flatMap(camposDaEtapa));
+}
+
+function camposDaAvaliacao(pergunta: PerguntaRoteiro, adiantaveis: PerguntaRoteiro[]): CampoFormulario[] {
+  return camposUnicos([...pergunta.campos, ...adiantaveis.flatMap((item) => item.campos)]);
+}
+
 export function schemaCampos(campos: CampoFormulario[]) {
   const unicos = camposUnicos(campos);
   return {
@@ -277,7 +307,24 @@ function schemaValor(pergunta: PerguntaRoteiro) {
   return opcoes.length > 0 ? { anyOf: [{ type: "string", enum: opcoes }, { type: "null" }] } : { type: "null" };
 }
 
-export function schemaAvaliacao(pergunta: PerguntaRoteiro) {
+function schemaRespostas(perguntas: PerguntaRoteiro[]) {
+  return {
+    type: "array",
+    items: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        perguntaId: { type: "string", enum: perguntas.map((pergunta) => pergunta.id) },
+        texto: { type: "string" },
+        valor: textoOuNulo,
+      },
+      required: ["perguntaId", "texto", "valor"],
+    },
+  };
+}
+
+// adiantaveis: perguntas que ainda virão e que a resposta pode responder de uma vez.
+export function schemaAvaliacao(pergunta: PerguntaRoteiro, adiantaveis: PerguntaRoteiro[] = []) {
   const properties = {
     suficiente: { type: "boolean" },
     texto: { type: "string" },
@@ -286,7 +333,9 @@ export function schemaAvaliacao(pergunta: PerguntaRoteiro) {
     comentario: { type: "string" },
     aprofundamento: { type: "string" },
     ...alertaOportunidade,
-    campos: schemaCampos(pergunta.campos),
+    // O modo strict não aceita enum vazio: sem perguntas adiantáveis, o campo não existe.
+    ...(adiantaveis.length > 0 ? { outrasRespostas: schemaRespostas(adiantaveis) } : {}),
+    campos: schemaCampos(camposDaAvaliacao(pergunta, adiantaveis)),
   };
   return { type: "object", additionalProperties: false, properties, required: Object.keys(properties) };
 }
@@ -314,24 +363,12 @@ export function schemaConfirmacao(etapa: EtapaRoteiro) {
   return { type: "object", additionalProperties: false, properties, required: Object.keys(properties) };
 }
 
-export function schemaExtracao(roteiro: Roteiro) {
+export function schemaExtracao(roteiro: Roteiro, estado?: EstadoRoteiro) {
   const properties = {
-    respostas: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          perguntaId: { type: "string", enum: todasPerguntas(roteiro).map((pergunta) => pergunta.id) },
-          texto: { type: "string" },
-          valor: textoOuNulo,
-        },
-        required: ["perguntaId", "texto", "valor"],
-      },
-    },
+    respostas: schemaRespostas(todasPerguntas(roteiro)),
     comentario: { type: "string" },
     ...alertaOportunidade,
-    campos: schemaCampos(camposDoRoteiro(roteiro)),
+    campos: schemaCampos(estado ? camposEmAberto(roteiro, estado) : camposDoRoteiro(roteiro)),
   };
   return { type: "object", additionalProperties: false, properties, required: Object.keys(properties) };
 }
@@ -371,6 +408,18 @@ function valoresDosCampos(campos: CampoFormulario[], atuais: Record<string, unkn
   return JSON.stringify(Object.fromEntries(unicos.map((campo) => [campo, atuais[campo] ?? null])));
 }
 
+function linhaPergunta(pergunta: PerguntaRoteiro, resposta: RespostaRegistrada | undefined): string {
+  const valor = pergunta.tipo === "sim_nao"
+    ? ` | Valor: "sim" ou "nao"`
+    : pergunta.opcoes ? ` | Valor: uma de ${JSON.stringify(pergunta.opcoes)}` : "";
+  const parcial = resposta?.textos.length
+    ? ` | Já registrado: ${resposta.textos.join("; ")} (devolva a lista completa, incluindo estes itens)`
+    : "";
+  return `- ${pergunta.id} (${pergunta.rotulo}): ${pergunta.texto} | Critério: ${pergunta.criterio}${valor}${parcial}`;
+}
+
+const INSTRUCAO_TEXTO_ATIVIDADES = `Para "e3.atividades", liste as atividades em ordem, uma por linha, no formato "Verbo + Objeto — responsável".`;
+
 export function promptAvaliacao(
   persona: PersonaPeter,
   roteiro: Roteiro,
@@ -381,6 +430,18 @@ export function promptAvaliacao(
   if (passo.tipo !== "pergunta") throw new HttpError(409, "A entrevista não está aguardando uma resposta.");
   const { pergunta, etapa } = passo;
   const ultimaTentativa = passo.aprofundamentos + 1 >= MAX_APROFUNDAMENTOS;
+  const adiantaveis = perguntasEmAberto(roteiro, estado, pergunta.id);
+
+  const secaoAdiantadas = adiantaveis.length > 0
+    ? `
+
+## INFORMAÇÕES ADIANTADAS
+O entrevistado pode contar mais do que a pergunta pediu, por exemplo descrevendo a rotina inteira. Se a resposta também responder, de forma suficiente segundo o critério, alguma destas perguntas que ainda virão no roteiro, registre-a em "outrasRespostas" para que ela não seja repetida. Registre só o que ele disse explicitamente; na dúvida, deixe para a pergunta própria.
+${adiantaveis.map((item) => linhaPergunta(item, estado.respostas[item.id])).join("\n")}`
+    : "";
+  const instrucaoAdiantadas = adiantaveis.length > 0
+    ? `\n- "outrasRespostas": uma entrada por pergunta de INFORMAÇÕES ADIANTADAS que a resposta já responde, com "perguntaId", "texto" (registro fiel e conciso) e "valor" (conforme indicado na pergunta; null nas demais). ${INSTRUCAO_TEXTO_ATIVIDADES} Lista vazia se a resposta não adianta nada.`
+    : "";
 
   const instrucaoValor = pergunta.tipo === "sim_nao"
     ? `"valor": "sim" ou "nao", conforme a resposta.`
@@ -400,20 +461,20 @@ O sistema conduz o roteiro; você avalia UMA resposta para UMA pergunta. Não fa
 
 Pergunta feita: "${passo.texto}"
 Critério de resposta suficiente: ${pergunta.criterio}
-Pergunta ${pergunta.obrigatoria ? "obrigatória" : "opcional"}.${pergunta.obrigatoria ? "" : ` Se o entrevistado disser que não há ou não se aplica, a resposta é suficiente.`}
+Pergunta ${pergunta.obrigatoria ? "obrigatória" : "opcional"}.${pergunta.obrigatoria ? "" : ` Se o entrevistado disser que não há ou não se aplica, a resposta é suficiente.`}${secaoAdiantadas}
 
 ## COMO RESPONDER (JSON)
 - "suficiente": true se a resposta atende ao critério. Respostas curtas mas honestas e aproveitáveis são suficientes.
-- "texto": registro fiel e conciso do que o entrevistado respondeu, sem acrescentar nada.
+- "texto": registro fiel e conciso do que o entrevistado respondeu a esta pergunta, sem acrescentar nada.
 - ${instrucaoValor}
 - ${instrucaoRepeticao}
-- "comentario": uma frase curta reconhecendo a resposta, sem pergunta. Pode ser vazio.
+- "comentario": uma frase curta reconhecendo a resposta, sem pergunta. Se registrou outras respostas, diga em poucas palavras o que já ficou anotado. Pode ser vazio.
 - "aprofundamento": se "suficiente" = false, UMA pergunta curta e específica pedindo exatamente o que falta, com um exemplo quando ajudar.${ultimaTentativa ? " Esta é a última tentativa: depois dela o sistema registra a lacuna e segue." : ""} Se "suficiente" = true, vazio.
 - "alerta": um risco ou inconsistência claramente sustentado pela resposta (ex.: atividade sem responsável, aprovação sem substituto), fundamentado em BPM, Lean ou ISO 9001; senão null.
-- "oportunidade": uma oportunidade de melhoria claramente sustentada pela resposta; senão null.
+- "oportunidade": uma oportunidade de melhoria claramente sustentada pela resposta; senão null.${instrucaoAdiantadas}
 - "campos": o valor COMPLETO e atualizado de cada campo listado, partindo do valor atual e incorporando a resposta. Use null para não alterar um campo.
 
-Valores atuais dos campos: ${valoresDosCampos(pergunta.campos, atuais)}`;
+Valores atuais dos campos: ${valoresDosCampos(camposDaAvaliacao(pergunta, adiantaveis), atuais)}`;
 }
 
 export function promptConfirmacao(
@@ -449,27 +510,34 @@ ${etapa.perguntas.map((pergunta) => `- ${pergunta.id} (${pergunta.rotulo})`).joi
 Valores atuais dos campos: ${valoresDosCampos(camposDaEtapa(etapa), atuais)}`;
 }
 
-export function promptExtracao(persona: PersonaPeter, roteiro: Roteiro, estado: EstadoRoteiro): string {
-  const pendentes = todasPerguntas(roteiro)
-    .filter((pergunta) => !estado.respostas[pergunta.id])
-    .map((pergunta) => `- ${pergunta.id} (${pergunta.rotulo}): ${pergunta.texto} | Critério: ${pergunta.criterio}`)
+export function promptExtracao(
+  persona: PersonaPeter,
+  roteiro: Roteiro,
+  estado: EstadoRoteiro,
+  atuais: Record<string, unknown> = {},
+): string {
+  const pendentes = perguntasEmAberto(roteiro, estado)
+    .map((pergunta) => linhaPergunta(pergunta, estado.respostas[pergunta.id]))
     .join("\n");
 
   return `${cabecalho(persona)}
 
 ## SUA TAREFA AGORA
 O entrevistado enviou um texto ou arquivo descrevendo o processo. Extraia dele as respostas para as perguntas do roteiro que ainda não foram respondidas. A entrevista vai perguntar só o que ficar faltando.
+Imagens (fluxogramas, fotos de quadros, prints de sistemas ou de formulários) também são material: leia o conteúdo visual, inclusive setas, caixas e textos escritos nelas.
 
 Perguntas ainda não respondidas:
 ${pendentes}
 
 ## COMO RESPONDER (JSON)
 - "respostas": uma entrada por pergunta que o material responde de forma suficiente, segundo o critério. Não inclua perguntas que o material não responde.
-  - "texto": registro fiel e conciso da resposta encontrada. Para "e3.atividades", liste as atividades em ordem, uma por linha, no formato "Verbo + Objeto — responsável".
-  - "valor": para perguntas de sim/não, "sim" ou "nao"; para e1.classificacao, "Negócio", "Apoio" ou "Gestão"; para e1.frequencia, "Contínuo", "Diário", "Semanal", "Mensal" ou "Sob demanda"; nas demais, null.
+  - "texto": registro fiel e conciso da resposta encontrada. ${INSTRUCAO_TEXTO_ATIVIDADES}
+  - "valor": conforme indicado na pergunta; nas demais, null.
 - "comentario": uma ou duas frases dizendo o que foi identificado no material.
 - "alerta" e "oportunidade": apenas se claramente sustentados pelo material; senão null.
-- "campos": os campos do formulário preenchidos com o que o material informa; null nos campos sem informação.`;
+- "campos": o valor COMPLETO e atualizado de cada campo listado, partindo do valor atual e incorporando o que o material informa. Listas são substituídas, então mantenha os itens atuais que continuam válidos. Use null para não alterar um campo.
+
+Valores atuais dos campos: ${valoresDosCampos(camposEmAberto(roteiro, estado), atuais)}`;
 }
 
 // ─── Aplicação dos resultados do Peter ──────────────────────────────────────
@@ -512,19 +580,37 @@ function juntar(...partes: Array<string | null | undefined>): string {
   return partes.map((parte) => parte?.trim()).filter(Boolean).join("\n\n");
 }
 
+function lerRespostas(raw: unknown): Array<{ perguntaId: string; texto: string; valor?: string }> {
+  return (Array.isArray(raw) ? raw : [])
+    .filter(isRecord)
+    .map((item) => ({
+      perguntaId: textoLimpo(item.perguntaId),
+      texto: textoLimpo(item.texto).slice(0, MAX_TEXTO_RESPOSTA),
+      valor: textoOuNull(item.valor) ?? undefined,
+    }));
+}
+
 export function aplicarAvaliacao(roteiro: Roteiro, estado: EstadoRoteiro, raw: unknown): ResultadoTurno {
   const passoAtual = proximoPasso(roteiro, estado);
   if (passoAtual.tipo !== "pergunta") throw new HttpError(409, "A entrevista não está aguardando uma resposta.");
   const r = isRecord(raw) ? raw : {};
   const pergunta = passoAtual.pergunta;
+  const adiantaveis = perguntasEmAberto(roteiro, estado, pergunta.id);
+  const adiantadas = lerRespostas(r.outrasRespostas)
+    .filter((item) => item.texto && adiantaveis.some((adiantavel) => adiantavel.id === item.perguntaId));
+  // Campos de outras perguntas só mudam quando o Peter registrou aquela pergunta como adiantada.
+  const perguntasAdiantadas = adiantaveis.filter((item) => adiantadas.some((adiantada) => adiantada.perguntaId === item.id));
 
-  const novoEstado = registrarResposta(roteiro, estado, {
+  const registrado = registrarResposta(roteiro, estado, {
     perguntaId: pergunta.id,
     texto: textoLimpo(r.texto).slice(0, MAX_TEXTO_RESPOSTA),
     suficiente: r.suficiente === true,
     valor: textoOuNull(r.valor) ?? undefined,
     encerraRepeticao: r.encerraRepeticao === true,
   });
+  // O que o entrevistado adiantou não é perguntado de novo. As atividades seguem
+  // abertas, para a entrevista confirmar se há uma próxima quando chegar a vez delas.
+  const novoEstado = aplicarRespostasExtraidas(roteiro, registrado, adiantadas, "entrevista", { encerrarRepeticao: false });
 
   const passo = descreverPasso(roteiro, novoEstado);
   const mesmaPergunta = passo.tipo === "pergunta" && passo.pergunta?.id === pergunta.id && r.suficiente !== true;
@@ -536,7 +622,7 @@ export function aplicarAvaliacao(roteiro: Roteiro, estado: EstadoRoteiro, raw: u
     estado: novoEstado,
     passo,
     mensagem,
-    campos: filtrarCampos(r.campos, pergunta.campos),
+    campos: filtrarCampos(r.campos, camposDaAvaliacao(pergunta, perguntasAdiantadas)),
     alerta: textoOuNull(r.alerta),
     oportunidade: textoOuNull(r.oportunidade),
   };
@@ -584,24 +670,17 @@ export function aplicarExtracao(
   origem: Exclude<OrigemResposta, "entrevista">,
 ): ResultadoTurno {
   const r = isRecord(raw) ? raw : {};
-  const extraidas = (Array.isArray(r.respostas) ? r.respostas : [])
-    .filter(isRecord)
-    .map((item) => ({
-      perguntaId: textoLimpo(item.perguntaId),
-      texto: textoLimpo(item.texto).slice(0, MAX_TEXTO_RESPOSTA),
-      valor: textoOuNull(item.valor) ?? undefined,
-    }));
 
   // Só a etapa em andamento e as seguintes: etapas já confirmadas não são reabertas.
-  const etapasAbertas = new Set(roteiro.etapas.filter((etapa) => etapa.numero >= estado.etapaAtual).flatMap((etapa) => etapa.perguntas.map((pergunta) => pergunta.id)));
-  const novoEstado = aplicarRespostasExtraidas(roteiro, estado, extraidas.filter((item) => etapasAbertas.has(item.perguntaId)), origem);
+  const etapasAbertas = new Set(etapasEmAberto(roteiro, estado).flatMap((etapa) => etapa.perguntas.map((pergunta) => pergunta.id)));
+  const novoEstado = aplicarRespostasExtraidas(roteiro, estado, lerRespostas(r.respostas).filter((item) => etapasAbertas.has(item.perguntaId)), origem);
   const passo = descreverPasso(roteiro, novoEstado);
 
   return {
     estado: novoEstado,
     passo,
     mensagem: juntar(textoLimpo(r.comentario), textoDoPasso(roteiro, novoEstado, passo, 0)),
-    campos: filtrarCampos(r.campos, camposDoRoteiro(roteiro)),
+    campos: filtrarCampos(r.campos, camposEmAberto(roteiro, estado)),
     alerta: textoOuNull(r.alerta),
     oportunidade: textoOuNull(r.oportunidade),
   };
@@ -669,7 +748,8 @@ export type ParteArquivo =
   | { type: "input_text"; text: string }
   | { type: "input_image"; image_url: string; detail?: "high" | "low" | "auto" };
 
-const MAX_PARTES_ARQUIVO = 12;
+// Até 10 arquivos por envio; cada imagem vai com uma parte de texto que a identifica.
+const MAX_PARTES_ARQUIVO = 20;
 const MAX_TEXTO_PARTE = 50_000;
 const MAX_IMAGEM_CHARS = 7_000_064;
 const MAX_TOTAL_ARQUIVO = 20_000_000;

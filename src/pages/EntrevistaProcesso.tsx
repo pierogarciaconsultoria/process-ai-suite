@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Check, Lightbulb, Loader2, Paperclip, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, FileText, Lightbulb, Loader2, Paperclip, RefreshCw, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,8 @@ Como prefere começar?`;
 const AVISO_RASCUNHO_ANTIGO = "Este rascunho foi criado na versão anterior da entrevista. Vamos seguir pelo roteiro novo; o que já estava preenchido no processo continua salvo.";
 
 const PEDIR_TEXTO = "Cole abaixo a descrição do processo: pode ser um texto informal, um procedimento antigo ou anotações de reunião. Eu extraio o que der e pergunto só o que faltar.";
+
+const PEDIR_TEXTO_DURANTE = "Pode contar com suas palavras como a rotina funciona, ou colar um procedimento ou anotações. Eu aproveito o que der para as próximas perguntas e sigo de onde paramos.";
 
 const RESPOSTA_FIM_ATIVIDADES = "Não há mais atividades, o processo termina aqui.";
 
@@ -363,7 +365,14 @@ function EntrevistaProcessoPage() {
 
   const comecarTexto = () => {
     setModoTexto(true);
-    setMensagens((atuais) => [...atuais, { role: "user", content: "Colar um texto" }, { role: "assistant", content: PEDIR_TEXTO }]);
+    setMensagens((atuais) => [...atuais, { role: "user", content: "Colar um texto" }, { role: "assistant", content: estado ? PEDIR_TEXTO_DURANTE : PEDIR_TEXTO }]);
+  };
+
+  const cancelarTexto = () => {
+    setModoTexto(false);
+    setInput("");
+    // Retira o pedido de texto que não chegou a ser usado.
+    setMensagens((atuais) => atuais.slice(0, -2));
   };
 
   const enviarTextoLivre = async (texto: string) => {
@@ -564,7 +573,8 @@ function EntrevistaProcessoPage() {
                   disabled={ocupado}
                   rows={6}
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={cancelarTexto} disabled={ocupado}>Cancelar</Button>
                   <Button onClick={() => void enviarTextoLivre(input)} disabled={ocupado || !input.trim()}>
                     Enviar texto <Send className="ml-2 h-4 w-4" />
                   </Button>
@@ -601,6 +611,18 @@ function EntrevistaProcessoPage() {
                     title="Anexar arquivo"
                   >
                     <Paperclip className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={comecarTexto}
+                    disabled={ocupado}
+                    aria-label="Colar um texto"
+                    title="Colar um texto ou contar a rotina livremente"
+                  >
+                    <FileText className="h-4 w-4" />
                   </Button>
                   <Input
                     ref={inputRef}

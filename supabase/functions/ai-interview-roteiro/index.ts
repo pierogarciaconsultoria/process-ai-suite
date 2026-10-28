@@ -12,6 +12,7 @@ import {
   aplicarAnalise,
   aplicarExtracao,
   iniciarTurno,
+  perguntasEmAberto,
   promptAnalise,
   promptAvaliacao,
   promptConfirmacao,
@@ -76,6 +77,15 @@ serve(async (req: Request) => {
     if (resposta.length > MAX_RESPOSTA) throw new HttpError(400, "Resposta excede 8.000 caracteres.");
     if (checkModeration(resposta).blocked) throw new HttpError(422, "Conteúdo inapropriado. Use linguagem profissional.");
 
+    const origem = body?.origem === "anexo" ? "anexo" : "texto_livre";
+    const partes = operacao === "extrair"
+      ? validarArquivo(body?.arquivo_content ?? (resposta ? [{ type: "text", text: resposta }] : []))
+      : [];
+    // Texto colado passa pela mesma moderação das respostas; documentos anexados não.
+    if (origem === "texto_livre" && partes.some((parte) => parte.type === "input_text" && checkModeration(parte.text).blocked)) {
+      throw new HttpError(422, "Conteúdo inapropriado. Use linguagem profissional.");
+    }
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurado");
 
@@ -97,13 +107,11 @@ serve(async (req: Request) => {
       }
 
       if (operacao === "extrair") {
-        const origem = body?.origem === "anexo" ? "anexo" : "texto_livre";
-        const partes = validarArquivo(body?.arquivo_content ?? (resposta ? [{ type: "text", text: resposta }] : []));
         consumo += JSON.stringify(partes).length;
         const raw = await callResponsesAPI({
-          systemPrompt: promptExtracao(persona, roteiro, estado),
+          systemPrompt: promptExtracao(persona, roteiro, estado, current),
           messages: [{ role: "user", content: partes }],
-          responseSchema: schemaExtracao(roteiro),
+          responseSchema: schemaExtracao(roteiro, estado),
           openaiApiKey: OPENAI_API_KEY,
         });
         return jsonResponse(aplicarExtracao(roteiro, estado, raw, origem));
@@ -116,7 +124,7 @@ serve(async (req: Request) => {
         const raw = await callResponsesAPI({
           systemPrompt: promptAvaliacao(persona, roteiro, estado, current),
           messages: mensagens,
-          responseSchema: schemaAvaliacao(passo.pergunta),
+          responseSchema: schemaAvaliacao(passo.pergunta, perguntasEmAberto(roteiro, estado, passo.pergunta.id)),
           openaiApiKey: OPENAI_API_KEY,
         });
         return jsonResponse(aplicarAvaliacao(roteiro, estado, raw));

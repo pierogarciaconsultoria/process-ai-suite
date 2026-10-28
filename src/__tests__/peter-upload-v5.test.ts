@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   EXTENSOES_ACEITAS,
-  IMAGENS_ASSISTANT_CONFIRMADAS,
   LIMITE_TEXTO_CHARS,
   validarArquivo,
   validarLote,
@@ -17,15 +16,16 @@ import {
 const makeFile = (content: string, name: string, type: string) => new File([content], name, { type });
 
 describe("Peter v5 — upload", () => {
-  it("valida formatos, tamanho, lote e mantém imagens desabilitadas sem teste real", () => {
+  it("valida formatos, tamanho e lote, aceitando imagens PNG e JPG", () => {
     expect(validarArquivo(makeFile("pdf", "processo.pdf", "application/pdf")).valido).toBe(true);
     expect(validarArquivo(makeFile("x", "antigo.doc", "application/msword")).erro).toContain("DOCX");
     expect(validarArquivo(makeFile("x", "dados.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).erro).toContain("Excel");
     expect(validarArquivo(makeFile("x", "slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).erro).toContain("PowerPoint");
     expect(validarArquivo(makeFile("", "vazio.txt", "text/plain")).valido).toBe(false);
-    expect(IMAGENS_ASSISTANT_CONFIRMADAS).toBe(false);
-    expect(EXTENSOES_ACEITAS).toBe(".pdf,.docx,.txt,.csv");
-    expect(validarArquivo(makeFile("png", "mapa.png", "image/png")).erro).toContain("em breve");
+    expect(EXTENSOES_ACEITAS).toBe(".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg");
+    expect(validarArquivo(makeFile("png", "mapa.png", "image/png")).valido).toBe(true);
+    expect(validarArquivo(makeFile("jpg", "quadro.jpg", "image/jpeg")).valido).toBe(true);
+    expect(validarArquivo(makeFile("gif", "anim.gif", "image/gif")).erro).toContain("PNG e JPG");
     expect(validarLote([]).valido).toBe(true);
     const large = new File([new Uint8Array(8 * 1024 * 1024)], "large.txt", { type: "text/plain" });
     expect(validarLote([large, large]).valido).toBe(false);
@@ -66,5 +66,14 @@ describe("Peter v5 — upload", () => {
     }));
     expect(montarPartesArquivo(files)).toHaveLength(2);
     expect(labelVisualArquivos(files)).toContain("2 arquivos");
+  });
+
+  it("envia a imagem como data URL, precedida do nome do arquivo", async () => {
+    const { arquivo } = await processarArquivo(makeFile("png", "fluxo.png", "image/png"));
+    expect(arquivo).toMatchObject({ modoEnvio: "image_url", tipo: "image/png", base64: btoa("png") });
+    expect(montarPartesArquivo([arquivo])).toEqual([
+      { type: "text", text: '[Imagem (PNG): "fluxo.png"]' },
+      { type: "image_url", image_url: { url: `data:image/png;base64,${btoa("png")}`, detail: "high" } },
+    ]);
   });
 });
