@@ -525,6 +525,7 @@ export function promptExtracao(
 ## SUA TAREFA AGORA
 O entrevistado enviou um texto ou arquivo descrevendo o processo. Extraia dele as respostas para as perguntas do roteiro que ainda não foram respondidas. A entrevista vai perguntar só o que ficar faltando.
 Imagens (fluxogramas, fotos de quadros, prints de sistemas ou de formulários) também são material: leia o conteúdo visual, inclusive setas, caixas e textos escritos nelas.
+Diagramas BPMN chegam convertidos em texto, com os elementos na ordem do fluxo. Use o início como gatilho, as tarefas como atividades (reescreva no formato Verbo + Objeto), a raia ou o participante de cada tarefa como responsável, as decisões e seus caminhos como decisões e aprovações, documentos e dados como entradas, saídas e ferramentas, e o fim como saída do processo. O diagrama pode estar desatualizado ou incompleto: registre só o que ele mostra.
 
 Perguntas ainda não respondidas:
 ${pendentes}

@@ -22,10 +22,10 @@ describe("Peter v5 — upload", () => {
     expect(validarArquivo(makeFile("x", "dados.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).erro).toContain("Excel");
     expect(validarArquivo(makeFile("x", "slides.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")).erro).toContain("PowerPoint");
     expect(validarArquivo(makeFile("", "vazio.txt", "text/plain")).valido).toBe(false);
-    expect(EXTENSOES_ACEITAS).toBe(".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg");
+    expect(EXTENSOES_ACEITAS).toBe(".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg,.bpmn,.xml");
     expect(validarArquivo(makeFile("png", "mapa.png", "image/png")).valido).toBe(true);
     expect(validarArquivo(makeFile("jpg", "quadro.jpg", "image/jpeg")).valido).toBe(true);
-    expect(validarArquivo(makeFile("gif", "anim.gif", "image/gif")).erro).toContain("PNG e JPG");
+    expect(validarArquivo(makeFile("gif", "anim.gif", "image/gif")).erro).toContain("PNG, JPG e BPMN");
     expect(validarLote([]).valido).toBe(true);
     const large = new File([new Uint8Array(8 * 1024 * 1024)], "large.txt", { type: "text/plain" });
     expect(validarLote([large, large]).valido).toBe(false);

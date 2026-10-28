@@ -1,19 +1,23 @@
 /**
  * Processamento de arquivos da entrevista do Peter.
- * Suporta PDF (inclusive digitalizado via OCR), DOCX, TXT, CSV e imagens PNG/JPG
- * (enviadas ao Peter como imagem). DOC legado, Excel e PowerPoint não são suportados.
+ * Suporta PDF (inclusive digitalizado via OCR), DOCX, TXT, CSV, diagramas BPMN 2.0
+ * (convertidos em texto) e imagens PNG/JPG (enviadas ao Peter como imagem).
+ * DOC legado, Excel e PowerPoint não são suportados.
  */
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import type { ArquivoProcessado } from "../../supabase/functions/_shared/peter-interview-contract";
 import {
   LIMITE_TEXTO_CHARS,
+  TIPO_LABEL_BPMN,
   TAMANHO_MAX_IMAGEM_BASE64_CHARS,
   TIPOS_ACEITOS_MIME,
   TIPOS_IMAGEM,
   TIPOS_PDF,
   TIPOS_TEXTO,
   TIPOS_WORD,
+  ehArquivoBpmn,
 } from "../../supabase/functions/_shared/peter-interview-contract";
+import { bpmnParaTexto } from "./peter-bpmn";
 
 // Erro com mensagem pronta para o usuário: chega à tela sem ser trocado pelo genérico.
 class ErroLeituraArquivo extends Error {}
@@ -114,6 +118,15 @@ export async function extrairTextoPlano(file: File): Promise<string> {
     : text;
 }
 
+export async function extrairTextoBpmn(file: File): Promise<string> {
+  const convertido = bpmnParaTexto(await extrairTextoPlano(file));
+  if (!convertido) {
+    throw new ErroLeituraArquivo(`"${file.name}" não é um diagrama BPMN 2.0 válido. Exporte o processo da sua ferramenta no formato BPMN 2.0 (.bpmn) e tente novamente.`);
+  }
+  if (convertido.totalElementos === 0) throw new ErroLeituraArquivo(`O diagrama "${file.name}" não tem atividades nem eventos.`);
+  return convertido.texto;
+}
+
 export function detectarTipoConteudo(texto: string): "pop" | "processo" | "generico" {
   const text = texto.toLowerCase();
   if (text.includes("procedimento operacional") || text.includes("instrução de trabalho") || (text.includes("revisão") && text.includes("aprovado por"))) return "pop";
@@ -171,6 +184,7 @@ async function imagemParaEnvio(file: File): Promise<File> {
 }
 
 export async function processarArquivo(file: File): Promise<{ arquivo: ArquivoProcessado; avisoTruncamento: boolean }> {
+  if (ehArquivoBpmn(file)) return textoProcessado(file, TIPO_LABEL_BPMN, await extrairTextoBpmn(file));
   const tipoLabel = TIPOS_ACEITOS_MIME[file.type] ?? file.type;
   if (TIPOS_IMAGEM.includes(file.type)) {
     const imagem = await imagemParaEnvio(file);

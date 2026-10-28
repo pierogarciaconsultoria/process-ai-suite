@@ -29,7 +29,7 @@ export const TIPOS_ACEITOS_MIME: Record<string, string> = {
   "image/jpg": "Imagem (JPG)",
 };
 
-export const EXTENSOES_ACEITAS = ".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg";
+export const EXTENSOES_ACEITAS = ".pdf,.docx,.txt,.csv,.png,.jpg,.jpeg,.bpmn,.xml";
 export const TAMANHO_MAX_POR_ARQUIVO_BYTES = 10 * 1024 * 1024;
 export const TAMANHO_MAX_LOTE_BYTES = 15 * 1024 * 1024;
 export const TAMANHO_MAX_IMAGEM_BASE64_CHARS = 7_000_000;
@@ -41,8 +41,16 @@ export const TIPOS_PDF = ["application/pdf"];
 export const TIPOS_WORD = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
 export const TIPOS_TEXTO = ["text/plain", "text/csv"];
 
+export const TIPO_LABEL_BPMN = "Diagrama BPMN";
+
+// O navegador não informa tipo para .bpmn (e varia para .xml): o diagrama é
+// reconhecido pela extensão, e o conteúdo é conferido na leitura.
+export function ehArquivoBpmn(file: File): boolean {
+  return /\.(bpmn|xml)$/i.test(file.name);
+}
+
 export function validarArquivo(file: File): ValidacaoArquivo {
-  if (!Object.keys(TIPOS_ACEITOS_MIME).includes(file.type)) {
+  if (!ehArquivoBpmn(file) && !Object.keys(TIPOS_ACEITOS_MIME).includes(file.type)) {
     const name = file.name.toLowerCase();
     if (file.type === "application/msword" || name.endsWith(".doc")) {
       return { valido: false, erro: "Formato DOC não suportado. Salve o arquivo como DOCX e tente novamente." };
@@ -53,7 +61,7 @@ export function validarArquivo(file: File): ValidacaoArquivo {
     if (file.type.includes("powerpoint") || file.type.includes("presentation") || /\.(ppt|pptx)$/i.test(name)) {
       return { valido: false, erro: "PowerPoint ainda não é suportado. Descreva os slides relevantes no chat." };
     }
-    return { valido: false, erro: `Formato não suportado: "${file.name}". Aceitos: PDF, DOCX, TXT, CSV, PNG e JPG.` };
+    return { valido: false, erro: `Formato não suportado: "${file.name}". Aceitos: PDF, DOCX, TXT, CSV, PNG, JPG e BPMN.` };
   }
   if (file.size > TAMANHO_MAX_POR_ARQUIVO_BYTES) {
     return { valido: false, erro: `"${file.name}" é grande demais (${(file.size / 1024 / 1024).toFixed(1)}MB). Limite: 10MB por arquivo.` };
