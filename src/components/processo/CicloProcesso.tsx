@@ -17,8 +17,8 @@ import { ACOES_CICLO, ETAPAS_CICLO, acoesDisponiveis, normalizarStatus, type Aca
 
 const DICA_POR_STATUS: Record<string, string> = {
   "Em entrevista": "Conclua a entrevista com o Peter para gerar o diagnóstico.",
-  Diagnosticado: "Falta aprovar o plano de melhoria na Etapa 6 da entrevista.",
-  "Melhorias aprovadas": "Quando as melhorias estiverem implantadas, marque o processo como implementado para liberar a documentação.",
+  Diagnosticado: "Diagnóstico validado: a documentação já pode ser gerada em \"Criar procedimento\". Falta aprovar o plano de melhoria na Etapa 6 da entrevista.",
+  "Melhorias aprovadas": "Quando as melhorias estiverem implantadas, marque o processo como implementado e revise a documentação.",
   Implementado: "Processo implementado: a documentação pode ser gerada em \"Criar procedimento\".",
   Obsoleto: "Este processo não está mais em uso e não aceita nova documentação.",
 };

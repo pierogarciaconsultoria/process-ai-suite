@@ -36,10 +36,15 @@ describe("Ciclo de vida do processo", () => {
     expect(statusPelaEntrevista({ ...base, etapasConfirmadas: [1, 2, 3, 4, 5, 6] }, "Implementado")).toBe("Implementado");
   });
 
-  it("libera documentação só para processo implementado, inclusive no status antigo", () => {
+  it("libera documentação a partir do diagnóstico, inclusive nos status antigos, e nunca para obsoleto", () => {
+    expect(podeGerarDocumentacao("Diagnosticado")).toBe(true);
+    expect(podeGerarDocumentacao("Melhorias aprovadas")).toBe(true);
     expect(podeGerarDocumentacao("Implementado")).toBe(true);
+    expect(podeGerarDocumentacao("Em revisão")).toBe(true);
     expect(podeGerarDocumentacao("Aprovado")).toBe(true);
-    expect(podeGerarDocumentacao("Melhorias aprovadas")).toBe(false);
+    expect(podeGerarDocumentacao("Em entrevista")).toBe(false);
+    expect(podeGerarDocumentacao("Rascunho")).toBe(false);
+    expect(podeGerarDocumentacao("Obsoleto")).toBe(false);
     expect(podeGerarDocumentacao(undefined)).toBe(false);
   });
 

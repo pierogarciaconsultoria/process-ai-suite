@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
-import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
+import { DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao } from "@/lib/ciclo-processo";
 import {
   buildMappedProcessPayload,
   formatRevision,
@@ -64,7 +64,7 @@ const OPERATIONAL_DOCUMENT_STATUSES = [
   "Obsoleto",
 ] as const;
 
-const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo implementado encontrado. Marque um processo como implementado antes de vincular.";
+const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo com diagnóstico confirmado. Conclua a Etapa 5 da entrevista com o Peter antes de vincular.";
 
 type DbGeneratedDocument = Tables<"generated_documents">;
 
@@ -477,11 +477,12 @@ export default function Documentos() {
       setSelectedProcessId(requestedProcessId);
       setIsNewDocumentOpen(true);
     } else {
+      const obsoleto = requestedProcess?.status === "Obsoleto";
       toast({
-        title: requestedProcess ? "Processo ainda não implementado" : "Processo não encontrado",
-        description: requestedProcess
-          ? "A documentação é gerada depois que as melhorias do processo são implantadas. Marque o processo como implementado na tela do processo."
-          : "Não foi possível localizar o processo solicitado nesta empresa.",
+        title: !requestedProcess ? "Processo não encontrado" : obsoleto ? "Processo obsoleto" : "Processo ainda sem diagnóstico",
+        description: !requestedProcess
+          ? "Não foi possível localizar o processo solicitado nesta empresa."
+          : obsoleto ? "Processos obsoletos não aceitam nova documentação." : DOCUMENTACAO_BLOQUEADA,
         variant: "destructive",
       });
     }
@@ -610,7 +611,7 @@ export default function Documentos() {
 
     if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo implementado",
+        title: "Nenhum processo diagnosticado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
@@ -716,7 +717,7 @@ export default function Documentos() {
     if (!activeTemplate || !preview) return;
     if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo implementado",
+        title: "Nenhum processo diagnosticado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
@@ -882,7 +883,7 @@ export default function Documentos() {
 
     if (reviewSourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo implementado",
+        title: "Nenhum processo diagnosticado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });

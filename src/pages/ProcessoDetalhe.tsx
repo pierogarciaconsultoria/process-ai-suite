@@ -8,7 +8,7 @@ import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
-import { atualizacaoDaAcao, podeGerarDocumentacao, type AcaoCiclo } from "@/lib/ciclo-processo";
+import { atualizacaoDaAcao, DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao, type AcaoCiclo } from "@/lib/ciclo-processo";
 import { montarRelatorio } from "@/lib/relatorio-processo";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -122,7 +122,7 @@ const ProcessoDetalhe = () => {
             <Button
               variant="outline"
               disabled={!documentacaoLiberada}
-              title={documentacaoLiberada ? undefined : "A documentação é liberada quando o processo é marcado como implementado."}
+              title={documentacaoLiberada ? undefined : DOCUMENTACAO_BLOQUEADA}
               onClick={() => navigate(`/documentos?processId=${id}&mode=linked_process`)}
             >
               <FileText className="mr-2 h-4 w-4" /> Criar procedimento

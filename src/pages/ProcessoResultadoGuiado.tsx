@@ -14,9 +14,8 @@ import { mapProcessRowToForm } from "@/lib/processos";
 import { buildMappedProcessPayload } from "@/data/documentation-config";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
 import { montarRelatorio } from "@/lib/relatorio-processo";
-import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
+import { DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao } from "@/lib/ciclo-processo";
 
-const DOCUMENTACAO_BLOQUEADA = "A documentação é liberada quando o processo é marcado como implementado, na tela do processo.";
 
 type GenerationState = "idle" | "loading" | "ready" | "error";
 
