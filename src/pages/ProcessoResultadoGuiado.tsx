@@ -11,11 +11,11 @@ import type { DiagnosticoResult, ProcessoFormData } from "@/data/processo-form-t
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
+import { mapaVeioDoAnexo, restaurarMensagens } from "@/lib/entrevista-roteiro";
 import { buildMappedProcessPayload } from "@/data/documentation-config";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
 import { montarRelatorio } from "@/lib/relatorio-processo";
 import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
-import { mapaVeioDoAnexo, restaurarMensagens } from "@/lib/entrevista-roteiro";
 
 const DOCUMENTACAO_BLOQUEADA = "A documentação é liberada quando o processo é marcado como implementado, na tela do processo.";
 
