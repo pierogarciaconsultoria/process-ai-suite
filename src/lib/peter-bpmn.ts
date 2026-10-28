@@ -6,6 +6,7 @@
  */
 
 const NS_BPMN = "http://www.omg.org/spec/BPMN/20100524/MODEL";
+const NS_BPMNDI = "http://www.omg.org/spec/BPMN/20100524/DI";
 
 const ROTULO_ELEMENTO: Record<string, string> = {
   task: "Tarefa",
@@ -226,4 +227,10 @@ export function bpmnParaTexto(xml: string): BpmnConvertido | null {
   if (mensagens.length > 0) secoes.push(["Comunicação entre participantes:", ...mensagens].join("\n"));
 
   return { texto: secoes.join("\n\n"), totalElementos };
+}
+
+// Só um diagrama com o desenho (BPMNDI) pode ser aberto como mapa no editor.
+export function temDesenhoBpmn(xml: string): boolean {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  return doc.getElementsByTagNameNS(NS_BPMNDI, "BPMNShape").length > 0;
 }

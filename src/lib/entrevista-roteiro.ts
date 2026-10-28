@@ -20,6 +20,8 @@ export interface MensagemEntrevista {
   tipo?: TipoMensagem;
   // Em mensagens de análise, content guarda o JSON da versão exibida.
   acao?: AcaoIA;
+  // No anexo de um diagrama BPMN que passou a ser o mapa AS IS do processo.
+  mapaAnexado?: boolean;
 }
 
 export type OperacaoRoteiro = "responder" | "extrair" | "analisar";
@@ -119,7 +121,13 @@ export function restaurarMensagens(raw: Json | null | undefined): MensagemEntrev
       content: item.content as string,
       ...(item.tipo === "alerta" || item.tipo === "oportunidade" || item.tipo === "analise" ? { tipo: item.tipo } : {}),
       ...(item.acao === "diagnostico_as_is" || item.acao === "plano_melhoria" ? { acao: item.acao } : {}),
+      ...(item.mapaAnexado === true ? { mapaAnexado: true } : {}),
     }));
+}
+
+// O mapa AS IS veio de um diagrama anexado na entrevista e não deve ser redesenhado pela IA.
+export function mapaVeioDoAnexo(mensagens: MensagemEntrevista[]): boolean {
+  return mensagens.some((mensagem) => mensagem.mapaAnexado);
 }
 
 async function mensagemDeErro(error: unknown): Promise<string> {

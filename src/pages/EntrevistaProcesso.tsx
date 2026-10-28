@@ -22,7 +22,7 @@ import {
 } from "@/lib/entrevista-roteiro";
 import { statusPelaEntrevista } from "@/lib/ciclo-processo";
 import { moderarEntrada } from "@/lib/peter-moderation";
-import { labelVisualArquivos, montarPartesArquivo, processarArquivo } from "@/lib/peter-upload";
+import { labelVisualArquivos, mapaAsIsDosAnexos, montarPartesArquivo, processarArquivo } from "@/lib/peter-upload";
 import {
   buildProcessInsertPayload,
   buildProcessUpdatePayload,
@@ -300,12 +300,12 @@ function EntrevistaProcessoPage() {
     chamada: () => Promise<ResultadoTurno>,
     base: MensagemEntrevista[],
     status: string,
-    opcoes: { desfazer?: () => void; repetir?: () => void } = {},
+    opcoes: { desfazer?: () => void; repetir?: () => void; formBase?: ProcessoFormData } = {},
   ) => {
     setPendente(status);
     setErro(null);
     try {
-      aplicarTurno(await chamada(), base, form);
+      aplicarTurno(await chamada(), base, opcoes.formBase ?? form);
       return true;
     } catch (error) {
       opcoes.desfazer?.();
@@ -420,8 +420,10 @@ function EntrevistaProcessoPage() {
     setPendente("Lendo os arquivos…");
     setErro(null);
     const processados: ArquivoProcessado[] = [];
+    let mapa: string | null = null;
     try {
       for (const arquivo of arquivos) processados.push((await processarArquivo(arquivo)).arquivo);
+      mapa = await mapaAsIsDosAnexos(arquivos);
     } catch (error) {
       setPendente(null);
       setErro({ mensagem: error instanceof Error ? error.message : "Não foi possível ler os arquivos." });
@@ -429,7 +431,10 @@ function EntrevistaProcessoPage() {
     }
     setPendente(null);
 
-    const base: MensagemEntrevista[] = [...mensagens, { role: "user", content: labelVisualArquivos(processados) }];
+    const base: MensagemEntrevista[] = [
+      ...mensagens,
+      { role: "user", content: labelVisualArquivos(processados), ...(mapa ? { mapaAnexado: true } : {}) },
+    ];
     setMensagens(base);
     const ok = await executar(
       () => chamarRoteiro({
@@ -442,7 +447,7 @@ function EntrevistaProcessoPage() {
       }),
       base,
       "Peter está analisando os arquivos…",
-      { desfazer: () => setMensagens(mensagens) },
+      { desfazer: () => setMensagens(mensagens), ...(mapa ? { formBase: { ...form, bpmnAsIs: mapa } } : {}) },
     );
     if (ok) setModoTexto(false);
   };

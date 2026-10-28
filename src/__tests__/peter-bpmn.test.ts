@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bpmnParaTexto } from "@/lib/peter-bpmn";
-import { processarArquivo } from "@/lib/peter-upload";
+import { bpmnParaTexto, temDesenhoBpmn } from "@/lib/peter-bpmn";
+import { mapaAsIsDosAnexos, processarArquivo } from "@/lib/peter-upload";
 import { validarArquivo } from "../../supabase/functions/_shared/peter-interview-contract";
 
 const COMPRAS = `<?xml version="1.0" encoding="UTF-8"?>
@@ -100,5 +100,23 @@ describe("Peter — diagrama BPMN", () => {
     await expect(processarArquivo(new File(["<nota />"], "nota.xml", { type: "text/xml" }))).rejects.toThrow(/não é um diagrama BPMN 2.0 válido/);
     await expect(processarArquivo(new File(['<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" />'], "vazio.bpmn", { type: "" })))
       .rejects.toThrow(/não tem atividades nem eventos/);
+  });
+
+  it("usa como mapa AS IS o último .bpmn anexado que tem desenho e não é um TO BE", async () => {
+    const semDesenho = COMPRAS.replace(/<bpmndi:BPMNDiagram[\s\S]*<\/bpmndi:BPMNDiagram>/, "");
+    expect(temDesenhoBpmn(COMPRAS)).toBe(true);
+    expect(temDesenhoBpmn(semDesenho)).toBe(false);
+
+    const asIs = new File([COMPRAS], "Compras - AS IS.bpmn", { type: "" });
+    const outro = new File([COMPRAS.replace("Compras de materiais", "Compras v2")], "compras-v2.xml", { type: "text/xml" });
+    expect(await mapaAsIsDosAnexos([asIs])).toBe(COMPRAS);
+    expect(await mapaAsIsDosAnexos([asIs, outro])).toContain("Compras v2");
+    expect(await mapaAsIsDosAnexos([asIs, new File([COMPRAS], "Compras - TO BE.bpmn", { type: "" })])).toBe(COMPRAS);
+    for (const nome of ["Compras TO BE.bpmn", "compras_tobe.bpmn", "Compras-To-Be.bpmn"]) {
+      expect(await mapaAsIsDosAnexos([new File([COMPRAS], nome, { type: "" })])).toBeNull();
+    }
+    expect(await mapaAsIsDosAnexos([new File([COMPRAS], "October tobacco.bpmn", { type: "" })])).toBe(COMPRAS);
+    expect(await mapaAsIsDosAnexos([new File([semDesenho], "compras.bpmn", { type: "" })])).toBeNull();
+    expect(await mapaAsIsDosAnexos([new File(["png"], "fluxo.png", { type: "image/png" })])).toBeNull();
   });
 });
