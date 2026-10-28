@@ -13,16 +13,20 @@ import {
   aplicarAvaliacao,
   aplicarConfirmacao,
   aplicarExtracao,
+  descreverPasso,
   filtrarCampos,
   iniciarTurno,
+  perguntasEmAberto,
   promptAnalise,
   promptAvaliacao,
+  promptExtracao,
   sanitizarEstado,
   sanitizarHistorico,
   schemaAnalise,
   schemaAvaliacao,
   schemaConfirmacao,
   schemaExtracao,
+  textoDoPasso,
   validarArquivo,
 } from "../../supabase/functions/_shared/roteiro-peter";
 import { SCHEMA_DIAGNOSTICO, SCHEMA_PLANO } from "../../supabase/functions/_shared/roteiro-analise";
@@ -86,9 +90,13 @@ describe("Peter no roteiro — schemas", () => {
   it("gera schemas compatíveis com o modo strict para todas as perguntas e etapas", () => {
     for (const etapa of roteiro.etapas) {
       verificarStrict(schemaConfirmacao(etapa));
-      for (const pergunta of etapa.perguntas) verificarStrict(schemaAvaliacao(pergunta));
+      for (const pergunta of etapa.perguntas) {
+        verificarStrict(schemaAvaliacao(pergunta));
+        verificarStrict(schemaAvaliacao(pergunta, perguntasEmAberto(roteiro, iniciarRoteiro(roteiro), pergunta.id)));
+      }
     }
     verificarStrict(schemaExtracao(roteiro));
+    verificarStrict(schemaExtracao(roteiro, confirmarEtapa(roteiro, ateConfirmacao(1))));
     verificarStrict(SCHEMA_DIAGNOSTICO);
     verificarStrict(SCHEMA_PLANO);
   });
@@ -240,6 +248,89 @@ describe("Peter no roteiro — turnos", () => {
     expect(turno.estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Aprovar pedido — Gerente"]);
     expect(turno.passo.pergunta?.id).toBe("e2.entradas");
     expect(turno.mensagem).toMatch(/^Identifiquei o gatilho/);
+  });
+
+  it("registra o que o entrevistado adiantou e não repete essas perguntas", () => {
+    const turno = aplicarAvaliacao(roteiro, iniciarRoteiro(roteiro), avaliacao({
+      texto: "Ana, compradora",
+      comentario: "Prazer, Ana! Já anotei o processo e as primeiras atividades.",
+      outrasRespostas: [
+        { perguntaId: "e1.nome", texto: "Compras de materiais", valor: null },
+        { perguntaId: "e3.atividades", texto: "Receber requisição — Compras\nCotar fornecedores — Compras", valor: null },
+        { perguntaId: "e1.entrevistado", texto: "não é adiantável", valor: null },
+      ],
+      campos: {
+        entrevistados: "Ana (compradora)",
+        nomeProcesso: "Compras de materiais",
+        etapas: [{ atividade: "Receber requisição", responsavel: "Compras", ferramentaDocumento: "" }],
+        area: "não adiantada",
+      },
+    }));
+    expect(turno.estado.respostas["e1.entrevistado"].textos).toEqual(["Ana, compradora"]);
+    expect(turno.estado.respostas["e1.nome"]).toMatchObject({ textos: ["Compras de materiais"], origem: "entrevista" });
+    expect(turno.estado.respostas["e3.atividades"]).toMatchObject({
+      textos: ["Receber requisição — Compras", "Cotar fornecedores — Compras"],
+      repeticaoEncerrada: false,
+    });
+    expect(turno.passo.pergunta?.id).toBe("e1.area");
+    expect(turno.mensagem).toMatch(/^Prazer, Ana! Já anotei/);
+    expect(turno.campos).toEqual({
+      entrevistados: "Ana (compradora)",
+      nomeProcesso: "Compras de materiais",
+      etapas: [{ atividade: "Receber requisição", responsavel: "Compras", ferramentaDocumento: "", ordem: 1 }],
+    });
+  });
+
+  it("ao chegar nas atividades adiantadas, mostra o que já foi anotado e pede a próxima", () => {
+    const antes = ateConfirmacao(2);
+    const comAtividades: EstadoRoteiro = {
+      ...antes,
+      respostas: {
+        ...antes.respostas,
+        "e3.atividades": { perguntaId: "e3.atividades", textos: ["Receber requisição — Compras"], status: "respondida", origem: "entrevista", repeticaoEncerrada: false },
+      },
+    };
+    const estado = confirmarEtapa(roteiro, comAtividades);
+    const passo = descreverPasso(roteiro, estado);
+    expect(passo.pergunta?.id).toBe("e3.atividades");
+    const texto = textoDoPasso(roteiro, estado, passo, 2);
+    expect(texto).toContain("Até aqui anotei:\n1. Receber requisição — Compras");
+    expect(texto).toContain("E depois disso, qual é a próxima atividade");
+  });
+
+  it("um texto colado substitui as atividades ainda em levantamento pela lista completa", () => {
+    const base = confirmarEtapa(roteiro, ateConfirmacao(2));
+    const estado = aplicarAvaliacao(roteiro, base, avaliacao({ texto: "Receber requisição — Compras", encerraRepeticao: false })).estado;
+    expect(perguntasEmAberto(roteiro, estado).map((pergunta) => pergunta.id)).toContain("e3.atividades");
+    expect(promptExtracao(persona, roteiro, estado, {})).toContain("Já registrado: Receber requisição — Compras");
+
+    const turno = aplicarExtracao(roteiro, estado, {
+      respostas: [{ perguntaId: "e3.atividades", texto: "Receber requisição — Compras\nCotar fornecedores — Compras\nEmitir pedido — Compras", valor: null }],
+      comentario: "Identifiquei o fluxo completo.",
+      alerta: null,
+      oportunidade: null,
+      campos: { nomeProcesso: "etapa confirmada", decisoes: "Valor acima de R$ 5 mil" },
+    }, "texto_livre");
+    expect(turno.estado.respostas["e3.atividades"]).toMatchObject({
+      textos: ["Receber requisição — Compras", "Cotar fornecedores — Compras", "Emitir pedido — Compras"],
+      repeticaoEncerrada: true,
+      origem: "texto_livre",
+    });
+    expect(turno.passo.pergunta?.id).toBe("e3.sistemas");
+    expect(turno.campos).toEqual({ decisoes: "Valor acima de R$ 5 mil" });
+  });
+
+  it("envia ao Peter os valores atuais dos campos na extração e as perguntas adiantáveis na avaliação", () => {
+    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const extracao = promptExtracao(persona, roteiro, estado, { gatilho: "Pedido do cliente", nomeProcesso: "Compras" });
+    expect(extracao).toContain('"gatilho":"Pedido do cliente"');
+    expect(extracao).not.toContain('"nomeProcesso"');
+    expect(extracao).not.toContain("e1.nome (");
+
+    const avaliacaoPrompt = promptAvaliacao(persona, roteiro, iniciarRoteiro(roteiro), {});
+    expect(avaliacaoPrompt).toContain("## INFORMAÇÕES ADIANTADAS");
+    expect(avaliacaoPrompt).toContain("- e3.atividades (Atividades)");
+    expect(avaliacaoPrompt).not.toContain("- e1.entrevistado (");
   });
 
   it("monta o prompt com a pergunta atual e o critério de suficiência", () => {

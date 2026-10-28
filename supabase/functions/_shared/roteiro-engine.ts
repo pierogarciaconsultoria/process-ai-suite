@@ -87,7 +87,7 @@ function buscarPergunta(roteiro: Roteiro, perguntaId: string): PerguntaRoteiro |
   return undefined;
 }
 
-function repeticaoPendente(pergunta: PerguntaRoteiro, resposta: RespostaRegistrada): boolean {
+export function repeticaoPendente(pergunta: PerguntaRoteiro, resposta: RespostaRegistrada): boolean {
   return Boolean(pergunta.repetir) && resposta.status === "respondida" && !resposta.repeticaoEncerrada;
 }
 
@@ -197,26 +197,30 @@ export function corrigirResposta(
   };
 }
 
-// Respostas extraídas de texto livre ou anexo: preenchem perguntas ainda não respondidas,
-// para que a entrevista pergunte só o que faltou.
+// Respostas extraídas de texto livre, anexo ou adiantadas numa resposta da entrevista:
+// preenchem perguntas ainda não respondidas, para que a entrevista pergunte só o que faltou.
+// Com encerrarRepeticao = false, a pergunta repetida (atividades) continua pedindo a próxima.
 export function aplicarRespostasExtraidas(
   roteiro: Roteiro,
   estado: EstadoRoteiro,
   extraidas: Array<{ perguntaId: string; texto: string; valor?: string }>,
-  origem: Exclude<OrigemResposta, "entrevista">,
+  origem: OrigemResposta,
+  { encerrarRepeticao = true }: { encerrarRepeticao?: boolean } = {},
 ): EstadoRoteiro {
   const respostas = { ...estado.respostas };
   for (const item of extraidas) {
     const texto = item.texto.trim();
     const pergunta = buscarPergunta(roteiro, item.perguntaId);
-    if (!texto || respostas[item.perguntaId] || !pergunta) continue;
+    const anterior = respostas[item.perguntaId];
+    // Atividades ainda em levantamento são substituídas pela lista completa extraída.
+    if (!texto || !pergunta || (anterior && !repeticaoPendente(pergunta, anterior))) continue;
     respostas[item.perguntaId] = {
       perguntaId: item.perguntaId,
       textos: textosDaResposta(pergunta, texto),
       valor: normalizarValor(item.valor),
       status: "respondida",
       origem,
-      repeticaoEncerrada: true,
+      repeticaoEncerrada: encerrarRepeticao || !pergunta.repetir,
     };
   }
   return { ...estado, respostas };

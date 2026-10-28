@@ -1,7 +1,7 @@
 /**
  * Processamento de arquivos da entrevista do Peter.
- * Suporta PDF (inclusive digitalizado via OCR), DOCX, TXT e CSV.
- * DOC legado, Excel, PowerPoint e imagens avulsas não são suportados nesta camada.
+ * Suporta PDF (inclusive digitalizado via OCR), DOCX, TXT, CSV e imagens PNG/JPG
+ * (enviadas ao Peter como imagem). DOC legado, Excel e PowerPoint não são suportados.
  */
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 import type { ArquivoProcessado } from "../../supabase/functions/_shared/peter-interview-contract";
@@ -14,6 +14,9 @@ import {
   TIPOS_TEXTO,
   TIPOS_WORD,
 } from "../../supabase/functions/_shared/peter-interview-contract";
+
+// Erro com mensagem pronta para o usuário: chega à tela sem ser trocado pelo genérico.
+class ErroLeituraArquivo extends Error {}
 
 export async function fileParaBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -72,7 +75,7 @@ export async function extrairTextoPdf(file: File): Promise<string> {
       }
       const ocrText = ocrPages.join("\n\n").trim();
       if (!ocrText) {
-        throw new Error(`O PDF "${file.name}" não contém texto selecionável e o OCR não encontrou conteúdo legível. Tente outra cópia com melhor resolução ou cole o conteúdo no chat.`);
+        throw new ErroLeituraArquivo(`O PDF "${file.name}" não contém texto selecionável e o OCR não encontrou conteúdo legível. Tente outra cópia com melhor resolução ou cole o conteúdo no chat.`);
       }
       console.info(`[Peter upload] OCR extraiu ${ocrText.length} caracteres de "${file.name}".`);
       return ocrText;
@@ -80,7 +83,7 @@ export async function extrairTextoPdf(file: File): Promise<string> {
     console.info(`[Peter upload] PDF.js extraiu ${finalText.length} caracteres de "${file.name}".`);
     return finalText;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Nenhum texto")) throw error;
+    if (error instanceof ErroLeituraArquivo) throw error;
     throw new Error(`Não foi possível extrair o conteúdo de "${file.name}". O PDF pode estar protegido ou corrompido. Tente outra cópia ou cole o conteúdo relevante no chat.`);
   }
 }
@@ -90,10 +93,10 @@ export async function extrairTextoDocx(file: File): Promise<string> {
     const mammoth = await import("mammoth/mammoth.browser");
     const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
     const finalText = String(result.value || "").trim();
-    if (!finalText) throw new Error(`Nenhum texto encontrado em "${file.name}".`);
+    if (!finalText) throw new ErroLeituraArquivo(`Nenhum texto encontrado em "${file.name}".`);
     return finalText;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Nenhum texto")) throw error;
+    if (error instanceof ErroLeituraArquivo) throw error;
     throw new Error(`Não foi possível extrair o conteúdo de "${file.name}". Verifique se o arquivo não está corrompido.`);
   }
 }
@@ -135,12 +138,45 @@ function textoProcessado(file: File, tipoLabel: string, text: string) {
   };
 }
 
+const TAMANHO_IMAGEM_SEM_REDUCAO_BYTES = 4 * 1024 * 1024;
+const LADO_MAX_IMAGEM_PX = 2048;
+
+// Fotos de celular passam fácil do limite de envio. Acima de 4MB, a imagem é
+// redesenhada com no máximo 2048px no maior lado (a OpenAI reduz para isso de
+// qualquer forma) e salva como JPEG.
+async function imagemParaEnvio(file: File): Promise<File> {
+  if (file.size <= TAMANHO_IMAGEM_SEM_REDUCAO_BYTES || typeof createImageBitmap !== "function") return file;
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new ErroLeituraArquivo(`Não foi possível ler a imagem "${file.name}". Verifique se o arquivo não está corrompido.`);
+  }
+  try {
+    const escala = Math.min(1, LADO_MAX_IMAGEM_PX / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+    // JPEG não tem transparência: o fundo branco evita áreas pretas em PNGs.
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    return blob ? new File([blob], file.name, { type: "image/jpeg" }) : file;
+  } finally {
+    bitmap.close();
+  }
+}
+
 export async function processarArquivo(file: File): Promise<{ arquivo: ArquivoProcessado; avisoTruncamento: boolean }> {
   const tipoLabel = TIPOS_ACEITOS_MIME[file.type] ?? file.type;
   if (TIPOS_IMAGEM.includes(file.type)) {
-    const base64 = await fileParaBase64(file);
-    if (base64.length > TAMANHO_MAX_IMAGEM_BASE64_CHARS) throw new Error(`A imagem "${file.name}" é grande demais. Reduza a resolução e tente novamente.`);
-    return { arquivo: { nome: file.name, tipo: file.type, tipoLabel, tamanhoBytes: file.size, base64, modoEnvio: "image_url", truncado: false }, avisoTruncamento: false };
+    const imagem = await imagemParaEnvio(file);
+    const base64 = await fileParaBase64(imagem);
+    if (base64.length > TAMANHO_MAX_IMAGEM_BASE64_CHARS) throw new ErroLeituraArquivo(`A imagem "${file.name}" é grande demais. Reduza a resolução e tente novamente.`);
+    return { arquivo: { nome: file.name, tipo: imagem.type, tipoLabel, tamanhoBytes: file.size, base64, modoEnvio: "image_url", truncado: false }, avisoTruncamento: false };
   }
   if (TIPOS_PDF.includes(file.type)) return textoProcessado(file, tipoLabel, await extrairTextoPdf(file));
   if (TIPOS_WORD.includes(file.type)) return textoProcessado(file, tipoLabel, await extrairTextoDocx(file));
@@ -157,6 +193,7 @@ export function montarPartesArquivo(arquivos: ArquivoProcessado[]): ContentPart[
   const parts: ContentPart[] = [];
   for (const file of arquivos) {
     if (file.modoEnvio === "image_url" && file.base64) {
+      parts.push({ type: "text", text: `[${file.tipoLabel}: "${file.nome}"]` });
       parts.push({ type: "image_url", image_url: { url: `data:${file.tipo};base64,${file.base64}`, detail: "high" } });
     } else if (file.modoEnvio === "texto_extraido" && file.textoExtraido) {
       const prefix = detectarTipoConteudo(file.textoExtraido) === "pop"

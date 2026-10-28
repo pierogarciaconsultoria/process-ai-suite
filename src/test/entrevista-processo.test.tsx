@@ -9,7 +9,7 @@ import {
   registrarResposta,
   type EstadoRoteiro,
 } from "../../supabase/functions/_shared/roteiro-engine";
-import { aplicarAnalise, aplicarAvaliacao, sanitizarEstado } from "../../supabase/functions/_shared/roteiro-peter";
+import { aplicarAnalise, aplicarAvaliacao, aplicarExtracao, sanitizarEstado } from "../../supabase/functions/_shared/roteiro-peter";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -53,6 +53,18 @@ function servidor(analise?: unknown) {
   return async (_nome: string, { body }: { body: Record<string, unknown> }) => {
     const estado = sanitizarEstado(roteiro, body.estado);
     if (body.operacao === "analisar") return { data: aplicarAnalise(roteiro, estado, analise), error: null };
+    if (body.operacao === "extrair") {
+      return {
+        data: aplicarExtracao(roteiro, estado, {
+          respostas: [{ perguntaId: "e1.nome", texto: "Compras", valor: null }, { perguntaId: "e1.area", texto: "Suprimentos", valor: null }],
+          comentario: "Anotei o processo e a área.",
+          alerta: null,
+          oportunidade: null,
+          campos: { nomeProcesso: "Compras", area: "Suprimentos" },
+        }, "texto_livre"),
+        error: null,
+      };
+    }
     const passo = proximoPasso(roteiro, estado);
     if (passo.tipo !== "pergunta") throw new Error(`passo inesperado: ${passo.tipo}`);
     const resposta = String(body.resposta);
@@ -131,6 +143,31 @@ describe("Entrevista guiada — tela", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Apoio" }));
     expect(await screen.findByText(/Com que frequência esse processo acontece\?/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sob demanda" })).toBeInTheDocument();
+  });
+
+  it("aceita um texto livre no meio da entrevista e segue só com o que faltou", async () => {
+    mocks.invoke.mockImplementation(servidor());
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Entrevista guiada" }));
+    responder("Ana, compradora");
+    await screen.findByText(/Qual é o nome do processo que vamos mapear\?/);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Colar um texto" })).not.toBeDisabled());
+
+    fireEvent.click(screen.getByRole("button", { name: "Colar um texto" }));
+    expect(screen.getByText(/Pode contar com suas palavras como a rotina funciona/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByText(/Pode contar com suas palavras/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Colar um texto" }));
+    fireEvent.change(screen.getByPlaceholderText("Cole aqui a descrição do processo…"), { target: { value: "No setor de Suprimentos, o processo de Compras começa com a requisição." } });
+    fireEvent.click(screen.getByRole("button", { name: /Enviar texto/ }));
+
+    expect(await screen.findByText(/Anotei o processo e a área\./)).toBeInTheDocument();
+    expect(screen.getByText(/Quem é o responsável \(dono\) por esse processo\?/)).toBeInTheDocument();
+    const chamada = mocks.invoke.mock.calls.at(-1)![1].body;
+    expect(chamada).toMatchObject({ operacao: "extrair", origem: "texto_livre" });
+    expect(chamada.estado.respostas["e1.entrevistado"]).toBeDefined();
+    expect(screen.getByPlaceholderText("Digite sua resposta…")).toBeInTheDocument();
   });
 
   it("mostra o erro, devolve o texto ao campo e não avança quando o servidor falha", async () => {
