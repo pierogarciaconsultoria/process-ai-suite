@@ -13,9 +13,9 @@ export type ProcessoStatus = (typeof PROCESSO_STATUS)[number];
 
 export const ETAPAS_CICLO: Array<{ status: Exclude<ProcessoStatus, "Obsoleto">; descricao: string }> = [
   { status: "Em entrevista", descricao: "Levantamento do processo com o Peter" },
-  { status: "Diagnosticado", descricao: "Diagnóstico AS IS validado" },
+  { status: "Diagnosticado", descricao: "Diagnóstico AS IS validado; documentação liberada" },
   { status: "Melhorias aprovadas", descricao: "Plano de melhoria aprovado" },
-  { status: "Implementado", descricao: "Melhorias implantadas; documentação liberada" },
+  { status: "Implementado", descricao: "Melhorias implantadas" },
 ];
 
 // Status usados antes deste ciclo; a migration 202610270001 converte os registros salvos.
@@ -52,9 +52,13 @@ export function statusPelaEntrevista(estado: EstadoRoteiro, atual: ProcessoStatu
   return promoverStatus(atual, alvo);
 }
 
+// A documentação descreve o processo como ele é: liberada assim que o diagnóstico é validado.
 export function podeGerarDocumentacao(status: string | null | undefined): boolean {
-  return normalizarStatus(status) === "Implementado";
+  const atual = normalizarStatus(status);
+  return atual !== "Obsoleto" && ordem(atual) >= ordem("Diagnosticado");
 }
+
+export const DOCUMENTACAO_BLOQUEADA = "A documentação é liberada depois que o diagnóstico do processo é confirmado na Etapa 5 da entrevista.";
 
 export type AcaoCiclo = "implementar" | "reabrir_implantacao" | "tornar_obsoleto";
 
@@ -63,13 +67,13 @@ export const ACOES_CICLO: Record<AcaoCiclo, { rotulo: string; de: ProcessoStatus
     rotulo: "Marcar como implementado",
     de: "Melhorias aprovadas",
     para: "Implementado",
-    confirmacao: "Confirma que as melhorias do plano foram implantadas? A partir daí o processo pode ter sua documentação gerada.",
+    confirmacao: "Confirma que as melhorias do plano foram implantadas? Revise a documentação do processo para refletir as mudanças.",
   },
   reabrir_implantacao: {
     rotulo: "Voltar para melhorias aprovadas",
     de: "Implementado",
     para: "Melhorias aprovadas",
-    confirmacao: "O processo volta para \"Melhorias aprovadas\" e deixa de aceitar nova documentação até ser marcado como implementado de novo. Continuar?",
+    confirmacao: "O processo volta para \"Melhorias aprovadas\". Continuar?",
   },
   tornar_obsoleto: {
     rotulo: "Tornar obsoleto",

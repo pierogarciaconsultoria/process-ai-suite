@@ -57,12 +57,12 @@ describe("Tela do processo — ciclo de vida", () => {
     mocks.updates.length = 0;
   });
 
-  it("marca o processo como implementado após confirmação e libera a documentação", async () => {
+  it("marca o processo como implementado após confirmação, com a documentação já liberada", async () => {
     mocks.linha = linha("Melhorias aprovadas");
     renderizar();
 
     const criarProcedimento = await screen.findByRole("button", { name: /Criar procedimento/ });
-    expect(criarProcedimento).toBeDisabled();
+    expect(criarProcedimento).toBeEnabled();
     const ciclo = screen.getByRole("list", { name: "Etapas do ciclo do processo" });
     expect(within(ciclo).getByText("Melhorias aprovadas").closest("li")).toHaveAttribute("aria-current", "step");
 
@@ -83,6 +83,6 @@ describe("Tela do processo — ciclo de vida", () => {
     const ciclo = await screen.findByRole("list", { name: "Etapas do ciclo do processo" });
     expect(within(ciclo).getByText("Diagnosticado").closest("li")).toHaveAttribute("aria-current", "step");
     expect(screen.queryByRole("button", { name: "Marcar como implementado" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Criar procedimento/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Criar procedimento/ })).toBeEnabled();
   });
 });

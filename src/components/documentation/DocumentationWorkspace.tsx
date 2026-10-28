@@ -73,7 +73,7 @@ import {
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 const LEGACY_TEMPLATE_KEY = "process:docTemplate";
-const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo implementado encontrado. Marque um processo como implementado antes de vincular.";
+const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo com diagnóstico confirmado. Conclua a Etapa 5 da entrevista com o Peter antes de vincular.";
 
 type CompanyContext = {
   companyId: string | null;
@@ -684,7 +684,7 @@ export default function DocumentationWorkspace() {
     if (!activeTemplate) return;
     if (documentOrigin === "mapped_process" && approvedProcesses.length === 0) {
       toast({
-        title: "Nenhum processo implementado",
+        title: "Nenhum processo diagnosticado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
@@ -755,7 +755,7 @@ export default function DocumentationWorkspace() {
     if (!activeTemplate || !preview) return;
     if (documentOrigin === "mapped_process" && !mappedProcessPayload) {
       toast({
-        title: "Nenhum processo implementado",
+        title: "Nenhum processo diagnosticado",
         description: NO_APPROVED_PROCESSES_MESSAGE,
         variant: "destructive",
       });
