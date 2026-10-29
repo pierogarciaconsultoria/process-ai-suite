@@ -16,6 +16,7 @@ import type { Json, Tables, TablesInsert, TablesUpdate } from "@/integrations/su
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
 import { DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao } from "@/lib/ciclo-processo";
+import { mensagemDoErro } from "../../supabase/functions/_shared/authorization-core";
 import {
   buildMappedProcessPayload,
   formatRevision,
@@ -31,6 +32,12 @@ import {
   type GeneratedDocumentRecord,
   type ProcedureCategory,
 } from "@/data/documentation-config";
+
+// Acrescenta a causa devolvida pelo Supabase (PostgrestError não é Error) à mensagem da tela.
+function comCausa(texto: string, error: unknown): string {
+  const causa = mensagemDoErro(error);
+  return causa === "Erro desconhecido" ? texto : `${texto} Detalhe: ${causa}`;
+}
 
 type CompanyContext = {
   companyId: string | null;
@@ -830,10 +837,11 @@ export default function Documentos() {
         procedureCategory: "Procedimento Operacional",
       });
       toast({ title: "Documento criado", description: "O procedimento foi salvo na listagem operacional da empresa." });
-    } catch {
+    } catch (error) {
+      console.error("Falha ao salvar:", error);
       toast({
         title: "Falha ao salvar",
-        description: "Não foi possível persistir o procedimento no Supabase.",
+        description: comCausa("Não foi possível salvar o procedimento.", error),
         variant: "destructive",
       });
     } finally {
@@ -862,10 +870,11 @@ export default function Documentos() {
       await refreshDocuments(companyContext.companyId);
       setEditingDoc(null);
       toast({ title: "Documento atualizado", description: "As alterações foram salvas na versão atual." });
-    } catch {
+    } catch (error) {
+      console.error("Falha ao editar:", error);
       toast({
         title: "Falha ao editar",
-        description: "Não foi possível atualizar o documento selecionado.",
+        description: comCausa("Não foi possível atualizar o documento selecionado.", error),
         variant: "destructive",
       });
     }
@@ -1008,10 +1017,11 @@ export default function Documentos() {
       setReviewReason("");
       setReviewProcessId("");
       toast({ title: "Nova revisão criada", description: "A revisão anterior foi marcada como obsoleta e o fluxo de aprovação foi reiniciado." });
-    } catch {
+    } catch (error) {
+      console.error("Falha ao revisar:", error);
       toast({
         title: "Falha ao revisar",
-        description: "Não foi possível criar a nova revisão do procedimento.",
+        description: comCausa("Não foi possível criar a nova revisão do procedimento.", error),
         variant: "destructive",
       });
     }
@@ -1074,10 +1084,11 @@ export default function Documentos() {
         title: approvalDecision === "approve" ? "Documento publicado" : approvalDecision === "reject" ? "Documento reprovado" : "Documento enviado para aprovação",
         description: "O status operacional foi atualizado com rastreabilidade.",
       });
-    } catch {
+    } catch (error) {
+      console.error("Falha na aprovação:", error);
       toast({
         title: "Falha na aprovação",
-        description: "Não foi possível atualizar o status do documento.",
+        description: comCausa("Não foi possível atualizar o status do documento.", error),
         variant: "destructive",
       });
     }
@@ -1129,10 +1140,11 @@ export default function Documentos() {
       setDistributionDoc(null);
       setDistributionRecipients("");
       toast({ title: "Distribuição registrada", description: "Os destinatários ficaram vinculados ao documento com data e responsável." });
-    } catch {
+    } catch (error) {
+      console.error("Falha na distribuição:", error);
       toast({
         title: "Falha na distribuição",
-        description: "Não foi possível registrar a distribuição do documento.",
+        description: comCausa("Não foi possível registrar a distribuição do documento.", error),
         variant: "destructive",
       });
     }
