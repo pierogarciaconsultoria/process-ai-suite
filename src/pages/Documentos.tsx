@@ -21,6 +21,7 @@ import {
   buildMappedProcessPayload,
   formatRevision,
   loadDocumentationState,
+  recomendarTipoDocumento,
   PROCEDURE_CATEGORIES,
   type DocumentationState,
   type DocumentApprovalEntry,
@@ -552,6 +553,19 @@ export default function Documentos() {
     [selectedProcessRow],
   );
 
+  // Processo mapeado: sugere PR ou IT pelo número de cargos e pré-seleciona o modelo correspondente.
+  const recomendacao = useMemo(
+    () => (sourceMode === "linked_process" && selectedProcessPayload ? recomendarTipoDocumento(selectedProcessPayload.form.etapas) : null),
+    [selectedProcessPayload, sourceMode],
+  );
+  const tipoRecomendado = recomendacao?.documentType;
+
+  useEffect(() => {
+    if (!tipoRecomendado) return;
+    const modelo = activeTemplates.find((template) => template.documentType === tipoRecomendado);
+    if (modelo) setSelectedTemplateId(modelo.id);
+  }, [activeTemplates, selectedProcessId, tipoRecomendado]);
+
   const selectedReviewProcessPayload = useMemo(
     () => buildMappedProcessPayload(selectedReviewProcessRow),
     [selectedReviewProcessRow],
@@ -746,6 +760,7 @@ export default function Documentos() {
     setIsPersisting(true);
     try {
       const revision = formatRevision(0);
+      const categoriaVinculada: ProcedureCategory = activeTemplate.documentType === "Instrução de Trabalho" ? "Instrução de Trabalho" : "Procedimento Operacional";
       const documentOrigin = sourceMode === "linked_process" ? "mapped_process" : "manual_description";
       const processName = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.nome : "";
       const area = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.area : independentDraft.area;
@@ -764,7 +779,7 @@ export default function Documentos() {
         source_mode: sourceMode,
         area,
         document_owner: documentOwner,
-        procedure_category: sourceMode === "linked_process" ? "Procedimento Operacional" : independentDraft.procedureCategory,
+        procedure_category: sourceMode === "linked_process" ? categoriaVinculada : independentDraft.procedureCategory,
         template_id: activeTemplate.id,
         document_origin: documentOrigin,
         document_type: activeTemplate.documentType,
@@ -798,7 +813,7 @@ export default function Documentos() {
           processName,
           area,
           documentOwner,
-          procedureCategory: sourceMode === "linked_process" ? "Procedimento Operacional" : independentDraft.procedureCategory,
+          procedureCategory: sourceMode === "linked_process" ? categoriaVinculada : independentDraft.procedureCategory,
           linkedMapRevision,
           linkedMapApprovedAt,
           mapVersionLabel,
@@ -1410,10 +1425,31 @@ export default function Documentos() {
                   <p className="mt-2 text-sm text-muted-foreground">Cria um procedimento sem vínculo com processo mapeado.</p>
                 </button>
               </div>
-              <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-                <div className="font-medium text-foreground">Template ativo da geração</div>
-                <div className="mt-2 text-muted-foreground">{activeTemplate?.name || "Nenhum template ativo configurado"}</div>
-                <div className="mt-1 text-muted-foreground">Essa definição é controlada apenas em Configurações → Documentação do Processo.</div>
+              <div className="space-y-2 rounded-xl border bg-muted/30 p-4 text-sm">
+                <Label htmlFor="modelo-documento">Modelo do documento</Label>
+                {activeTemplates.length === 0 ? (
+                  <div className="text-muted-foreground">Nenhum template ativo configurado</div>
+                ) : (
+                  <Select value={activeTemplate?.id ?? ""} onValueChange={setSelectedTemplateId}>
+                    <SelectTrigger id="modelo-documento"><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
+                    <SelectContent>
+                      {activeTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}{template.documentType === tipoRecomendado ? " • Recomendado" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {recomendacao ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Recomendado: {recomendacao.documentType === "Procedimento" ? "PR - Procedimento" : "IT - Instrução de Trabalho"}.
+                    </span>{" "}
+                    {recomendacao.motivo}
+                  </p>
+                ) : null}
+                <p className="text-muted-foreground">Os modelos são configurados em Configurações → Documentação do Processo.</p>
               </div>
               {sourceMode === "linked_process" ? (
                 <div className="space-y-4">

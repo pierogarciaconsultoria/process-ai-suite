@@ -8,14 +8,14 @@ const bpmnEdge = readFileSync(resolve(process.cwd(), "supabase/functions/ai-gene
 
 describe("Peter v5 — documentos canônicos", () => {
   it("preserva os 13 tipos e adiciona as três variantes canônicas", () => {
-    expect(DOCUMENT_TYPES).toHaveLength(16);
+    expect(DOCUMENT_TYPES).toHaveLength(17);
     expect(DOCUMENT_TYPES.slice(0, 13)).toEqual([
       "Procedimento Operacional Padrão", "Relatório de Análise do Processo", "Análise por Fase",
       "Matriz de Riscos", "Indicadores do Processo", "Plano de Ação", "Checklist Operacional",
       "Manual do Processo", "Instrução de Trabalho", "Roteiro de Treinamento", "Documento de Entrevista",
       "Documento consolidado do processo", "Documento avulso gerado por IA",
     ]);
-    expect(DOCUMENT_TYPES.slice(13)).toEqual(["raci", "ficha_processo", "pop_v5"]);
+    expect(DOCUMENT_TYPES.slice(13)).toEqual(["raci", "ficha_processo", "pop_v5", "Procedimento"]);
   });
 
   it("materializa as seções canônicas sem duplicar o builder", () => {

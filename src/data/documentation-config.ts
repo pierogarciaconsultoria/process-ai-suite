@@ -37,6 +37,7 @@ export const DOCUMENT_TYPES = [
   "raci",
   "ficha_processo",
   "pop_v5",
+  "Procedimento",
 ] as const;
 
 export const PROCEDURE_CATEGORIES = [
@@ -460,6 +461,21 @@ export function createStandardSections(documentType: DocumentType): DocumentSect
           "Evidências",
           "Histórico de revisão",
         ]
+      : documentType === "Procedimento"
+        ? [
+            "Objetivo",
+            "Campo de aplicação",
+            "Referências normativas",
+            "Definições e siglas",
+            "Responsabilidades",
+            "Descrição do processo",
+            "Pontos de decisão e fluxos alternativos",
+            "Registros",
+            "Indicadores",
+            "Riscos e controles",
+            "Documentos relacionados",
+            "Controle de informação documentada",
+          ]
       : documentType === "Instrução de Trabalho"
         ? [
             "Objetivo",
@@ -625,6 +641,9 @@ function createTemplate(
   };
 }
 
+const NOME_MODELO_PROCEDIMENTO = "PR-XXX - Procedimento";
+const DESCRICAO_MODELO_PROCEDIMENTO = "Procedimento do processo: fluxo entre áreas e cargos, responsabilidades, decisões, registros e indicadores.";
+
 export function createDefaultDocumentationState(companyId: string | null, createdBy: string): DocumentationState {
   const templates = [
     createTemplate(
@@ -636,6 +655,7 @@ export function createDefaultDocumentationState(companyId: string | null, create
       companyId,
       "Template operacional padrão da empresa para instruções de trabalho e procedimentos controlados.",
     ),
+    createTemplate(NOME_MODELO_PROCEDIMENTO, "Procedimento", false, true, createdBy, companyId, DESCRICAO_MODELO_PROCEDIMENTO),
     createTemplate(
       "Relatório Executivo de Processo",
       "Relatório de Análise do Processo",
@@ -681,10 +701,53 @@ export function loadDocumentationState(companyId: string | null, createdBy: stri
   const saved = localStorage.getItem(storageKeyForDocumentation(companyId));
   if (!saved) return createDefaultDocumentationState(companyId, createdBy);
   try {
-    return JSON.parse(saved) as DocumentationState;
+    return comModeloProcedimento(JSON.parse(saved) as DocumentationState, companyId, createdBy);
   } catch {
     return createDefaultDocumentationState(companyId, createdBy);
   }
+}
+
+// Configurações salvas antes do modelo PR ganham o modelo padrão, para a recomendação PR/IT funcionar.
+function comModeloProcedimento(state: DocumentationState, companyId: string | null, createdBy: string): DocumentationState {
+  if (state.templates.some((template) => template.documentType === "Procedimento")) return state;
+  const modelo = createTemplate(NOME_MODELO_PROCEDIMENTO, "Procedimento", false, true, createdBy, companyId, DESCRICAO_MODELO_PROCEDIMENTO);
+  return { ...state, templates: [...state.templates, modelo] };
+}
+
+export interface RecomendacaoDocumento {
+  documentType: Extract<DocumentType, "Procedimento" | "Instrução de Trabalho">;
+  motivo: string;
+}
+
+// ISO 9001: o Procedimento (PR) descreve o fluxo entre cargos e áreas; a Instrução de Trabalho (IT)
+// detalha como um cargo executa suas tarefas. O critério é quantos cargos executam as atividades.
+export function recomendarTipoDocumento(etapas: Array<{ atividade?: string; responsavel?: string }>): RecomendacaoDocumento {
+  // Mesmo cargo escrito com caixa diferente conta uma vez, com a grafia da primeira atividade.
+  const porChave = new Map<string, string>();
+  for (const etapa of etapas) {
+    const cargo = etapa.responsavel?.trim() ?? "";
+    const chave = cargo.toLocaleLowerCase("pt-BR");
+    if (etapa.atividade?.trim() && cargo && !porChave.has(chave)) porChave.set(chave, cargo);
+  }
+  const cargos = Array.from(porChave.values());
+
+  if (cargos.length === 1) {
+    return {
+      documentType: "Instrução de Trabalho",
+      motivo: `As atividades são executadas por um só cargo (${cargos[0]}): uma Instrução de Trabalho detalha como executá-las.`,
+    };
+  }
+  if (cargos.length === 0) {
+    return {
+      documentType: "Procedimento",
+      motivo: "O processo não tem atividades com responsável definido: o Procedimento descreve o fluxo e aponta o que falta definir.",
+    };
+  }
+  const lista = cargos.length > 4 ? `${cargos.slice(0, 4).join(", ")} e mais ${cargos.length - 4}` : cargos.join(", ");
+  return {
+    documentType: "Procedimento",
+    motivo: `O processo passa por ${cargos.length} cargos ou áreas (${lista}): um Procedimento descreve o fluxo entre eles. Instruções de Trabalho podem detalhar tarefas específicas depois.`,
+  };
 }
 
 export function saveDocumentationState(companyId: string | null, state: DocumentationState) {
