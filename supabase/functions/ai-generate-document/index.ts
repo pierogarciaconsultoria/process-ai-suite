@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 import { acquireAiQuota, fetchWithAiQuota } from "../_shared/quota.ts";
 import { runConfiguredAssistant, stripCodeFence } from "../_shared/openai-assistant.ts";
+import { instrucoesDoModelo, modeloSemInstrucoes } from "../_shared/instrucoes-documento.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,9 +100,8 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     const contextPayload = {
-      template,
+      template: modeloSemInstrucoes(template),
       sections,
-      generationConfig,
       companyContext,
       mappedProcessData,
       manualDescription,
@@ -136,11 +136,17 @@ serve(async (req) => {
     }
 
     const tipoDocumento = String(template?.documentType || template?.type || generationConfig?.documentType || "");
-    const systemPrompt = getSystemPromptPorTipo(tipoDocumento);
+    // As instruções do modelo vêm antes das regras fixas e do formato JSON, que prevalecem.
+    const promptDoTipo = getSystemPromptPorTipo(tipoDocumento);
+    const instrucoes = instrucoesDoModelo(template, generationConfig);
+    const systemPrompt = instrucoes
+      ? promptDoTipo.replace(SYSTEM_PROMPT_ATUAL, `${instrucoes}\n\n${SYSTEM_PROMPT_ATUAL}`)
+      : promptDoTipo;
 
     if (use_peter_assistant === true) {
       const userContent = JSON.stringify(contextPayload);
       const lease = await acquireAiQuota(client, "ai-generate-document", companyId);
+      const consumo = userContent.length + instrucoes.length;
       try {
         const content = stripCodeFence(await runConfiguredAssistant(
           OPENAI_API_KEY,
@@ -150,12 +156,12 @@ serve(async (req) => {
         JSON.parse(content);
         return new Response(content, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } finally {
-        await lease.complete(userContent.length, Math.max(1, Math.ceil(userContent.length / 200)));
+        await lease.complete(consumo, Math.max(1, Math.ceil(consumo / 200)));
       }
     }
 
     const openAiBaseUrl = Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
-    const response = await fetchWithAiQuota(client, "ai-generate-document", companyId, JSON.stringify(contextPayload).length,
+    const response = await fetchWithAiQuota(client, "ai-generate-document", companyId, JSON.stringify(contextPayload).length + instrucoes.length,
       `${openAiBaseUrl}/chat/completions`,
       {
         method: "POST",

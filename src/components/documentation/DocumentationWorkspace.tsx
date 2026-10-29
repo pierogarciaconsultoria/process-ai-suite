@@ -1162,7 +1162,9 @@ export default function DocumentationWorkspace() {
           <Card>
             <CardHeader>
               <CardTitle>Prompts e IA</CardTitle>
-              <CardDescription>Centralize o comportamento da IA por template sem espalhar prompts pelo código.</CardDescription>
+              <CardDescription>
+                O prompt de sistema e as instruções de geração orientam a escrita dos documentos deste modelo. Cole aqui as instruções de um GPT ou de uma skill que você já usa; modelos e exemplos vão no Texto/base de referência, na aba do cadastro. As regras do sistema continuam valendo: nada de dados inventados e [não informado] no que faltar.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-2">
