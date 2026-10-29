@@ -247,7 +247,39 @@ describe("Peter no roteiro — turnos", () => {
     expect(turno.estado.respostas["e2.gatilho"].origem).toBe("texto_livre");
     expect(turno.estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Aprovar pedido — Gerente"]);
     expect(turno.passo.pergunta?.id).toBe("e2.entradas");
-    expect(turno.mensagem).toMatch(/^Identifiquei o gatilho/);
+    expect(turno.mensagem).toMatch(/^Identifiquei o gatilho e duas atividades\.\n\nDo que você enviou, já anotei: Gatilho, Atividades\. Não vou perguntar de novo/);
+  });
+
+  it("com diagrama BPMN, aproveita respostas parciais e o que não aparece no diagrama", () => {
+    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const prompt = promptExtracao(persona, roteiro, estado, {});
+    expect(prompt).toContain('"Resumo do diagrama"');
+    expect(prompt).toContain('"nao" com o texto "Não aparece no diagrama"');
+    expect(prompt).toContain("Registre o que o diagrama mostra mesmo que não cubra todo o critério");
+
+    const turno = aplicarExtracao(roteiro, estado, {
+      respostas: [
+        { perguntaId: "e2.gatilho", texto: "Pedido de venda", valor: null },
+        { perguntaId: "e2.entradas", texto: "Pedido de venda", valor: null },
+        { perguntaId: "e3.paralelo", texto: "Não aparece no diagrama", valor: "nao" },
+      ],
+      comentario: "",
+      alerta: null,
+      oportunidade: null,
+      campos: {},
+    }, "anexo");
+    expect(turno.estado.respostas["e3.paralelo"]).toMatchObject({ valor: "nao", origem: "anexo" });
+    expect(turno.passo.pergunta?.id).toBe("e2.fornecedores");
+    expect(turno.mensagem).toMatch(/^Do que você enviou, já anotei: Gatilho, Entradas, Atividades em paralelo\./);
+  });
+
+  it("não diz que anotou algo quando o material não respondeu nenhuma pergunta", () => {
+    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const turno = aplicarExtracao(roteiro, estado, {
+      respostas: [], comentario: "Não encontrei informações do processo.", alerta: null, oportunidade: null, campos: {},
+    }, "anexo");
+    expect(turno.mensagem).not.toContain("já anotei");
+    expect(turno.passo.pergunta?.id).toBe("e2.gatilho");
   });
 
   it("registra o que o entrevistado adiantou e não repete essas perguntas", () => {

@@ -66,6 +66,7 @@ describe("Peter — diagrama BPMN", () => {
     expect(texto).toContain('Comunicação entre participantes:\n- Cliente → Pedido recebido: "Pedido de compra"');
     expect(texto).not.toContain("Bounds");
     expect(texto).not.toContain("Anotações:");
+    expect(texto).toMatch(/Resumo do diagrama:\n- Início: Pedido recebido\n- Fim: Pedido emitido\n- Decisões: Valor acima de R\$ 5 mil\?\n- Divisões em paralelo: nenhuma\n- Prazos e esperas \(temporizadores\): 2 dias sem registro\n- Erros e escalonamentos: nenhum\n- Tarefas automáticas \(sistema\): Emitir pedido no ERP\n- Participantes: Cliente, Empresa$/);
   });
 
   it("aceita BPMN sem prefixo e usa o participante como responsável quando não há raias", () => {
@@ -80,6 +81,8 @@ describe("Peter — diagrama BPMN", () => {
     expect(texto).toContain("Processo: Atendimento");
     expect(texto).toContain("1. [Início] (sem nome) — Atendimento\n2. [Tarefa] Abrir chamado — Atendimento\n3. [Fim] (sem nome) — Atendimento");
     expect(texto).toContain("Anotações:\n- Sem SLA definido");
+    expect(texto).toContain("- Início: 1 sem nome\n- Fim: 1 sem nome\n- Decisões: nenhuma");
+    expect(texto).toContain("- Participantes: Atendimento, Cliente");
   });
 
   it("recusa XML inválido ou que não é BPMN 2.0", () => {
