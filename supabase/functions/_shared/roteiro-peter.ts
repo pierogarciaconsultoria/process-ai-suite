@@ -420,6 +420,22 @@ function linhaPergunta(pergunta: PerguntaRoteiro, resposta: RespostaRegistrada |
 
 const INSTRUCAO_TEXTO_ATIVIDADES = `Para "e3.atividades", liste as atividades em ordem, uma por linha, no formato "Verbo + Objeto — responsável".`;
 
+// O entrevistado que anexa o diagrama espera não ser perguntado sobre o que ele já mostra.
+// Por isso o diagrama vale mesmo quando cobre só parte do critério: o resumo de cada etapa
+// é a conferência, e ali o entrevistado corrige o que estiver errado ou desatualizado.
+const INSTRUCAO_BPMN = `Diagramas BPMN chegam convertidos em texto, com os elementos na ordem do fluxo e um "Resumo do diagrama" no fim. Aproveite o diagrama ao máximo, para que a entrevista não pergunte o que ele já mostra:
+- e1.nome e e1.area: o nome do processo e o participante ou a raia, quando identificarem o processo e a área.
+- e2.gatilho e e2.entradas: o evento de início e o que ele recebe (pedido, solicitação, documento), mais os documentos e dados usados nas tarefas.
+- e2.fornecedores: quem envia o que inicia o processo (participante ou raia de origem) e de onde vem cada documento usado.
+- e2.saida_principal, e2.cliente e e2.saidas_secundarias: o fim do processo, para quem vai o resultado (mensagem ou participante de destino) e os documentos gerados ou as mensagens enviadas.
+- e3.atividades: as tarefas, reescritas no formato Verbo + Objeto, com a raia ou o participante como responsável.
+- e3.sistemas: tarefas automáticas, depósitos de dados e sistemas ou planilhas citados nos nomes.
+- e3.decisoes, e3.paralelo e e3.prazos: "sim" com o que o diagrama mostra (condições e caminhos, atividades em paralelo, temporizadores). Se o resumo indicar "nenhuma" ou "nenhum", "nao" com o texto "Não aparece no diagrama".
+- e3.terceiros: "sim" se outro participante executa atividades do fluxo; se o diagrama tiver um só participante, "nao" com o texto "Não aparece no diagrama".
+- e3.aprovacoes: "sim" se alguma tarefa ou decisão for uma aprovação; se nenhuma for, "nao" com o texto "Não aparece no diagrama". Havendo aprovação, a raia da tarefa responde e3.aprovador e o caminho negativo responde e3.aprovacao_negada.
+- e3.excecoes: eventos de erro ou escalonamento e caminhos de falha. Se não houver, não registre: a entrevista pergunta.
+Registre o que o diagrama mostra mesmo que não cubra todo o critério (por exemplo, a entrada sem o fornecedor de cada uma): o entrevistado confere cada etapa no resumo antes de seguir. Não registre o que o diagrama não mostra, exceto os "Não aparece no diagrama" indicados acima.`;
+
 export function promptAvaliacao(
   persona: PersonaPeter,
   roteiro: Roteiro,
@@ -525,13 +541,13 @@ export function promptExtracao(
 ## SUA TAREFA AGORA
 O entrevistado enviou um texto ou arquivo descrevendo o processo. Extraia dele as respostas para as perguntas do roteiro que ainda não foram respondidas. A entrevista vai perguntar só o que ficar faltando.
 Imagens (fluxogramas, fotos de quadros, prints de sistemas ou de formulários) também são material: leia o conteúdo visual, inclusive setas, caixas e textos escritos nelas.
-Diagramas BPMN chegam convertidos em texto, com os elementos na ordem do fluxo. Use o início como gatilho, as tarefas como atividades (reescreva no formato Verbo + Objeto), a raia ou o participante de cada tarefa como responsável, as decisões e seus caminhos como decisões e aprovações, documentos e dados como entradas, saídas e ferramentas, e o fim como saída do processo. O diagrama pode estar desatualizado ou incompleto: registre só o que ele mostra.
+${INSTRUCAO_BPMN}
 
 Perguntas ainda não respondidas:
 ${pendentes}
 
 ## COMO RESPONDER (JSON)
-- "respostas": uma entrada por pergunta que o material responde de forma suficiente, segundo o critério. Não inclua perguntas que o material não responde.
+- "respostas": uma entrada por pergunta que o material responde de forma suficiente, segundo o critério (para diagramas BPMN, conforme as regras acima). Não inclua perguntas que o material não responde.
   - "texto": registro fiel e conciso da resposta encontrada. ${INSTRUCAO_TEXTO_ATIVIDADES}
   - "valor": conforme indicado na pergunta; nas demais, null.
 - "comentario": uma ou duas frases dizendo o que foi identificado no material.
@@ -676,11 +692,16 @@ export function aplicarExtracao(
   const etapasAbertas = new Set(etapasEmAberto(roteiro, estado).flatMap((etapa) => etapa.perguntas.map((pergunta) => pergunta.id)));
   const novoEstado = aplicarRespostasExtraidas(roteiro, estado, lerRespostas(r.respostas).filter((item) => etapasAbertas.has(item.perguntaId)), origem);
   const passo = descreverPasso(roteiro, novoEstado);
+  // Diz o que não será perguntado, para o entrevistado saber o que o material já cobriu.
+  const anotadas = todasPerguntas(roteiro).filter((pergunta) => novoEstado.respostas[pergunta.id] !== estado.respostas[pergunta.id]);
+  const anotado = anotadas.length > 0
+    ? `Do que você enviou, já anotei: ${anotadas.map((pergunta) => pergunta.rotulo).join(", ")}. Não vou perguntar de novo; você confere tudo no resumo de cada etapa.`
+    : "";
 
   return {
     estado: novoEstado,
     passo,
-    mensagem: juntar(textoLimpo(r.comentario), textoDoPasso(roteiro, novoEstado, passo, 0)),
+    mensagem: juntar(textoLimpo(r.comentario), anotado, textoDoPasso(roteiro, novoEstado, passo, 0)),
     campos: filtrarCampos(r.campos, camposEmAberto(roteiro, estado)),
     alerta: textoOuNull(r.alerta),
     oportunidade: textoOuNull(r.oportunidade),

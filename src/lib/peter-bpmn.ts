@@ -1,7 +1,8 @@
 /**
  * Converte um diagrama BPMN 2.0 (.bpmn ou .xml exportado de Bizagi, Camunda,
  * bpmn.io, HEFLO etc.) em texto para a extração do Peter: elementos na ordem do
- * fluxo, responsáveis pelas raias, caminhos das decisões, documentos e anotações.
+ * fluxo, responsáveis pelas raias, caminhos das decisões, documentos, anotações
+ * e um resumo do que o diagrama tem e não tem.
  * As coordenadas do desenho (BPMNDI) são descartadas.
  */
 
@@ -78,6 +79,37 @@ interface Saida {
   rotulo: string;
 }
 
+const DECISOES = ["exclusiveGateway", "inclusiveGateway", "eventBasedGateway", "complexGateway"];
+const AUTOMATICAS = ["serviceTask", "scriptTask", "businessRuleTask"];
+
+function temEvento(no: Element, tipos: string[]): boolean {
+  return Array.from(no.children).some((filho) => tipos.includes(filho.localName));
+}
+
+function listarNos(nos: Element[], vazio: string): string {
+  if (nos.length === 0) return vazio;
+  const nomes = Array.from(new Set(nos.map(nomeDe).filter(Boolean)));
+  const semNome = nos.filter((no) => !nomeDe(no)).length;
+  return [...nomes, ...(semNome > 0 ? [`${semNome} sem nome`] : [])].join("; ");
+}
+
+// O que o diagrama tem e o que não tem: responde às perguntas de sim ou não da entrevista
+// (decisões, paralelos, prazos, terceiros), inclusive quando a resposta é "não aparece".
+function resumoDoDiagrama(nos: Element[], participantes: string[]): string {
+  const com = (filtro: (no: Element) => boolean, vazio: string) => listarNos(nos.filter(filtro), vazio);
+  return [
+    "Resumo do diagrama:",
+    `- Início: ${com((no) => no.localName === "startEvent", "não aparece")}`,
+    `- Fim: ${com((no) => no.localName === "endEvent", "não aparece")}`,
+    `- Decisões: ${com((no) => DECISOES.includes(no.localName), "nenhuma")}`,
+    `- Divisões em paralelo: ${com((no) => no.localName === "parallelGateway", "nenhuma")}`,
+    `- Prazos e esperas (temporizadores): ${com((no) => temEvento(no, ["timerEventDefinition"]), "nenhum")}`,
+    `- Erros e escalonamentos: ${com((no) => temEvento(no, ["errorEventDefinition", "escalationEventDefinition"]), "nenhum")}`,
+    `- Tarefas automáticas (sistema): ${com((no) => AUTOMATICAS.includes(no.localName), "nenhuma")}`,
+    `- Participantes: ${participantes.length > 1 ? participantes.join(", ") : "um só"}`,
+  ].join("\n");
+}
+
 // null quando o arquivo não é um BPMN 2.0 válido.
 export function bpmnParaTexto(xml: string): BpmnConvertido | null {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
@@ -122,12 +154,12 @@ export function bpmnParaTexto(xml: string): BpmnConvertido | null {
   }
 
   const secoes: string[] = [LEGENDA];
-  let totalElementos = 0;
+  const todosNos: Element[] = [];
 
   for (const processo of filhos(raiz, "process")) {
     const nos = descendentes(processo).filter((elemento) => ROTULO_ELEMENTO[elemento.localName] && elemento.getAttribute("id"));
     if (nos.length === 0) continue;
-    totalElementos += nos.length;
+    todosNos.push(...nos);
     const participante = participantePorProcesso.get(processo.getAttribute("id") ?? "") ?? "";
 
     // Raias internas vêm depois das externas no documento e prevalecem.
@@ -226,7 +258,9 @@ export function bpmnParaTexto(xml: string): BpmnConvertido | null {
   });
   if (mensagens.length > 0) secoes.push(["Comunicação entre participantes:", ...mensagens].join("\n"));
 
-  return { texto: secoes.join("\n\n"), totalElementos };
+  if (todosNos.length > 0) secoes.push(resumoDoDiagrama(todosNos, participantes.map(nomeDe).filter(Boolean)));
+
+  return { texto: secoes.join("\n\n"), totalElementos: todosNos.length };
 }
 
 // Só um diagrama com o desenho (BPMNDI) pode ser aberto como mapa no editor.
