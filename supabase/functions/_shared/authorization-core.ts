@@ -22,6 +22,19 @@ export type AuthorizationClient = {
   };
 };
 
+// Mensagem de qualquer erro, inclusive os objetos de erro do Supabase (PostgrestError), que não são Error.
+export function mensagemDoErro(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+  if (error && typeof error === "object") {
+    const { message, details, hint } = error as { message?: unknown; details?: unknown; hint?: unknown };
+    if (typeof message === "string" && message) {
+      return [message, details, hint].filter((parte) => typeof parte === "string" && parte).join(" | ");
+    }
+  }
+  return "Erro desconhecido";
+}
+
 export function requireString(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new HttpError(400, `${field} é obrigatório.`);

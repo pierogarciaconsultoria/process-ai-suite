@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mensagemDoErro } from "../_shared/authorization-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -158,8 +159,8 @@ serve(async (req) => {
 
     return json({ empresa });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[org-onboarding] unhandled error:", msg);
-    return json({ error: msg || "Erro desconhecido" }, 500);
+    const msg = mensagemDoErro(e);
+    console.error("[org-onboarding] unhandled error:", msg, e);
+    return json({ error: msg }, 500);
   }
 });

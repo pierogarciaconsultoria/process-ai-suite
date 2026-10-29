@@ -4,6 +4,7 @@ import {
   authorizeProcess,
   extractBearerToken,
   HttpError,
+  mensagemDoErro,
   requireString,
   validateAuthenticatedUser,
   type AuthorizationClient,
@@ -85,5 +86,15 @@ describe("Edge authorization core", () => {
     await expect(authorizeProcess(valid, "process-a", "company-a")).resolves.toBeUndefined();
     await expect(authorizeProcess(fakeClient({}), "process-b", "company-a"))
       .rejects.toMatchObject({ status: 404 });
+  });
+
+  it("lê a mensagem de Error, de texto e dos objetos de erro do Supabase", () => {
+    expect(mensagemDoErro(new Error("falhou"))).toBe("falhou");
+    expect(mensagemDoErro("texto")).toBe("texto");
+    expect(mensagemDoErro({ code: "42P17", message: "infinite recursion detected in policy for relation \"membros\"", details: null, hint: null }))
+      .toBe("infinite recursion detected in policy for relation \"membros\"");
+    expect(mensagemDoErro({ message: "falhou", details: "coluna x", hint: "crie a coluna" })).toBe("falhou | coluna x | crie a coluna");
+    expect(mensagemDoErro({ code: "1" })).toBe("Erro desconhecido");
+    expect(mensagemDoErro(undefined)).toBe("Erro desconhecido");
   });
 });

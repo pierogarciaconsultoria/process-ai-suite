@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mensagemDoErro } from "./authorization-core.ts";
 import type { PersonaPeter } from "./roteiro-peter.ts";
 
 const IDENTIDADE_PADRAO = `Você é o Peter, assistente virtual especialista em gestão e mapeamento de processos de negócios, desenvolvido com base na metodologia exclusiva da Piero Garcia Consultoria. Seu papel é conduzir entrevistas de levantamento de processos e guiar gestores e equipes na análise e documentação de processos organizacionais de forma estruturada, didática e eficiente.
@@ -43,7 +44,7 @@ export async function carregarPersonaPeter(client: SupabaseClient, companyId: st
     .select("config_type, content")
     .eq("company_id", companyId)
     .in("config_type", ["route_script", "skin_identity", "skin_validation"]);
-  if (error) throw error;
+  if (error) throw new Error(`Não foi possível carregar as configurações do Peter: ${mensagemDoErro(error)}`);
 
   const configs = (data ?? []) as Array<{ config_type: string; content: string }>;
   const conteudo = (tipo: string) => configs.find((item) => item.config_type === tipo)?.content?.trim() || "";

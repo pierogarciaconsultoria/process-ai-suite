@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mensagemDoErro } from "../_shared/authorization-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +44,7 @@ async function revokeIfExpired(admin: ReturnType<typeof createClient>, invite: I
     .single();
 
   if (error) {
-    throw error;
+    throw new Error(mensagemDoErro(error));
   }
 
   return data as InviteRecord;
@@ -217,8 +218,9 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.error("[org-accept-invite]", mensagemDoErro(error), error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Erro desconhecido" }),
+      JSON.stringify({ error: mensagemDoErro(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
