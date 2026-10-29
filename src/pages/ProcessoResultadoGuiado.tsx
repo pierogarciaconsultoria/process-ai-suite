@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, Loader2, RefreshCw, Workflow } from "lucide-react";
 import BPMNCanvas from "@/components/BPMNCanvas";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -263,7 +263,7 @@ export default function ProcessoResultadoGuiado() {
         </TabsContent>
         <TabsContent value="map">
           {bpmnXml && processForm && companyId ? (
-            <Card><CardContent className="pt-6">{mapaAnexado && <p className="mb-3 text-sm text-muted-foreground">Mapa do diagrama BPMN anexado na entrevista.</p>}<BPMNCanvas xml={bpmnXml} onChange={() => undefined} readOnly formData={processForm} mode="as-is" companyId={companyId} processId={id} /></CardContent></Card>
+            <Card><CardContent className="pt-6"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><p className="text-sm text-muted-foreground">{mapaAnexado ? "Mapa do diagrama BPMN anexado na entrevista." : "Mapa gerado a partir da entrevista."}</p><Button variant="outline" size="sm" onClick={() => navigate(`/processos/${id}/mapa`)}><Workflow className="mr-2 h-4 w-4" /> Editar mapa</Button></div><BPMNCanvas xml={bpmnXml} onChange={() => undefined} readOnly formData={processForm} mode="as-is" companyId={companyId} processId={id} /></CardContent></Card>
           ) : (
             <Card><CardContent className="py-10 text-center text-muted-foreground">O mapa BPMN AS IS ainda não foi gerado.</CardContent></Card>
           )}
