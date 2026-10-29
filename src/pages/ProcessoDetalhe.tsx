@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Download, FileText, GitBranch, Loader2, MessageSquare, Pencil } from "lucide-react";
+import { ArrowLeft, Download, FileText, GitBranch, Loader2, MessageSquare, Pencil, Workflow } from "lucide-react";
 import { CicloProcesso } from "@/components/processo/CicloProcesso";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
 import { useToast } from "@/hooks/use-toast";
@@ -119,6 +119,9 @@ const ProcessoDetalhe = () => {
                 <GitBranch className="mr-2 h-4 w-4" /> Gerar mapa AS IS
               </Button>
             )}
+            <Button variant="outline" onClick={() => navigate(`/processos/${id}/mapa`)}>
+              <Workflow className="mr-2 h-4 w-4" /> Editar mapa
+            </Button>
             <Button
               variant="outline"
               disabled={!documentacaoLiberada}
