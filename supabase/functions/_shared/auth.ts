@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient, type User } from "https://esm.sh/@supabase/supabase-js@2";
-import { extractBearerToken, HttpError, validateAuthenticatedUser } from "./authorization-core.ts";
+import { extractBearerToken, HttpError, mensagemDoErro, validateAuthenticatedUser } from "./authorization-core.ts";
 
-export { authorizeCompany, authorizeProcess, HttpError, requireString } from "./authorization-core.ts";
+export { authorizeCompany, authorizeProcess, HttpError, mensagemDoErro, requireString } from "./authorization-core.ts";
 
 export type AuthContext = {
   client: SupabaseClient;
@@ -28,7 +28,8 @@ export async function authenticateRequest(req: Request): Promise<AuthContext> {
 
 export function errorResponse(error: unknown, corsHeaders: Record<string, string>): Response {
   const status = error instanceof HttpError ? error.status : 500;
-  const message = error instanceof Error ? error.message : "Erro desconhecido";
+  const message = mensagemDoErro(error);
+  if (status >= 500) console.error(`[${status}]`, message, error);
   const retryHeaders = error instanceof HttpError && error.retryAfter
     ? { "Retry-After": String(error.retryAfter) }
     : {};
