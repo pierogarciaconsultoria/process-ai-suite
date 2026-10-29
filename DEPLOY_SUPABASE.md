@@ -16,6 +16,19 @@
 
 O front deve ir para o ar logo depois das migrations: a constraint `processos_status_check` recusa os status antigos (`Rascunho`, `Em revisão`), que o front anterior ainda grava.
 
+## Lovable Cloud
+
+O banco de produção é do Lovable Cloud, e o Lovable **não** aplica sozinho as migrations de `supabase/migrations`. Sem acesso pela CLI, cada migration nova é aplicada colando o arquivo em **Mais → Database → SQL editor** no Lovable.
+
+Para conferir se o banco está igual ao repositório (consulta só de leitura):
+
+```bash
+python3 scripts/schema/esperado.py supabase/migrations > /tmp/esperado.json
+python3 scripts/schema/gerar_sql.py /tmp/esperado.json > /tmp/diagnostico.sql
+```
+
+Cole `/tmp/diagnostico.sql` no SQL editor. Só as linhas "policy em membros" (sempre listadas, para conferência) significam banco igual ao repositório.
+
 ## Script único
 
 ```bash
