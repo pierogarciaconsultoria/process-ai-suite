@@ -38,7 +38,7 @@ import {
 } from "../../supabase/functions/_shared/peter-interview-contract";
 import { normalizarDiagnostico, normalizarPlano } from "../../supabase/functions/_shared/roteiro-analise";
 import { ROTEIRO_PADRAO } from "../../supabase/functions/_shared/roteiro-entrevista";
-import { iniciarRoteiro, type EstadoRoteiro } from "../../supabase/functions/_shared/roteiro-engine";
+import { iniciarRoteiroDoProcesso, type EstadoRoteiro } from "../../supabase/functions/_shared/roteiro-engine";
 import { descreverPasso, iniciarTurno, sanitizarEstado, type ResultadoTurno } from "../../supabase/functions/_shared/roteiro-peter";
 
 const ABERTURA = `Olá! Sou o **Peter** e vou conduzir a entrevista de mapeamento do seu processo. Você não precisa conhecer BPMN ou gestão de processos: é só me contar como as coisas funcionam que eu estruturo tudo.
@@ -360,7 +360,7 @@ function EntrevistaProcessoPage() {
 
   const comecarGuiada = () => {
     const base: MensagemEntrevista[] = [...mensagens, { role: "user", content: "Entrevista guiada" }];
-    aplicarTurno(iniciarTurno(ROTEIRO_PADRAO, iniciarRoteiro(ROTEIRO_PADRAO)), base, form);
+    aplicarTurno(iniciarTurno(ROTEIRO_PADRAO, iniciarRoteiroDoProcesso(ROTEIRO_PADRAO, form.nomeProcesso)), base, form);
   };
 
   const comecarTexto = () => {
@@ -391,7 +391,7 @@ function EntrevistaProcessoPage() {
       () => chamarRoteiro({
         operacao: "extrair",
         ...contexto,
-        estado: estado ?? iniciarRoteiro(ROTEIRO_PADRAO),
+        estado: estado ?? iniciarRoteiroDoProcesso(ROTEIRO_PADRAO, form.nomeProcesso),
         origem: "texto_livre",
         arquivo_content: [{ type: "text", text: texto }],
         current: form,
@@ -440,7 +440,7 @@ function EntrevistaProcessoPage() {
       () => chamarRoteiro({
         operacao: "extrair",
         ...contexto,
-        estado: estado ?? iniciarRoteiro(ROTEIRO_PADRAO),
+        estado: estado ?? iniciarRoteiroDoProcesso(ROTEIRO_PADRAO, form.nomeProcesso),
         origem: "anexo",
         arquivo_content: montarPartesArquivo(processados),
         current: form,

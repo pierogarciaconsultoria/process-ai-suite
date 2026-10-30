@@ -32,6 +32,8 @@ import {
 
 export const MAX_HISTORICO = 12;
 const MAX_TEXTO_RESPOSTA = 4_000;
+// Atividades do passo a passo: uma por linha, até o limite da pergunta repetida.
+const MAX_TEXTOS_POR_RESPOSTA = 60;
 
 export type CamposExtraidos = Partial<Record<CampoFormulario, unknown>>;
 
@@ -92,7 +94,7 @@ export function sanitizarEstado(roteiro: Roteiro, raw: unknown): EstadoRoteiro {
   const respostas: Record<string, RespostaRegistrada> = {};
   for (const [id, valor] of Object.entries(isRecord(raw.respostas) ? raw.respostas : {})) {
     if (!ids.has(id) || !isRecord(valor) || !Array.isArray(valor.textos)) continue;
-    const textos = valor.textos.filter((texto): texto is string => typeof texto === "string").slice(0, 30).map((texto) => texto.slice(0, MAX_TEXTO_RESPOSTA));
+    const textos = valor.textos.filter((texto): texto is string => typeof texto === "string").slice(0, MAX_TEXTOS_POR_RESPOSTA).map((texto) => texto.slice(0, MAX_TEXTO_RESPOSTA));
     const status = valor.status === "lacuna" ? "lacuna" : "respondida";
     const origem: OrigemResposta = valor.origem === "texto_livre" || valor.origem === "anexo" ? valor.origem : "entrevista";
     respostas[id] = {
@@ -166,7 +168,8 @@ export function resumoEtapa(roteiro: Roteiro, estado: EstadoRoteiro, numero: num
   const etapa = roteiro.etapas.find((item) => item.numero === numero);
   if (!etapa) return "";
   return etapa.perguntas
-    .filter((pergunta) => perguntaAplicavel(pergunta, estado))
+    // Perguntas que não são feitas só entram no resumo quando a informação apareceu.
+    .filter((pergunta) => perguntaAplicavel(pergunta, estado) && (!pergunta.somenteRegistro || estado.respostas[pergunta.id]))
     .map((pergunta) => {
       const resposta = estado.respostas[pergunta.id];
       if (!resposta || resposta.status === "lacuna" || resposta.textos.length === 0) return `❓ **${pergunta.rotulo}:** não informado`;
@@ -415,7 +418,11 @@ function linhaPergunta(pergunta: PerguntaRoteiro, resposta: RespostaRegistrada |
   const parcial = resposta?.textos.length
     ? ` | Já registrado: ${resposta.textos.join("; ")} (devolva a lista completa, incluindo estes itens)`
     : "";
-  return `- ${pergunta.id} (${pergunta.rotulo}): ${pergunta.texto} | Critério: ${pergunta.criterio}${valor}${parcial}`;
+  // Pergunta que a entrevista não faz: só é preenchida pelo que aparecer em outras respostas.
+  const somenteRegistro = pergunta.somenteRegistro
+    ? ` | Esta pergunta não será feita: registre-a sempre que a resposta trouxer a informação${pergunta.tipo === "sim_nao" ? ', inclusive "nao" quando ficar claro que não existe' : ""}`
+    : "";
+  return `- ${pergunta.id} (${pergunta.rotulo}): ${pergunta.texto} | Critério: ${pergunta.criterio}${valor}${parcial}${somenteRegistro}`;
 }
 
 const INSTRUCAO_TEXTO_ATIVIDADES = `Para "e3.atividades", liste as atividades em ordem, uma por linha, no formato "Verbo + Objeto — responsável".`;
@@ -465,9 +472,11 @@ ${adiantaveis.map((item) => linhaPergunta(item, estado.respostas[item.id])).join
       ? `"valor": exatamente uma das opções ${JSON.stringify(pergunta.opcoes)}; null se a resposta não permitir escolher.`
       : `"valor": sempre null.`;
 
-  const instrucaoRepeticao = pergunta.repetir
-    ? `Esta pergunta se repete para cada atividade do fluxo (atividade nº ${passo.iteracao + 1}). "encerraRepeticao" = true quando o entrevistado indicar que o processo terminou; se ele também descrever uma última atividade, registre-a em "texto".`
-    : `"encerraRepeticao": sempre false.`;
+  const instrucaoRepeticao = !pergunta.repetir
+    ? `"encerraRepeticao": sempre false.`
+    : passo.iteracao === 0
+      ? `Esta pergunta pede o passo a passo inteiro. Em "texto", liste as atividades descritas em ordem, uma por linha, no formato "Verbo + Objeto — responsável". Se uma resposta anterior desta mesma pergunta trouxe parte do passo a passo, devolva a lista completa. "encerraRepeticao" = true se a descrição vai até o fim do processo; false se o entrevistado parou no meio ou disse que vai continuar.`
+      : `O passo a passo já tem ${passo.iteracao} atividade(s) registrada(s); esta resposta continua a lista. Em "texto", registre só as atividades novas, uma por linha, no formato "Verbo + Objeto — responsável". "encerraRepeticao" = true quando o entrevistado indicar que o processo terminou; se ele também descrever uma última atividade, registre-a em "texto".`;
 
   return `${cabecalho(persona)}
 

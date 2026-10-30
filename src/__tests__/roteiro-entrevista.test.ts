@@ -8,6 +8,7 @@ import {
   confirmarEtapa,
   etapasConfirmadasAte,
   iniciarRoteiro,
+  iniciarRoteiroDoProcesso,
   listarLacunas,
   progresso,
   proximoPasso,
@@ -88,7 +89,7 @@ describe("Roteiro da entrevista — motor", () => {
     const passo = proximoPasso(roteiro, estado);
     expect(passo.tipo).toBe("pergunta");
     expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e1.entrevistado");
-    expect(progresso(roteiro, estado).rotulo).toBe("Etapa 1 de 6 — Identificação e contexto");
+    expect(progresso(roteiro, estado).rotulo).toBe("Etapa 1 de 6 — Sobre o processo");
   });
 
   it("percorre as 6 etapas, executando as análises da IA antes de confirmar as etapas 5 e 6", () => {
@@ -138,10 +139,33 @@ describe("Roteiro da entrevista — motor", () => {
     expect(estado.respostas["e3.aprovacao_negada"]).toBeUndefined();
   });
 
-  it("faz a pergunta das condicionais quando a resposta é sim", () => {
+  it("faz as perguntas sobre o aprovador quando a resposta sobre decisões registra uma aprovação", () => {
+    let estado = iniciarRoteiro(roteiro);
+    for (let passo = proximoPasso(roteiro, estado); !(passo.tipo === "pergunta" && passo.pergunta.id === "e3.decisoes"); passo = proximoPasso(roteiro, estado)) {
+      estado = passo.tipo === "pergunta" ? responderAtual(estado) : confirmarEtapa(roteiro, estado);
+    }
+    estado = responderAtual(estado, { texto: "Sim, acima de 10 mil o gerente aprova" });
+    // O Peter registra a aprovação citada na resposta (outrasRespostas).
+    estado = aplicarRespostasExtraidas(roteiro, estado, [{ perguntaId: "e3.aprovacoes", texto: "Gerente aprova acima de 10 mil", valor: "sim" }], "entrevista", { encerrarRepeticao: false });
+    const passo = proximoPasso(roteiro, estado);
+    expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.aprovador");
+  });
+
+  it("não faz as perguntas que só são registradas a partir de outras respostas", () => {
     const { perguntas } = avancarAteConcluir(iniciarRoteiro(roteiro));
-    expect(perguntas).toContain("e3.aprovador");
-    expect(perguntas).toContain("e3.aprovacao_negada");
+    const somenteRegistro = roteiro.etapas.flatMap((etapa) => etapa.perguntas).filter((pergunta) => pergunta.somenteRegistro).map((pergunta) => pergunta.id);
+    expect(somenteRegistro).toEqual(expect.arrayContaining(["e1.dono", "e2.fornecedores", "e2.cliente", "e3.aprovacoes", "e4.volume", "e6.gestor_mudanca"]));
+    for (const id of somenteRegistro) expect(perguntas).not.toContain(id);
+    // Sem aprovação registrada, as condicionais também não aparecem.
+    expect(perguntas).toHaveLength(20);
+  });
+
+  it("não pergunta o nome quando o processo já tem nome", () => {
+    const estado = iniciarRoteiroDoProcesso(roteiro, " COOPERA - Pós vendas ");
+    expect(estado.respostas["e1.nome"]).toMatchObject({ textos: ["COOPERA - Pós vendas"], status: "respondida" });
+    const { perguntas } = avancarAteConcluir(estado);
+    expect(perguntas).not.toContain("e1.nome");
+    expect(iniciarRoteiroDoProcesso(roteiro, "  ").respostas["e1.nome"]).toBeUndefined();
   });
 
   it("repete a pergunta de atividades até o entrevistado encerrar o fluxo", () => {
@@ -154,7 +178,7 @@ describe("Roteiro da entrevista — motor", () => {
     let passo = proximoPasso(roteiro, estado);
     expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.atividades");
     expect(passo.tipo === "pergunta" && passo.iteracao).toBe(1);
-    expect(passo.tipo === "pergunta" && passo.texto).toContain("próxima atividade");
+    expect(passo.tipo === "pergunta" && passo.texto).toContain("O que acontece depois disso");
 
     estado = responderAtual(estado, { texto: "Aprovar pedido — Gerente", encerraRepeticao: false });
     estado = responderAtual(estado, { texto: "", encerraRepeticao: true });
@@ -162,6 +186,17 @@ describe("Roteiro da entrevista — motor", () => {
     passo = proximoPasso(roteiro, estado);
     expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.sistemas");
     expect(estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Aprovar pedido — Gerente"]);
+  });
+
+  it("registra o passo a passo contado de uma vez, uma atividade por linha", () => {
+    let estado = iniciarRoteiro(roteiro);
+    for (let atual = proximoPasso(roteiro, estado); !(atual.tipo === "pergunta" && atual.pergunta.id === "e3.atividades"); atual = proximoPasso(roteiro, estado)) {
+      estado = atual.tipo === "pergunta" ? responderAtual(estado) : confirmarEtapa(roteiro, estado);
+    }
+    estado = responderAtual(estado, { texto: "Receber pedido — Comercial\n Separar material — Almoxarifado \nEmitir NF — Faturamento", encerraRepeticao: true });
+    expect(estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Separar material — Almoxarifado", "Emitir NF — Faturamento"]);
+    const passo = proximoPasso(roteiro, estado);
+    expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.sistemas");
   });
 
   it(`registra lacuna depois de ${MAX_APROFUNDAMENTOS} respostas insuficientes e segue em frente`, () => {
