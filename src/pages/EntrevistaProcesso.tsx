@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Check, FileText, Lightbulb, Loader2, Paperclip, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, FileText, Lightbulb, Loader2, Paperclip, RefreshCw, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,10 +136,12 @@ function Mensagem({ mensagem }: { mensagem: MensagemEntrevista }) {
       </div>
     );
   }
+  // Largura de leitura (~75 caracteres por linha): Peter à esquerda, você à direita.
+  const doPeter = mensagem.role === "assistant";
   return (
-    <div className={`rounded-md p-3 ${mensagem.role === "assistant" ? "bg-muted" : "border bg-card"}`}>
-      <div className="mb-1 text-xs text-muted-foreground">{mensagem.role === "assistant" ? "Peter" : "Você"}</div>
-      <div className="whitespace-pre-wrap text-sm"><TextoFormatado texto={mensagem.content} /></div>
+    <div className={`w-fit max-w-[min(100%,48rem)] rounded-lg px-4 py-3 ${doPeter ? "bg-muted" : "ml-auto border bg-card"}`}>
+      <div className="mb-1 text-xs text-muted-foreground">{doPeter ? "Peter" : "Você"}</div>
+      <div className="whitespace-pre-wrap text-[15px] leading-relaxed"><TextoFormatado texto={mensagem.content} /></div>
     </div>
   );
 }
@@ -166,7 +168,7 @@ function EntrevistaProcessoPage() {
   const statusRef = useRef<ProcessoStatus>("Em entrevista");
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
 
   const passo = useMemo(() => (estado ? descreverPasso(ROTEIRO_PADRAO, estado) : null), [estado]);
@@ -232,6 +234,17 @@ function EntrevistaProcessoPage() {
   useEffect(() => {
     if (!ocupado) window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [ocupado]);
+
+  // O campo de resposta cresce com o texto (até ~6 linhas) para dar para reler o passo a passo.
+  useEffect(() => {
+    const campo = inputRef.current;
+    if (!campo) return;
+    campo.style.height = "auto";
+    const alturaAntes = campo.offsetHeight;
+    campo.style.height = `${Math.min(campo.scrollHeight, 168)}px`;
+    // A conversa encolhe quando o campo cresce: mantém a última pergunta à vista.
+    if (campo.offsetHeight !== alturaAntes) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [input, passo?.tipo, modoTexto]);
 
   useEffect(() => {
     if (saveStatus === "saved" && !ocupado) return;
@@ -492,41 +505,30 @@ function EntrevistaProcessoPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden animate-fade-in">
-      <nav className="flex h-8 shrink-0 items-center gap-2 text-sm" aria-label="Navegação estrutural">
-        <button type="button" className="text-muted-foreground transition-colors hover:text-foreground" onClick={sair}>
-          Processos
-        </button>
-        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium text-foreground" aria-current="page">Entrevista</span>
-      </nav>
-
-      <div className="flex shrink-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Entrevista com o Peter</h1>
-          <p className="text-muted-foreground">{form.nomeProcesso || "Mapeamento guiado do processo"}</p>
+      {/* Cabeçalho em uma linha só, para sobrar altura para a conversa. */}
+      <div className="flex shrink-0 items-center gap-3">
+        <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={sair} aria-label="Voltar para Processos" title="Voltar para Processos">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-semibold text-foreground">Entrevista com o Peter</h1>
+          <p className="truncate text-sm text-muted-foreground">{form.nomeProcesso || "Mapeamento guiado do processo"}</p>
         </div>
-        <Badge variant={saveStatus === "error" ? "destructive" : "secondary"} className="flex w-fit items-center gap-2" aria-live="polite">
+        <Badge variant={saveStatus === "error" ? "destructive" : "secondary"} className="flex w-fit shrink-0 items-center gap-2" aria-live="polite">
           {saveStatus === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : saveStatus === "error" ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />}
           {saveStatus === "saving" ? "Salvando…" : saveStatus === "error" ? "Falha ao salvar" : "Salvo"}
         </Badge>
       </div>
 
-      {passo && (
-        <div className="shrink-0 space-y-1">
-          <div className="text-sm font-medium">{passo.progresso.rotulo}</div>
-          <Progress value={progressoPercentual} aria-label="Progresso da entrevista" />
-        </div>
-      )}
-
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <CardHeader className="shrink-0 pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>Conversa</CardTitle>
-            <Button type="button" variant="ghost" size="sm" onClick={sair}>Sair</Button>
+        {passo && (
+          <div className="shrink-0 space-y-1.5 border-b px-4 py-3">
+            <div className="text-sm font-medium">{passo.progresso.rotulo}</div>
+            <Progress value={progressoPercentual} className="h-1.5" aria-label="Progresso da entrevista" />
           </div>
-        </CardHeader>
-        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden pb-4">
-          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-md border p-3">
+        )}
+        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4">
             {mensagens.map((mensagem, indice) => <Mensagem key={indice} mensagem={mensagem} />)}
             {pendente && (
               <div className="flex items-center gap-2 rounded-md bg-muted p-3 text-sm text-muted-foreground" role="status">
@@ -535,7 +537,7 @@ function EntrevistaProcessoPage() {
             )}
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 border-t px-4 pb-4">
             {erro && (
               <div className="mt-3 flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between" role="alert">
                 <span>{erro.mensagem}</span>
@@ -604,7 +606,7 @@ function EntrevistaProcessoPage() {
                   </div>
                 )}
                 {pergunta?.ajuda && <p className="mt-2 text-xs text-muted-foreground">Dica: {pergunta.ajuda}</p>}
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex items-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -629,8 +631,10 @@ function EntrevistaProcessoPage() {
                   >
                     <FileText className="h-4 w-4" />
                   </Button>
-                  <Input
+                  <Textarea
                     ref={inputRef}
+                    rows={1}
+                    className="max-h-[168px] min-h-10 resize-none py-2"
                     placeholder={passo?.tipo === "confirmar_etapa" ? "Confirme ou diga o que ajustar…" : "Digite sua resposta…"}
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
@@ -642,9 +646,9 @@ function EntrevistaProcessoPage() {
                       }
                     }}
                   />
-                  <Button onClick={() => void enviarResposta(input)} disabled={ocupado || !input.trim()}>
-                    <span>Enviar</span>
-                    <Send className="ml-2 h-4 w-4" />
+                  <Button onClick={() => void enviarResposta(input)} disabled={ocupado || !input.trim()} aria-label="Enviar" className="shrink-0">
+                    <span className="hidden sm:inline">Enviar</span>
+                    <Send className="h-4 w-4 sm:ml-2" />
                   </Button>
                 </div>
               </>
