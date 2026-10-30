@@ -102,8 +102,8 @@ const ConfigRoteiroEntrevista = () => {
   };
 
   const handleSave = async () => {
-    const ok = await saveConfig(content);
-    if (ok) {
+    const erro = await saveConfig(content);
+    if (!erro) {
       toast({
         title: "Roteiro atualizado",
         description: "O roteiro da entrevista com a IA foi salvo no Supabase.",
@@ -112,7 +112,7 @@ const ConfigRoteiroEntrevista = () => {
     }
     toast({
       title: "Erro",
-      description: "Não foi possível salvar o roteiro.",
+      description: `Não foi possível salvar o roteiro. Detalhe: ${erro}`,
       variant: "destructive",
     });
   };

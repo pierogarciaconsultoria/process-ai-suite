@@ -29,11 +29,12 @@ const ConfigSkinIA = () => {
   const isLoading = identityConfig.isLoading || validationConfig.isLoading || routeScriptConfig.isLoading;
 
   const handleSave = async () => {
-    const [savedIdentity, savedValidation] = await Promise.all([
+    const erros = await Promise.all([
       identityConfig.saveConfig(skin),
       validationConfig.saveConfig(validationRules),
     ]);
-    if (savedIdentity && savedValidation) {
+    const erro = erros.find(Boolean);
+    if (!erro) {
       toast({
         title: "Skin atualizada",
         description: "A identidade do assistente e as regras de validação foram salvas no Supabase.",
@@ -42,7 +43,7 @@ const ConfigSkinIA = () => {
     }
     toast({
       title: "Erro",
-      description: "Não foi possível salvar a skin.",
+      description: `Não foi possível salvar a skin. Detalhe: ${erro}`,
       variant: "destructive",
     });
   };

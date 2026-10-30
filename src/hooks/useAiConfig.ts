@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AI_CONFIG_DEFAULTS, type AiConfigType } from "@/data/ai-config-defaults";
+import { mensagemDoErro } from "../../supabase/functions/_shared/authorization-core";
 
 async function validateAccessibleCompanyId(companyId: string) {
   try {
@@ -110,7 +111,8 @@ export function useAiConfig(configType: AiConfigType) {
     void loadConfig();
   }, [loadConfig]);
 
-  const saveConfig = useCallback(async (nextContent: string) => {
+  // Devolve null quando salvou, ou a causa da falha (PostgrestError não é Error).
+  const saveConfig = useCallback(async (nextContent: string): Promise<string | null> => {
     setIsSaving(true);
     setError(null);
     try {
@@ -137,10 +139,11 @@ export function useAiConfig(configType: AiConfigType) {
 
       setCompanyId(activeCompanyId);
       setContent(nextContent);
-      return true;
+      return null;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao salvar configuração");
-      return false;
+      const causa = mensagemDoErro(err);
+      setError(causa);
+      return causa;
     } finally {
       setIsSaving(false);
     }
