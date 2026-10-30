@@ -63,6 +63,13 @@ export function iniciarRoteiro(roteiro: Roteiro): EstadoRoteiro {
   };
 }
 
+// Processo que já tem nome (cadastrado ou trazido de outra tela): o nome não é perguntado de novo.
+export function iniciarRoteiroDoProcesso(roteiro: Roteiro, nomeProcesso: string): EstadoRoteiro {
+  const estado = iniciarRoteiro(roteiro);
+  const nome = nomeProcesso.trim();
+  return nome ? aplicarRespostasExtraidas(roteiro, estado, [{ perguntaId: "e1.nome", texto: nome }], "entrevista") : estado;
+}
+
 function normalizarValor(valor: string | undefined): string | undefined {
   const limpo = valor?.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return limpo || undefined;
@@ -87,6 +94,13 @@ function buscarPergunta(roteiro: Roteiro, perguntaId: string): PerguntaRoteiro |
   return undefined;
 }
 
+// Perguntas repetidas (atividades) chegam como uma linha por item: o passo a passo contado
+// de uma vez, texto livre, anexo ou correção.
+function textosDaResposta(pergunta: PerguntaRoteiro, texto: string): string[] {
+  if (!pergunta.repetir) return [texto];
+  return texto.split("\n").map((linha) => linha.trim()).filter(Boolean).slice(0, pergunta.repetir.maxIteracoes);
+}
+
 export function repeticaoPendente(pergunta: PerguntaRoteiro, resposta: RespostaRegistrada): boolean {
   return Boolean(pergunta.repetir) && resposta.status === "respondida" && !resposta.repeticaoEncerrada;
 }
@@ -96,7 +110,7 @@ export function proximoPasso(roteiro: Roteiro, estado: EstadoRoteiro): PassoRote
   if (!etapa) return { tipo: "concluido" };
 
   for (const pergunta of etapa.perguntas) {
-    if (!perguntaAplicavel(pergunta, estado)) continue;
+    if (!perguntaAplicavel(pergunta, estado) || pergunta.somenteRegistro) continue;
     const resposta = estado.respostas[pergunta.id];
     const aprofundamentos = estado.aprofundamentos[pergunta.id] ?? 0;
     if (!resposta) {
@@ -146,7 +160,7 @@ export function registrarResposta(roteiro: Roteiro, estado: EstadoRoteiro, entra
     };
   }
 
-  const textos = [...(anterior?.textos ?? []), ...(texto ? [texto] : [])];
+  const textos = [...(anterior?.textos ?? []), ...(texto ? textosDaResposta(pergunta, texto) : [])];
   const limite = pergunta.repetir?.maxIteracoes ?? 1;
   const registrada: RespostaRegistrada = {
     perguntaId: pergunta.id,
@@ -164,11 +178,6 @@ export function registrarResposta(roteiro: Roteiro, estado: EstadoRoteiro, entra
   };
 }
 
-// Perguntas repetidas (atividades) chegam de texto livre ou correção como uma linha por item.
-function textosDaResposta(pergunta: PerguntaRoteiro, texto: string): string[] {
-  if (!pergunta.repetir) return [texto];
-  return texto.split("\n").map((linha) => linha.trim()).filter(Boolean).slice(0, pergunta.repetir.maxIteracoes);
-}
 
 // Correção pedida pelo entrevistado ao revisar o resumo da etapa em andamento.
 export function corrigirResposta(
@@ -278,7 +287,7 @@ export function progresso(roteiro: Roteiro, estado: EstadoRoteiro): ProgressoRot
   if (!etapa) {
     return { etapa: totalEtapas, totalEtapas, titulo: "Concluída", rotulo: "Entrevista concluída", perguntasRespondidas: 0, perguntasAplicaveis: 0 };
   }
-  const aplicaveis = etapa.perguntas.filter((pergunta) => perguntaAplicavel(pergunta, estado));
+  const aplicaveis = etapa.perguntas.filter((pergunta) => perguntaAplicavel(pergunta, estado) && !pergunta.somenteRegistro);
   const respondidas = aplicaveis.filter((pergunta) => {
     const resposta = estado.respostas[pergunta.id];
     return resposta && !repeticaoPendente(pergunta, resposta);

@@ -29,7 +29,7 @@ import {
   textoDoPasso,
   validarArquivo,
 } from "../../supabase/functions/_shared/roteiro-peter";
-import { SCHEMA_DIAGNOSTICO, SCHEMA_PLANO } from "../../supabase/functions/_shared/roteiro-analise";
+import { INSTRUCOES_POR_ACAO, SCHEMA_DIAGNOSTICO, SCHEMA_PLANO } from "../../supabase/functions/_shared/roteiro-analise";
 
 const roteiro = ROTEIRO_PADRAO;
 const persona = { identidade: "Você é o Peter.", regras: "- Seja claro.", orientacoesEmpresa: "- Nenhuma." };
@@ -172,14 +172,16 @@ describe("Peter no roteiro — turnos", () => {
     let estado = iniciarRoteiro(roteiro);
     while (proximoPasso(roteiro, estado).tipo === "pergunta") {
       const passo = proximoPasso(roteiro, estado);
-      const lacuna = passo.tipo === "pergunta" && passo.pergunta.id === "e1.dono";
+      const lacuna = passo.tipo === "pergunta" && passo.pergunta.id === "e1.area";
       estado = aplicarAvaliacao(roteiro, estado, avaliacao({ suficiente: !lacuna, texto: lacuna ? "" : "ok", valor: passo.tipo === "pergunta" && passo.pergunta.opcoes ? passo.pergunta.opcoes[0] : null })).estado;
     }
     const turno = iniciarTurno(roteiro, estado);
     expect(turno.passo.tipo).toBe("confirmar_etapa");
     expect(turno.mensagem).toContain("✅ **Nome do processo:** ok");
-    expect(turno.mensagem).toContain("❓ **Dono do processo:** não informado");
-    expect(turno.mensagem).toContain("Está correto ou quer ajustar algo");
+    expect(turno.mensagem).toContain("❓ **Área:** não informado");
+    // Pergunta que só é registrada a partir de outras respostas não aparece como lacuna.
+    expect(turno.mensagem).not.toContain("Responsável pelo processo");
+    expect(turno.mensagem).toContain("Está certo ou quer ajustar algo");
   });
 
   it("confirma a etapa e anuncia a seguinte", () => {
@@ -247,7 +249,7 @@ describe("Peter no roteiro — turnos", () => {
     expect(turno.estado.respostas["e2.gatilho"].origem).toBe("texto_livre");
     expect(turno.estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Aprovar pedido — Gerente"]);
     expect(turno.passo.pergunta?.id).toBe("e2.entradas");
-    expect(turno.mensagem).toMatch(/^Identifiquei o gatilho e duas atividades\.\n\nDo que você enviou, já anotei: Gatilho, Atividades\. Não vou perguntar de novo/);
+    expect(turno.mensagem).toMatch(/^Identifiquei o gatilho e duas atividades\.\n\nDo que você enviou, já anotei: O que dá início, Atividades\. Não vou perguntar de novo/);
   });
 
   it("com diagrama BPMN, aproveita respostas parciais e o que não aparece no diagrama", () => {
@@ -269,8 +271,8 @@ describe("Peter no roteiro — turnos", () => {
       campos: {},
     }, "anexo");
     expect(turno.estado.respostas["e3.paralelo"]).toMatchObject({ valor: "nao", origem: "anexo" });
-    expect(turno.passo.pergunta?.id).toBe("e2.fornecedores");
-    expect(turno.mensagem).toMatch(/^Do que você enviou, já anotei: Gatilho, Entradas, Atividades em paralelo\./);
+    expect(turno.passo.pergunta?.id).toBe("e2.saida_principal");
+    expect(turno.mensagem).toMatch(/^Do que você enviou, já anotei: O que dá início, O que recebe, Atividades em paralelo\./);
   });
 
   it("não diz que anotou algo quando o material não respondeu nenhuma pergunta", () => {
@@ -327,7 +329,7 @@ describe("Peter no roteiro — turnos", () => {
     expect(passo.pergunta?.id).toBe("e3.atividades");
     const texto = textoDoPasso(roteiro, estado, passo, 2);
     expect(texto).toContain("Até aqui anotei:\n1. Receber requisição — Compras");
-    expect(texto).toContain("E depois disso, qual é a próxima atividade");
+    expect(texto).toContain("O que acontece depois disso, e quem faz?");
   });
 
   it("um texto colado substitui as atividades ainda em levantamento pela lista completa", () => {
@@ -363,6 +365,27 @@ describe("Peter no roteiro — turnos", () => {
     expect(avaliacaoPrompt).toContain("## INFORMAÇÕES ADIANTADAS");
     expect(avaliacaoPrompt).toContain("- e3.atividades (Atividades)");
     expect(avaliacaoPrompt).not.toContain("- e1.entrevistado (");
+  });
+
+  it("pede ao Peter que registre, a partir da resposta, as perguntas que a entrevista não faz", () => {
+    const prompt = promptAvaliacao(persona, roteiro, confirmarEtapa(roteiro, ateConfirmacao(1)), {});
+    expect(prompt).toContain('Pergunta feita: "O que dá início a esse processo?"');
+    expect(prompt).toMatch(/- e2\.fornecedores \(Quem envia\):.*Esta pergunta não será feita: registre-a sempre que a resposta trouxer a informação/);
+    expect(prompt).toMatch(/- e3\.aprovacoes \(Aprovações\):.*inclusive "nao" quando ficar claro que não existe/);
+  });
+
+  it("pede o passo a passo inteiro na primeira resposta sobre as atividades", () => {
+    const estado = confirmarEtapa(roteiro, ateConfirmacao(2));
+    const prompt = promptAvaliacao(persona, roteiro, estado, {});
+    expect(prompt).toContain("Esta pergunta pede o passo a passo inteiro");
+    expect(prompt).toContain('"encerraRepeticao" = true se a descrição vai até o fim do processo');
+  });
+
+  it("no plano 5W2H, não inventa quem conduz nem o prazo", () => {
+    const instrucoes = INSTRUCOES_POR_ACAO.plano_melhoria(roteiro, iniciarRoteiro(roteiro));
+    expect(instrucoes).toContain('Se nada disso foi informado, escreva "[a definir]"');
+    expect(instrucoes).toContain('"quando": derivado apenas do prazo de implantação informado. Sem prazo informado, escreva "[a definir]"');
+    expect(instrucoes).toContain("Nunca crie um cargo que não apareceu na entrevista");
   });
 
   it("monta o prompt com a pergunta atual e o critério de suficiência", () => {
@@ -435,7 +458,7 @@ describe("Peter no roteiro — análises", () => {
     expect(JSON.stringify(schemaAnalise(roteiro, estado))).toContain("Superprodução");
     const prompt = promptAnalise(persona, roteiro, estado);
     expect(prompt).toContain("ETAPA 5: DIAGNÓSTICO AS IS");
-    expect(prompt).toContain("- Dificuldades e gargalos: resposta");
+    expect(prompt).toContain("- Dificuldades: resposta");
 
     const turno = aplicarAnalise(roteiro, estado, diagnosticoValido);
     expect(turno.analise).toBe("diagnostico_as_is");

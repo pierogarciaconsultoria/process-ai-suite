@@ -273,7 +273,10 @@ ${JSON.stringify(estado.analises.diagnostico_as_is ?? null)}
 ## COMO RESPONDER (JSON)
 - "resumoToBe": como o processo deve funcionar depois das melhorias, em poucas frases.
 - "melhorias": priorize as oportunidades que o entrevistado indicou como prioritárias; cada melhoria resolve achados do diagnóstico. "prioridade": Alta, Média ou Baixa.
-- "planoAcao": uma ou mais ações 5W2H por melhoria. "quem" é um cargo ou área, nunca um nome inventado (use o responsável pelas mudanças informado quando couber). "quando" respeita o prazo de implantação informado. "custo" é uma estimativa qualitativa (Baixo, Médio ou Alto) se o entrevistado não informou valores.
+- "planoAcao": uma ou mais ações 5W2H por melhoria.
+  - "quem": o responsável pelas mudanças informado na entrevista, ou um cargo ou área que o entrevistado citou como responsável por aquela parte do processo. Se nada disso foi informado, escreva "[a definir]". Nunca crie um cargo que não apareceu na entrevista (por exemplo, "Gestor de TI").
+  - "quando": derivado apenas do prazo de implantação informado. Sem prazo informado, escreva "[a definir]".
+  - "custo": o valor informado; sem valor informado, uma estimativa qualitativa precedida de "Estimativa:" (Baixo, Médio ou Alto).
 - Respeite as restrições informadas (orçamento, prazo, pessoas, tecnologia).
 - Use "processo otimizado", nunca "processo perfeito".${blocoObservacoes(estado, 6, estado.analises.plano_melhoria)}`;
 }

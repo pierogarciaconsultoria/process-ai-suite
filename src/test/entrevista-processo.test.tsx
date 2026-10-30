@@ -117,7 +117,7 @@ describe("Entrevista guiada — tela", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Entrevista guiada" }));
     expect(await screen.findByText(/Para começar, qual é o seu nome e o seu cargo\?/)).toBeInTheDocument();
     // Na barra de progresso e no cabeçalho da etapa, dentro da conversa.
-    expect(screen.getAllByText("Etapa 1 de 6 — Identificação e contexto")).toHaveLength(2);
+    expect(screen.getAllByText("Etapa 1 de 6 — Sobre o processo")).toHaveLength(2);
     await waitFor(() => expect(mocks.inserts).toHaveLength(1));
     expect(mocks.inserts[0].entrevista_roteiro).toMatchObject({ etapaAtual: 1 });
     expect(mocks.inserts[0].status).toBe("Em entrevista");
@@ -135,14 +135,16 @@ describe("Entrevista guiada — tela", () => {
     mocks.invoke.mockImplementation(servidor());
     renderizar();
     fireEvent.click(await screen.findByRole("button", { name: "Entrevista guiada" }));
-    for (const texto of ["Ana", "Compras", "Suprimentos", "Gerente de compras", "Comprar no prazo"]) {
+    for (const texto of ["Ana", "Compras", "Suprimentos, gerente de compras", "Comprar no prazo"]) {
       await screen.findByPlaceholderText("Digite sua resposta…");
       await waitFor(() => expect(screen.getByPlaceholderText("Digite sua resposta…")).not.toBeDisabled());
       responder(texto);
     }
-    fireEvent.click(await screen.findByRole("button", { name: "Apoio" }));
+    expect(await screen.findByRole("button", { name: "Negócio" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Apoio" }));
+    // A frequência é respondida com as palavras do entrevistado, sem botões.
     expect(await screen.findByText(/Com que frequência esse processo acontece\?/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sob demanda" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sob demanda" })).not.toBeInTheDocument();
   });
 
   it("aceita um texto livre no meio da entrevista e segue só com o que faltou", async () => {
@@ -163,7 +165,7 @@ describe("Entrevista guiada — tela", () => {
     fireEvent.click(screen.getByRole("button", { name: /Enviar texto/ }));
 
     expect(await screen.findByText(/Anotei o processo e a área\./)).toBeInTheDocument();
-    expect(screen.getByText(/Quem é o responsável \(dono\) por esse processo\?/)).toBeInTheDocument();
+    expect(screen.getByText(/Para que serve esse processo\?/)).toBeInTheDocument();
     const chamada = mocks.invoke.mock.calls.at(-1)![1].body;
     expect(chamada).toMatchObject({ operacao: "extrair", origem: "texto_livre" });
     expect(chamada.estado.respostas["e1.entrevistado"]).toBeDefined();

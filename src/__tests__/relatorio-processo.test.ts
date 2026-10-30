@@ -33,19 +33,18 @@ const plano = {
 };
 
 const respostasFixas: Record<string, string> = {
-  "e1.frequencia": "Diário",
+  "e1.frequencia": "Diário, cerca de 200 pedidos por mês",
   "e1.requisitos": "ISO 9001",
   "e3.decisoes": "Se o valor passa de 10 mil, vai para a diretoria",
-  "e4.volume": "200 pedidos por mês",
 };
 
-// Percorre o roteiro até `ateEtapa` (inclusive), deixando a pergunta e1.dono como lacuna.
+// Percorre o roteiro até `ateEtapa` (inclusive), deixando a pergunta e1.area como lacuna.
 function estadoAte(ateEtapa: number): EstadoRoteiro {
   let estado = iniciarRoteiro(roteiro);
   for (let i = 0; i < 300 && estado.etapaAtual <= ateEtapa; i++) {
     const passo = proximoPasso(roteiro, estado);
     if (passo.tipo === "pergunta") {
-      const lacuna = passo.pergunta.id === "e1.dono";
+      const lacuna = passo.pergunta.id === "e1.area";
       estado = registrarResposta(roteiro, estado, {
         perguntaId: passo.pergunta.id,
         texto: lacuna ? "" : respostasFixas[passo.pergunta.id] ?? "ok",
@@ -92,7 +91,7 @@ describe("Relatório do processo", () => {
     const relatorio = montarRelatorio(linha({ entrevista_roteiro: estado as never }));
 
     expect(relatorio.entrevista).toEqual({ concluida: true, etapa: "Entrevista concluída" });
-    expect(relatorio.ficha).toContainEqual({ rotulo: "Frequência", valor: "Diário" });
+    expect(relatorio.ficha).toContainEqual({ rotulo: "Frequência", valor: "Diário, cerca de 200 pedidos por mês" });
     expect(relatorio.ficha).toContainEqual({ rotulo: "Requisitos normativos", valor: "ISO 9001" });
     expect(relatorio.sipoc.fornecedores).toEqual(["Produção"]);
     expect(relatorio.sipoc.entradas).toEqual(["Requisição", "Especificação"]);
@@ -101,22 +100,23 @@ describe("Relatório do processo", () => {
     expect(relatorio.sipoc.clientes).toEqual(["Fornecedor"]);
     expect(relatorio.atividades[0]).toEqual({ ordem: 1, atividade: "Atividade 1", responsavel: "Comprador", ferramenta: "ERP" });
     expect(relatorio.fluxo).toContainEqual({ rotulo: "Decisões", valor: "Se o valor passa de 10 mil, vai para a diretoria" });
-    expect(relatorio.medicao).toContainEqual({ rotulo: "Volume", valor: "200 pedidos por mês" });
+    // Volume e erros agora chegam por outras perguntas e só aparecem quando registrados.
+    expect(relatorio.medicao.map((item) => item.rotulo)).not.toContain("Volume");
     expect(relatorio.diagnostico?.maturidade.nivel).toBe("Inicial");
     expect(relatorio.plano?.melhorias).toHaveLength(1);
     expect(relatorio.proximosPassos).toEqual([
       "Publicar política de alçada — Gerente financeiro, 30 dias",
       "Treinar compradores",
     ]);
-    expect(relatorio.lacunas).toEqual(["Dono do processo", "Volume mensal", "Meta de prazo"]);
+    expect(relatorio.lacunas).toEqual(["Área", "Volume mensal", "Meta de prazo"]);
   });
 
   it("indica relatório parcial e o próximo passo quando a entrevista está em andamento", () => {
     const relatorio = montarRelatorio(linha({ entrevista_roteiro: estadoAte(2) as never }));
-    expect(relatorio.entrevista).toEqual({ concluida: false, etapa: "Etapa 3 de 6 — Atividades e responsáveis" });
+    expect(relatorio.entrevista).toEqual({ concluida: false, etapa: "Etapa 3 de 6 — Passo a passo" });
     expect(relatorio.diagnostico).toBeNull();
     expect(relatorio.proximosPassos).toEqual([
-      "Concluir a entrevista (Etapa 3 de 6 — Atividades e responsáveis) para gerar o diagnóstico e o plano de melhoria.",
+      "Concluir a entrevista (Etapa 3 de 6 — Passo a passo) para gerar o diagnóstico e o plano de melhoria.",
     ]);
   });
 
