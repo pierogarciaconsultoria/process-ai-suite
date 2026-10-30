@@ -49,6 +49,42 @@ export type Database = {
           },
         ]
       }
+      ai_usage_limits: {
+        Row: {
+          active_requests: number
+          company_id: string
+          consumed_units: number
+          estimated_cost_micros: number
+          function_name: string
+          request_count: number
+          updated_at: string
+          user_id: string
+          window_started_at: string
+        }
+        Insert: {
+          active_requests?: number
+          company_id: string
+          consumed_units?: number
+          estimated_cost_micros?: number
+          function_name: string
+          request_count?: number
+          updated_at?: string
+          user_id: string
+          window_started_at?: string
+        }
+        Update: {
+          active_requests?: number
+          company_id?: string
+          consumed_units?: number
+          estimated_cost_micros?: number
+          function_name?: string
+          request_count?: number
+          updated_at?: string
+          user_id?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       chamado_mensagens: {
         Row: {
           anexo_url: string | null
@@ -829,13 +865,6 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "generated_documents_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "document_templates"
-            referencedColumns: ["id"]
-          },
         ]
       }
       interview_sessions: {
@@ -1065,7 +1094,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      acquire_ai_request: { Args: { p_company_id: string }; Returns: boolean }
+      acquire_ai_request:
+        | {
+            Args: {
+              _company_id: string
+              _concurrency_limit?: number
+              _function_name: string
+              _request_limit?: number
+              _window_seconds?: number
+            }
+            Returns: {
+              allowed: boolean
+              denial_reason: string
+              retry_after: number
+            }[]
+          }
+        | { Args: { p_company_id: string }; Returns: boolean }
+      complete_ai_request: {
+        Args: {
+          _company_id: string
+          _consumed_units?: number
+          _estimated_cost_micros?: number
+          _function_name: string
+        }
+        Returns: undefined
+      }
       get_user_empresa_ids: { Args: { _user_id: string }; Returns: string[] }
       is_super_admin: { Args: never; Returns: boolean }
       is_super_admin_or_manage: {
