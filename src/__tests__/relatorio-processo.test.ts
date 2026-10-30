@@ -94,11 +94,14 @@ describe("Relatório do processo", () => {
     expect(relatorio.entrevista).toEqual({ concluida: true, etapa: "Entrevista concluída" });
     expect(relatorio.ficha).toContainEqual({ rotulo: "Frequência", valor: "Diário" });
     expect(relatorio.ficha).toContainEqual({ rotulo: "Requisitos normativos", valor: "ISO 9001" });
-    expect(relatorio.sipoc.fornecedores).toEqual(["Produção"]);
-    expect(relatorio.sipoc.entradas).toEqual(["Requisição", "Especificação"]);
-    expect(relatorio.sipoc.processo).toHaveLength(8);
-    expect(relatorio.sipoc.processo.at(-1)).toBe("+ 2 atividades");
-    expect(relatorio.sipoc.clientes).toEqual(["Fornecedor"]);
+    expect(relatorio.sipoc.inicio).toBe("Requisição de compra");
+    expect(relatorio.sipoc.entradas).toEqual([
+      { fornecedor: "Produção", entrada: "Requisição" },
+      { fornecedor: "produção", entrada: "Especificação" },
+    ]);
+    expect(relatorio.sipoc.processo).toHaveLength(7);
+    expect(relatorio.sipoc.atividadesRestantes).toBe(2);
+    expect(relatorio.sipoc.saidas).toEqual([{ saida: "Pedido de compra", cliente: "Fornecedor" }]);
     expect(relatorio.atividades[0]).toEqual({ ordem: 1, atividade: "Atividade 1", responsavel: "Comprador", ferramenta: "ERP" });
     expect(relatorio.fluxo).toContainEqual({ rotulo: "Decisões", valor: "Se o valor passa de 10 mil, vai para a diretoria" });
     expect(relatorio.medicao).toContainEqual({ rotulo: "Volume", valor: "200 pedidos por mês" });

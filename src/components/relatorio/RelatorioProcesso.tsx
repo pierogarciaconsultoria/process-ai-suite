@@ -39,44 +39,103 @@ function Itens({ itens }: { itens: ItemRelatorio[] }) {
   );
 }
 
-const COLUNAS_SIPOC: Array<{ chave: keyof Relatorio["sipoc"]; letra: string; titulo: string }> = [
-  { chave: "fornecedores", letra: "S", titulo: "Fornecedores" },
-  { chave: "entradas", letra: "I", titulo: "Entradas" },
-  { chave: "processo", letra: "P", titulo: "Processo" },
-  { chave: "saidas", letra: "O", titulo: "Saídas" },
-  { chave: "clientes", letra: "C", titulo: "Clientes" },
+const COLUNAS_SIPOC = [
+  { letra: "S", titulo: "Fornecedores" },
+  { letra: "I", titulo: "Entradas" },
+  { letra: "P", titulo: "Processo" },
+  { letra: "O", titulo: "Saídas" },
+  { letra: "C", titulo: "Clientes" },
 ];
 
-function TabelaSipoc({ sipoc }: { sipoc: Relatorio["sipoc"] }) {
+// A faixa colorida do cabeçalho também sai no PDF.
+const IMPRIMIR_CORES = "[-webkit-print-color-adjust:exact] [print-color-adjust:exact]";
+const CELULA_SIPOC = "border border-border px-3 py-2 align-top";
+
+function Traco() {
+  return <span className="text-muted-foreground">—</span>;
+}
+
+function ProcessoSipoc({ sipoc }: { sipoc: Relatorio["sipoc"] }) {
   return (
-    <div className="overflow-x-auto rounded-md border print:overflow-visible">
-      <Table className="min-w-[640px] text-xs print:min-w-0">
-        <TableHeader>
-          <TableRow>
+    <div className="space-y-2">
+      {sipoc.inicio && (
+        <p><span className="font-semibold">Início:</span> {sipoc.inicio}</p>
+      )}
+      {sipoc.processo.length > 0 ? (
+        <ol className="list-decimal space-y-1 pl-4">
+          {sipoc.processo.map((atividade, indice) => <li key={indice}>{atividade}</li>)}
+        </ol>
+      ) : (
+        !sipoc.inicio && <Traco />
+      )}
+      {sipoc.atividadesRestantes > 0 && (
+        <p className="text-muted-foreground print:text-foreground">
+          + {sipoc.atividadesRestantes} atividade{sipoc.atividadesRestantes > 1 ? "s" : ""} no detalhamento do processo atual (AS IS).
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Célula de um lado do SIPOC (S/I ou O/C). Abaixo do último item desse lado não há linhas
+// horizontais: o item continua visualmente até o fim da tabela.
+function CelulaLado({ indice, total, children, className = "" }: { indice: number; total: number; children: React.ReactNode; className?: string }) {
+  const ultimo = Math.max(total, 1) - 1;
+  const bordas = indice > ultimo ? "border-y-0" : indice === ultimo ? "border-b-0" : "";
+  return <td className={`${CELULA_SIPOC} ${bordas} ${className}`}>{indice > ultimo ? null : children}</td>;
+}
+
+// Cada linha liga o fornecedor à entrada que ele fornece e a saída ao cliente que a recebe;
+// a coluna Processo ocupa todas as linhas. As linhas de itens ficam com a altura do conteúdo
+// (height: 1px) e a última linha, vazia, absorve a altura que sobra da coluna Processo.
+function TabelaSipoc({ sipoc }: { sipoc: Relatorio["sipoc"] }) {
+  const linhas = Math.max(sipoc.entradas.length, sipoc.saidas.length, 1);
+  const nEntradas = sipoc.entradas.length;
+  const nSaidas = sipoc.saidas.length;
+  return (
+    <div className="overflow-x-auto print:overflow-visible">
+      <table className={`w-full min-w-[680px] border-collapse border border-border text-xs leading-5 print:min-w-0 ${IMPRIMIR_CORES}`}>
+        <colgroup>
+          <col className="w-[17%]" />
+          <col className="w-[18%]" />
+          <col className="w-[30%]" />
+          <col className="w-[18%]" />
+          <col className="w-[17%]" />
+        </colgroup>
+        <thead>
+          <tr>
             {COLUNAS_SIPOC.map((coluna) => (
-              <TableHead key={coluna.chave} className="w-1/5 align-bottom">
-                <span className="block text-base font-bold text-primary">{coluna.letra}</span>
-                {coluna.titulo}
-              </TableHead>
+              <th key={coluna.letra} scope="col" className="border border-primary bg-primary px-3 py-2 text-left font-normal text-primary-foreground">
+                <span className="block text-lg font-bold leading-none">{coluna.letra}</span>
+                <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider">{coluna.titulo}</span>
+              </th>
             ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow className="hover:bg-transparent">
-            {COLUNAS_SIPOC.map((coluna) => (
-              <TableCell key={coluna.chave} className="align-top">
-                {sipoc[coluna.chave].length > 0 ? (
-                  <ul className="space-y-1">
-                    {sipoc[coluna.chave].map((item, indice) => <li key={indice}>{item}</li>)}
-                  </ul>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: linhas }, (_, indice) => {
+            const entrada = sipoc.entradas[indice];
+            const saida = sipoc.saidas[indice];
+            return (
+              <tr key={indice} className="h-px print:break-inside-avoid">
+                <CelulaLado indice={indice} total={nEntradas}>{entrada?.fornecedor || <Traco />}</CelulaLado>
+                <CelulaLado indice={indice} total={nEntradas} className="font-medium">{entrada?.entrada || <Traco />}</CelulaLado>
+                {indice === 0 && (
+                  <td rowSpan={linhas + 1} className={`${CELULA_SIPOC} bg-muted/40`}>
+                    <ProcessoSipoc sipoc={sipoc} />
+                  </td>
                 )}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableBody>
-      </Table>
+                <CelulaLado indice={indice} total={nSaidas} className="font-medium">{saida?.saida || <Traco />}</CelulaLado>
+                <CelulaLado indice={indice} total={nSaidas}>{saida?.cliente || <Traco />}</CelulaLado>
+              </tr>
+            );
+          })}
+          <tr aria-hidden="true">
+            {[0, 1].map((coluna) => <td key={coluna} className="border-x border-y-0 border-border p-0" />)}
+            {[3, 4].map((coluna) => <td key={coluna} className="border-x border-y-0 border-border p-0" />)}
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

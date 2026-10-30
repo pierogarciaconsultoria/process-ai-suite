@@ -24,12 +24,13 @@ export interface AtividadeRelatorio {
   ferramenta: string;
 }
 
+// Cada entrada fica na mesma linha de quem a fornece, e cada saída na de quem a recebe.
 export interface SipocRelatorio {
-  fornecedores: string[];
-  entradas: string[];
+  inicio: string;
+  entradas: Array<{ fornecedor: string; entrada: string }>;
   processo: string[];
-  saidas: string[];
-  clientes: string[];
+  atividadesRestantes: number;
+  saidas: Array<{ saida: string; cliente: string }>;
 }
 
 export interface RelatorioProcesso {
@@ -58,6 +59,20 @@ export interface RelatorioProcesso {
 
 // Máximo de atividades na coluna "Processo" do SIPOC, que é uma visão de alto nível.
 const MAX_ATIVIDADES_SIPOC = 7;
+
+// Pares repetidos (mesmo texto, com caixa diferente) aparecem uma vez.
+function paresUnicos<T extends Record<string, string>>(itens: T[]): T[] {
+  const vistos = new Set<string>();
+  return itens
+    .map((item) => Object.fromEntries(Object.entries(item).map(([chave, valor]) => [chave, valor.trim()])) as T)
+    .filter((item) => {
+      const valores = Object.values(item);
+      const chave = valores.join("|").toLowerCase();
+      if (valores.every((valor) => !valor) || vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+}
 
 function unicos(valores: string[]): string[] {
   const vistos = new Set<string>();
@@ -141,13 +156,11 @@ export function montarRelatorio(row: Tables<"processos">): RelatorioProcesso {
       ["Sistemas e ferramentas", "e3.sistemas", form.recursos],
     ]),
     sipoc: {
-      fornecedores: unicos(entradas.map((item) => item.fornecedor)),
-      entradas: unicos(entradas.map((item) => item.entrada)),
-      processo: excedentes > 0
-        ? [...nomesAtividades.slice(0, MAX_ATIVIDADES_SIPOC), `+ ${excedentes} atividade${excedentes > 1 ? "s" : ""}`]
-        : nomesAtividades,
-      saidas: unicos(saidas.map((item) => item.saida)),
-      clientes: unicos(saidas.map((item) => item.cliente)),
+      inicio: form.gatilho.trim(),
+      entradas: paresUnicos(entradas.map((item) => ({ fornecedor: item.fornecedor, entrada: item.entrada }))),
+      processo: nomesAtividades.slice(0, MAX_ATIVIDADES_SIPOC),
+      atividadesRestantes: Math.max(0, excedentes),
+      saidas: paresUnicos(saidas.map((item) => ({ saida: item.saida, cliente: item.cliente }))),
     },
     atividades,
     fluxo: itens(estado, [
