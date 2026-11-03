@@ -16,12 +16,18 @@ const mocks = vi.hoisted(() => ({
   inserts: [] as Record<string, unknown>[],
   updates: [] as Record<string, unknown>[],
   linhaSalva: null as Record<string, unknown> | null,
+  // Outros processos da empresa, usados na conferência de nome repetido.
+  outros: [] as Record<string, unknown>[],
+  excluidos: [] as string[],
 }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
 vi.mock("@/integrations/supabase/client", () => {
   const select = () => ({
-    eq: () => ({ single: async () => ({ data: mocks.linhaSalva, error: mocks.linhaSalva ? null : { message: "não encontrado" } }) }),
+    eq: () => ({
+      single: async () => ({ data: mocks.linhaSalva, error: mocks.linhaSalva ? null : { message: "não encontrado" } }),
+      order: async () => ({ data: mocks.outros, error: null }),
+    }),
   });
   const processos = {
     select,
@@ -32,6 +38,16 @@ vi.mock("@/integrations/supabase/client", () => {
     update: (payload: Record<string, unknown>) => {
       mocks.updates.push(payload);
       const filtro = { eq: () => filtro, then: (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve) };
+      return filtro;
+    },
+    delete: () => {
+      const filtro = {
+        eq: (coluna: string, valor: string) => {
+          if (coluna === "id") mocks.excluidos.push(valor);
+          return filtro;
+        },
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve),
+      };
       return filtro;
     },
   };
@@ -78,7 +94,9 @@ function servidor(analise?: unknown) {
         aprofundamento: "",
         alerta: null,
         oportunidade: null,
-        campos: passo.pergunta.id === "e1.entrevistado" ? { entrevistados: resposta } : {},
+        campos: passo.pergunta.id === "e1.entrevistado"
+          ? { entrevistados: resposta }
+          : passo.pergunta.id === "e1.nome" ? { nomeProcesso: resposta } : {},
       }),
       error: null,
     };
@@ -91,6 +109,7 @@ function renderizar(caminho = "/processos/novo/entrevista") {
       <Routes>
         <Route path="/processos/novo/entrevista" element={<EntrevistaProcesso />} />
         <Route path="/processos/:id/entrevista" element={<EntrevistaProcesso />} />
+        <Route path="/processos/:id" element={<div>Detalhe do processo</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -108,6 +127,55 @@ describe("Entrevista guiada — tela", () => {
     mocks.inserts.length = 0;
     mocks.updates.length = 0;
     mocks.linhaSalva = null;
+    mocks.outros = [];
+    mocks.excluidos.length = 0;
+  });
+
+  async function chegarAoNomeRepetido() {
+    mocks.invoke.mockImplementation(servidor());
+    mocks.outros = [{ id: "proc-9", nome: "COMPRAS", status: "Implementado", created_at: "2026-10-29T12:00:00Z" }];
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Entrevista guiada" }));
+    responder("Ana, compradora");
+    await screen.findByText(/Qual é o nome do processo que vamos mapear\?/);
+    await waitFor(() => expect(mocks.updates).toHaveLength(1));
+    await waitFor(() => expect(screen.getByPlaceholderText("Digite sua resposta…")).not.toBeDisabled());
+    responder("Compras");
+    expect(await screen.findByText(/Já existe um processo com esse nome/)).toHaveTextContent("COMPRAS (Implementado, criado em 29/10/2026)");
+  }
+
+  it("não salva um nome que outro processo da empresa já usa e pergunta se é o mesmo processo", async () => {
+    await chegarAoNomeRepetido();
+    expect(mocks.updates).toHaveLength(1);
+    expect(screen.queryByPlaceholderText("Digite sua resposta…")).not.toBeInTheDocument();
+    expect(screen.getByText("Nome repetido")).toBeInTheDocument();
+  });
+
+  it("muda o nome quando é outro processo e volta a salvar", async () => {
+    await chegarAoNomeRepetido();
+    fireEvent.click(screen.getByRole("button", { name: "É outro processo, vou mudar o nome" }));
+    const campo = screen.getByRole("textbox", { name: "Novo nome do processo" });
+    expect(campo).toHaveValue("Compras");
+
+    fireEvent.change(campo, { target: { value: "compras " } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
+    expect(await screen.findByText(/Esse nome ainda é igual ao do processo existente/)).toBeInTheDocument();
+
+    fireEvent.change(campo, { target: { value: "Compras de serviços" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nome" }));
+    expect(await screen.findByText(/Combinado: este processo vai se chamar "Compras de serviços"/)).toBeInTheDocument();
+    await waitFor(() => expect(mocks.updates).toHaveLength(2));
+    expect(mocks.updates[1].nome).toBe("Compras de serviços");
+    expect(mocks.updates[1].entrevista_roteiro).toMatchObject({ respostas: { "e1.nome": { textos: ["Compras de serviços"] } } });
+    expect(screen.queryByText(/Já existe um processo com esse nome/)).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Digite sua resposta…")).toBeInTheDocument();
+  });
+
+  it("abre o processo existente e descarta a entrevista nova", async () => {
+    await chegarAoNomeRepetido();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir o existente" }));
+    expect(await screen.findByText("Detalhe do processo")).toBeInTheDocument();
+    expect(mocks.excluidos).toEqual(["proc-1"]);
   });
 
   it("começa pela primeira pergunta, salva o processo e avança a cada resposta", async () => {

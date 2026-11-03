@@ -22,6 +22,14 @@ import {
 } from "@/lib/entrevista-roteiro";
 import { statusPelaEntrevista } from "@/lib/ciclo-processo";
 import { moderarEntrada } from "@/lib/peter-moderation";
+import {
+  buscarProcessoComMesmoNome,
+  chaveDoNome,
+  ProcessoDuplicado,
+  renomearNaEntrevista,
+  violouNomeUnico,
+  type ProcessoExistente,
+} from "@/lib/processo-duplicado";
 import { labelVisualArquivos, mapaAsIsDosAnexos, montarPartesArquivo, processarArquivo } from "@/lib/peter-upload";
 import {
   buildProcessInsertPayload,
@@ -164,7 +172,13 @@ function EntrevistaProcessoPage() {
   const [pendente, setPendente] = useState<string | null>(null);
   const [erro, setErro] = useState<{ mensagem: string; repetir?: () => void } | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  // Outro processo da empresa já tem o nome informado: nada é salvo até o entrevistado decidir.
+  const [duplicado, setDuplicado] = useState<ProcessoExistente | null>(null);
+  const [novoNome, setNovoNome] = useState<string | null>(null);
   const processIdRef = useRef<string | null>(routeProcessId ?? routeState?.processId ?? null);
+  const criadoAquiRef = useRef(false);
+  // Chave do último nome já conferido (ou salvo), para não consultar o banco a cada resposta.
+  const nomeConferidoRef = useRef("");
   const statusRef = useRef<ProcessoStatus>("Em entrevista");
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -199,6 +213,7 @@ function EntrevistaProcessoPage() {
         if (cancelado) return;
         const row = data as Tables<"processos">;
         statusRef.current = normalizeSavedStatus(row.status);
+        nomeConferidoRef.current = chaveDoNome(row.nome);
         setForm(mapProcessRowToForm(row));
 
         let restaurado: EstadoRoteiro | null = null;
@@ -229,7 +244,7 @@ function EntrevistaProcessoPage() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [mensagens, pendente]);
+  }, [mensagens, pendente, duplicado]);
 
   useEffect(() => {
     if (!ocupado) window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -270,30 +285,45 @@ function EntrevistaProcessoPage() {
       const statusFinal = status ?? statusPelaEntrevista(estadoAtual, statusRef.current);
       const comum = { form: formAtual, userId, status: statusFinal, interviewMessages: mensagensAtuais, entrevistaRoteiro: estadoAtual };
 
+      const chave = chaveDoNome(formAtual.nomeProcesso);
+      const conferirNome = async () => {
+        const existente = await buscarProcessoComMesmoNome(companyId, formAtual.nomeProcesso, processIdRef.current);
+        if (existente) throw new ProcessoDuplicado(existente);
+      };
+      if (chave && chave !== nomeConferidoRef.current) await conferirNome();
+
+      // Duas abas ou duas pessoas ao mesmo tempo: a regra do banco recusa e a conferência mostra qual é o outro.
+      const falhou = async (error: unknown): Promise<never> => {
+        if (violouNomeUnico(error)) await conferirNome();
+        throw error;
+      };
       if (processIdRef.current) {
         const { error } = await supabase
           .from("processos")
           .update(buildProcessUpdatePayload(comum))
           .eq("id", processIdRef.current)
           .eq("company_id", companyId);
-        if (error) throw error;
+        if (error) return falhou(error);
       } else {
         const { data, error } = await supabase
           .from("processos")
           .insert(buildProcessInsertPayload({ ...comum, companyId }))
           .select("id")
           .single();
-        if (error || !data) throw error ?? new Error("Não foi possível criar o processo.");
+        if (error || !data) return falhou(error ?? new Error("Não foi possível criar o processo."));
         processIdRef.current = data.id;
+        criadoAquiRef.current = true;
         // Troca a URL sem remontar a página, para um recarregamento retomar a entrevista.
         window.history.replaceState(window.history.state, "", `/processos/${data.id}/entrevista`);
       }
       statusRef.current = statusFinal;
+      nomeConferidoRef.current = chave;
     });
     saveQueueRef.current = tarefa.then(
       () => setSaveStatus("saved"),
       (error) => {
-        console.error("Falha ao salvar a entrevista:", error);
+        if (error instanceof ProcessoDuplicado) setDuplicado(error.existente);
+        else console.error("Falha ao salvar a entrevista:", error);
         setSaveStatus("error");
       },
     );
@@ -344,8 +374,8 @@ function EntrevistaProcessoPage() {
 
   // A análise roda sozinha quando vira o passo atual (também ao retomar um rascunho).
   useEffect(() => {
-    if (carregamento === "pronto" && passo?.tipo === "acao_ia" && !ocupado && !erro) analisar();
-  }, [analisar, carregamento, erro, ocupado, passo]);
+    if (carregamento === "pronto" && passo?.tipo === "acao_ia" && !ocupado && !erro && !duplicado) analisar();
+  }, [analisar, carregamento, duplicado, erro, ocupado, passo]);
 
   const enviarResposta = async (texto: string) => {
     if (!estado || ocupado || !texto.trim()) return;
@@ -471,11 +501,48 @@ function EntrevistaProcessoPage() {
     try {
       await persistir(form, mensagens, estado);
       navigate(`/processos/${processIdRef.current}/resultado-guiado`, { state: { processo: form, autoGenerate: true } });
-    } catch {
-      setErro({ mensagem: "Não consegui salvar o processo. Verifique sua conexão e tente novamente." });
+    } catch (error) {
+      // Nome repetido: o aviso com as opções já está na tela.
+      if (!(error instanceof ProcessoDuplicado)) setErro({ mensagem: "Não consegui salvar o processo. Verifique sua conexão e tente novamente." });
     } finally {
       setPendente(null);
     }
+  };
+
+  const abrirExistente = async () => {
+    if (!duplicado) return;
+    setPendente("Abrindo o processo existente…");
+    // A entrevista nova foi criada agora e ainda não tem o nome: sem ela, não sobra rascunho repetido.
+    if (criadoAquiRef.current && processIdRef.current && companyId) {
+      const { error } = await supabase.from("processos").delete().eq("id", processIdRef.current).eq("company_id", companyId);
+      if (error) console.error("Não foi possível descartar a entrevista nova:", error);
+    }
+    setPendente(null);
+    setSaveStatus("saved");
+    navigate(duplicado.status === "Em entrevista" ? `/processos/${duplicado.id}/entrevista` : `/processos/${duplicado.id}`);
+  };
+
+  const salvarNovoNome = () => {
+    const nome = (novoNome ?? "").trim();
+    if (!estado || !duplicado || !nome) return;
+    if (chaveDoNome(nome) === chaveDoNome(duplicado.nome)) {
+      setErro({ mensagem: "Esse nome ainda é igual ao do processo existente. Acrescente o que os diferencia, por exemplo a unidade ou a etapa." });
+      return;
+    }
+    setErro(null);
+    const proximoForm = { ...form, nomeProcesso: nome };
+    const proximoEstado = renomearNaEntrevista(estado, nome);
+    const proximasMensagens: MensagemEntrevista[] = [
+      ...mensagens,
+      { role: "user", content: nome },
+      { role: "assistant", content: `Combinado: este processo vai se chamar "${nome}". Pode seguir de onde paramos.` },
+    ];
+    setForm(proximoForm);
+    setEstado(proximoEstado);
+    setMensagens(proximasMensagens);
+    setDuplicado(null);
+    setNovoNome(null);
+    void persistir(proximoForm, proximasMensagens, proximoEstado).catch(() => undefined);
   };
 
   const sair = () => {
@@ -514,9 +581,13 @@ function EntrevistaProcessoPage() {
           <h1 className="truncate text-lg font-semibold text-foreground">Entrevista com o Peter</h1>
           <p className="truncate text-sm text-muted-foreground">{form.nomeProcesso || "Mapeamento guiado do processo"}</p>
         </div>
-        <Badge variant={saveStatus === "error" ? "destructive" : "secondary"} className="flex w-fit shrink-0 items-center gap-2" aria-live="polite">
+        <Badge
+          variant={saveStatus === "error" && !duplicado ? "destructive" : "secondary"}
+          className={`flex w-fit shrink-0 items-center gap-2 ${duplicado ? "bg-amber-100 text-amber-900 hover:bg-amber-100" : ""}`}
+          aria-live="polite"
+        >
           {saveStatus === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : saveStatus === "error" ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-          {saveStatus === "saving" ? "Salvando…" : saveStatus === "error" ? "Falha ao salvar" : "Salvo"}
+          {saveStatus === "saving" ? "Salvando…" : duplicado ? "Nome repetido" : saveStatus === "error" ? "Falha ao salvar" : "Salvo"}
         </Badge>
       </div>
 
@@ -589,7 +660,44 @@ function EntrevistaProcessoPage() {
               </div>
             )}
 
-            {estado && aguardandoTexto && !modoTexto && (
+            {duplicado && (
+              <div className="mt-3 space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+                <div className="flex gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    Já existe um processo com esse nome: <strong>{duplicado.nome}</strong> ({duplicado.status}, criado em{" "}
+                    {new Date(duplicado.criadoEm).toLocaleDateString("pt-BR")}). É o mesmo processo? Se for, abra o existente; esta entrevista nova é descartada.
+                  </div>
+                </div>
+                {novoNome === null ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => void abrirExistente()} disabled={ocupado}>Abrir o existente</Button>
+                    <Button size="sm" variant="outline" onClick={() => setNovoNome(form.nomeProcesso)} disabled={ocupado}>
+                      É outro processo, vou mudar o nome
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      autoFocus
+                      aria-label="Novo nome do processo"
+                      value={novoNome}
+                      onChange={(event) => setNovoNome(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          salvarNovoNome();
+                        }
+                      }}
+                      className="bg-background"
+                    />
+                    <Button size="sm" className="h-10 shrink-0" onClick={salvarNovoNome} disabled={!novoNome.trim()}>Salvar nome</Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {estado && aguardandoTexto && !modoTexto && !duplicado && (
               <>
                 {(opcoesRapidas.length > 0 || podeEncerrarAtividades) && (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -669,9 +777,11 @@ function EntrevistaProcessoPage() {
 }
 
 export default function EntrevistaProcesso() {
+  // Abrir outro processo a partir desta tela (nome repetido) precisa remontar a página.
+  const { id } = useParams<{ id: string }>();
   return (
     <EntrevistaErrorBoundary>
-      <EntrevistaProcessoPage />
+      <EntrevistaProcessoPage key={id ?? "novo"} />
     </EntrevistaErrorBoundary>
   );
 }
