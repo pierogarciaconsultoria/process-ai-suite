@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAiConfig } from "@/hooks/useAiConfig";
+import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import {
@@ -494,7 +495,7 @@ const ProcessoFormulario = () => {
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Tente novamente.";
+      const message = mensagemDoErroDoProcesso(err, "Tente novamente.");
       console.error("Diagnose error:", err);
       toast({ title: "Erro ao gerar diagnóstico", description: message, variant: "destructive" });
     } finally {
@@ -510,7 +511,7 @@ const ProcessoFormulario = () => {
       toast({ title: "Mapeamento concluido", description: "Processo salvo com sucesso." });
       navigate("/processos/diagnostico", { state: { processo: form, processId: savedProcess.id } });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Não foi possível salvar o processo.";
+      const message = mensagemDoErroDoProcesso(err, "Não foi possível salvar o processo.");
       console.error("Save process error:", err);
       toast({ title: "Erro ao salvar processo", description: message, variant: "destructive" });
     } finally {

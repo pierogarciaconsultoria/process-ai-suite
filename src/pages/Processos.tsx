@@ -7,10 +7,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Loader2, Search, Eye, Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Bot, Loader2, Search, Eye, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, PROCESSO_STATUS, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
+import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 import { entrevistaEmAberto, STATUS_CORES } from "@/lib/ciclo-processo";
 
 const criticidadeColors: Record<string, string> = {
@@ -27,7 +39,13 @@ const Processos = () => {
   const [statusFilter, setStatusFilter] = useState<ProcessoStatus | "all" | "">("");
   const [lista, setLista] = useState<ProcessoListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  // Entrevistas paradas mostradas antes de começar outra, para não mapear o mesmo processo duas vezes.
+  const [escolhendoInicio, setEscolhendoInicio] = useState(false);
+  const [paraExcluir, setParaExcluir] = useState<ProcessoListItem | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -37,6 +55,7 @@ const Processos = () => {
       try {
         const { data: auth } = await supabase.auth.getUser();
         const activeCompanyId = await resolveAccessibleCompanyId(auth.user?.id ?? null);
+        if (isMounted) setCompanyId(activeCompanyId);
 
         if (!activeCompanyId) {
           if (isMounted) setLista([]);
@@ -76,6 +95,34 @@ const Processos = () => {
     () => Array.from(new Set(lista.map((p) => p.responsavel).filter((r) => r && r.trim().length > 0))),
     [lista],
   );
+  const entrevistasParadas = useMemo(() => lista.filter((p) => p.status === "Em entrevista"), [lista]);
+
+  const comecarNovo = () => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } });
+  const retomar = (id: string) => navigate(`/processos/${id}/entrevista?guided=1`, { state: { guidedExperience: true } });
+  const novoProcesso = () => (entrevistasParadas.length > 0 ? setEscolhendoInicio(true) : comecarNovo());
+
+  const excluir = async () => {
+    if (!paraExcluir || !companyId) return;
+    setExcluindo(true);
+    // Só entrevistas não concluídas podem ser excluídas por aqui.
+    const { data, error } = await supabase
+      .from("processos")
+      .delete()
+      .eq("id", paraExcluir.id)
+      .eq("company_id", companyId)
+      .eq("status", "Em entrevista")
+      .select("id");
+    setExcluindo(false);
+    if (error || !data?.length) {
+      const motivo = error ? mensagemDoErroDoProcesso(error, "Tente novamente.") : "A entrevista já não está mais em andamento. Atualize a página.";
+      toast({ title: "Não foi possível excluir", description: motivo, variant: "destructive" });
+      return;
+    }
+    setLista((atual) => atual.filter((p) => p.id !== paraExcluir.id));
+    toast({ title: "Entrevista excluída", description: paraExcluir.nome || "Entrevista sem nome" });
+    setParaExcluir(null);
+  };
+
   const filtered = useMemo(() => {
     const term = search.toLowerCase();
     return lista.filter((p) => {
@@ -102,7 +149,7 @@ const Processos = () => {
           <p className="text-muted-foreground">Gerencie os processos da organização</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })}>
+          <Button onClick={novoProcesso}>
             <Bot className="h-4 w-4 mr-2" />
             Novo Processo
           </Button>
@@ -199,7 +246,7 @@ const Processos = () => {
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-3 py-6">
                       <span>Nenhum processo cadastrado ainda. Inicie uma experiência guiada com o Peter.</span>
-                      <Button onClick={() => navigate("/processos/novo/entrevista", { state: { guidedExperience: true } })}>
+                      <Button onClick={novoProcesso}>
                         <Bot className="h-4 w-4 mr-2" />
                         Novo Processo
                       </Button>
@@ -209,7 +256,7 @@ const Processos = () => {
               ) : (
                 filtered.map((processo) => (
                   <TableRow key={processo.id}>
-                    <TableCell className="font-medium">{processo.nome}</TableCell>
+                    <TableCell className="font-medium">{processo.nome || <span className="text-muted-foreground">Sem nome</span>}</TableCell>
                     <TableCell>{processo.area}</TableCell>
                     <TableCell>{processo.responsavel}</TableCell>
                     <TableCell>
@@ -221,14 +268,14 @@ const Processos = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(processo.data_criacao).toLocaleDateString("pt-BR")}</TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {entrevistaEmAberto(processo.status) && (
                         <Button
                           variant="ghost"
                           size="icon"
                           title="Retomar entrevista"
                           aria-label={`Retomar entrevista de ${processo.nome}`}
-                          onClick={() => navigate(`/processos/${processo.id}/entrevista?guided=1`, { state: { guidedExperience: true } })}
+                          onClick={() => retomar(processo.id)}
                         >
                           <Bot className="h-4 w-4" />
                         </Button>
@@ -239,6 +286,17 @@ const Processos = () => {
                       <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}/editar`)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      {processo.status === "Em entrevista" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Excluir entrevista"
+                          aria-label={`Excluir entrevista de ${processo.nome || "processo sem nome"}`}
+                          onClick={() => setParaExcluir(processo)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -247,6 +305,51 @@ const Processos = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={escolhendoInicio} onOpenChange={setEscolhendoInicio}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Você tem entrevistas não concluídas</DialogTitle>
+            <DialogDescription>
+              Se o processo que você vai mapear já está aqui, continue a entrevista dele em vez de começar outra.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-72 space-y-2 overflow-y-auto">
+            {entrevistasParadas.map((processo) => (
+              <li key={processo.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{processo.nome || "Sem nome"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Iniciada em {new Date(processo.data_criacao).toLocaleDateString("pt-BR")}
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => retomar(processo.id)}>Continuar</Button>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button onClick={comecarNovo}>Começar um processo novo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={paraExcluir !== null} onOpenChange={(aberto) => !aberto && !excluindo && setParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta entrevista?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{paraExcluir?.nome || "Entrevista sem nome"}" e tudo o que foi respondido nela serão apagados. Não dá para desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={() => void excluir()} disabled={excluindo}>
+              {excluindo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
