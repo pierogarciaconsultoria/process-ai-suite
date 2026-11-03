@@ -5,12 +5,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   linha: null as Record<string, unknown> | null,
   updates: [] as Record<string, unknown>[],
+  outros: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
 vi.mock("@/components/relatorio/MapaBpmnImagem", () => ({ MapaBpmnImagem: () => <div>mapa</div> }));
 vi.mock("@/integrations/supabase/client", () => {
-  const filtroSelect = { eq: () => filtroSelect, maybeSingle: async () => ({ data: mocks.linha, error: null }) };
+  const filtroSelect = {
+    eq: () => filtroSelect,
+    maybeSingle: async () => ({ data: mocks.linha, error: null }),
+    order: async () => ({ data: mocks.outros, error: null }),
+  };
   return {
     supabase: {
       auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
@@ -29,6 +34,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+import { Toaster } from "@/components/ui/toaster";
 import ProcessoDetalhe from "@/pages/ProcessoDetalhe";
 
 function linha(status: string) {
@@ -48,6 +54,7 @@ function renderizar() {
       <Routes>
         <Route path="/processos/:id" element={<ProcessoDetalhe />} />
       </Routes>
+      <Toaster />
     </MemoryRouter>,
   );
 }
@@ -55,6 +62,46 @@ function renderizar() {
 describe("Tela do processo — ciclo de vida", () => {
   beforeEach(() => {
     mocks.updates.length = 0;
+    mocks.outros = [];
+  });
+
+  it("edita uma seção no painel lateral e o relatório mostra a correção", async () => {
+    mocks.linha = linha("Implementado");
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Editar SIPOC" }));
+    const painel = await screen.findByRole("dialog");
+    expect(within(painel).getByText("Editar: SIPOC")).toBeInTheDocument();
+
+    fireEvent.change(within(painel).getByLabelText("Início (o que dispara o processo)"), { target: { value: "Requisição aprovada" } });
+    fireEvent.click(within(painel).getByRole("button", { name: "Incluir saída" }));
+    fireEvent.change(within(painel).getByLabelText("Saída 1"), { target: { value: "Pedido de compra" } });
+    fireEvent.change(within(painel).getByLabelText("Cliente 1"), { target: { value: "Fornecedor" } });
+    fireEvent.click(within(painel).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(mocks.updates).toHaveLength(1));
+    expect(mocks.updates[0]).toEqual({
+      updated_by: "user-1",
+      gatilho: "Requisição aprovada",
+      entradas: [],
+      saidas: [{ saida: "Pedido de compra", cliente: "Fornecedor" }],
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText("Pedido de compra")).toBeInTheDocument();
+    // No SIPOC (início) e na identificação (gatilho).
+    expect(screen.getAllByText("Requisição aprovada").length).toBeGreaterThan(0);
+  });
+
+  it("não deixa renomear para o nome de outro processo da empresa", async () => {
+    mocks.linha = linha("Implementado");
+    mocks.outros = [{ id: "proc-2", nome: "COMPRAS INDIRETAS", status: "Em entrevista", created_at: "2026-10-20T10:00:00Z" }];
+    renderizar();
+    fireEvent.click(await screen.findByRole("button", { name: "Editar dados do processo" }));
+    const painel = await screen.findByRole("dialog");
+    fireEvent.change(within(painel).getByLabelText("Nome do processo"), { target: { value: "Compras indiretas" } });
+    fireEvent.click(within(painel).getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText(/Já existe um processo chamado "COMPRAS INDIRETAS"/)).toBeInTheDocument();
+    expect(mocks.updates).toHaveLength(0);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("marca o processo como implementado após confirmação, com a documentação já liberada", async () => {

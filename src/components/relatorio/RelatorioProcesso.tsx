@@ -1,7 +1,10 @@
+import { Pencil, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DiagnosticoView, PlanoView } from "@/components/entrevista/AnaliseRoteiro";
 import { MapaBpmnImagem } from "@/components/relatorio/MapaBpmnImagem";
+import type { SecaoEditavel } from "@/lib/edicao-processo";
 import type { ItemRelatorio, RelatorioProcesso as Relatorio } from "@/lib/relatorio-processo";
 
 function formatarData(data: string): string {
@@ -9,13 +12,25 @@ function formatarData(data: string): string {
   return Number.isNaN(valor.getTime()) ? data : valor.toLocaleDateString("pt-BR");
 }
 
+// Botão de edição da seção; some no PDF.
+function BotaoEditar({ rotulo, onClick }: { rotulo: string; onClick: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs font-normal print:hidden" onClick={onClick} aria-label={`Editar ${rotulo}`}>
+      <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
+    </Button>
+  );
+}
+
 // `junto`: seção curta que não deve ser partida entre páginas no PDF.
-function Secao({ numero, titulo, junto = false, children }: { numero: number; titulo: string; junto?: boolean; children: React.ReactNode }) {
+function Secao({ numero, titulo, junto = false, onEditar, children }: { numero: number; titulo: string; junto?: boolean; onEditar?: () => void; children: React.ReactNode }) {
   return (
     <section className={`space-y-3 ${junto ? "print:break-inside-avoid" : ""}`}>
-      <h2 className="border-b pb-1 text-lg font-semibold text-foreground print:break-after-avoid">
-        <span className="mr-2 text-muted-foreground">{numero}.</span>{titulo}
-      </h2>
+      <div className="flex items-end justify-between gap-2 border-b pb-1 print:break-after-avoid">
+        <h2 className="text-lg font-semibold text-foreground">
+          <span className="mr-2 text-muted-foreground">{numero}.</span>{titulo}
+        </h2>
+        {onEditar && <BotaoEditar rotulo={titulo} onClick={onEditar} />}
+      </div>
       {children}
     </section>
   );
@@ -140,9 +155,19 @@ function TabelaSipoc({ sipoc }: { sipoc: Relatorio["sipoc"] }) {
   );
 }
 
-export function RelatorioProcesso({ relatorio }: { relatorio: Relatorio }) {
+// Com `onEditar`, cada seção ganha o botão Editar (página do processo); sem ele, o relatório é só leitura.
+export function RelatorioProcesso({
+  relatorio,
+  onEditar,
+  onEditarMapa,
+}: {
+  relatorio: Relatorio;
+  onEditar?: (secao: SecaoEditavel) => void;
+  onEditarMapa?: () => void;
+}) {
   let secao = 0;
   const proxima = () => ++secao;
+  const editar = (alvo: SecaoEditavel) => (onEditar ? () => onEditar(alvo) : undefined);
 
   return (
     <article className="mx-auto max-w-4xl space-y-8 rounded-lg border bg-card p-5 sm:p-10 print:max-w-none print:rounded-none print:border-0 print:p-0">
@@ -151,6 +176,7 @@ export function RelatorioProcesso({ relatorio }: { relatorio: Relatorio }) {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{relatorio.nome}</h1>
           {relatorio.diagnostico && <Badge>Maturidade: {relatorio.diagnostico.maturidade.nivel}</Badge>}
+          {onEditar && <div className="ml-auto"><BotaoEditar rotulo="dados do processo" onClick={() => onEditar("dados")} /></div>}
         </div>
         <Itens
           itens={[
@@ -168,23 +194,23 @@ export function RelatorioProcesso({ relatorio }: { relatorio: Relatorio }) {
         )}
       </header>
 
-      <Secao numero={proxima()} titulo="Resumo executivo" junto>
+      <Secao numero={proxima()} titulo="Resumo executivo" junto onEditar={editar("dados")}>
         {relatorio.diagnostico ? <p className="text-sm leading-6">{relatorio.diagnostico.resumo}</p> : null}
         {relatorio.objetivo
           ? <p className="text-sm leading-6"><span className="font-medium">Objetivo do processo:</span> {relatorio.objetivo}</p>
           : <NaoInformado texto="Objetivo do processo não informado." />}
       </Secao>
 
-      <Secao numero={proxima()} titulo="Identificação do processo" junto>
+      <Secao numero={proxima()} titulo="Identificação do processo" junto onEditar={editar("identificacao")}>
         <Itens itens={relatorio.ficha} />
       </Secao>
 
-      <Secao numero={proxima()} titulo="SIPOC" junto>
+      <Secao numero={proxima()} titulo="SIPOC" junto onEditar={editar("sipoc")}>
         <p className="text-sm text-muted-foreground print:text-foreground">Fronteiras do processo: quem fornece, o que entra, o que é feito, o que sai e quem recebe.</p>
         <TabelaSipoc sipoc={relatorio.sipoc} />
       </Secao>
 
-      <Secao numero={proxima()} titulo="Processo atual (AS IS)">
+      <Secao numero={proxima()} titulo="Processo atual (AS IS)" onEditar={editar("atividades")}>
         {relatorio.atividades.length > 0 ? (
           <div className="overflow-x-auto rounded-md border print:overflow-visible">
             <Table className="text-xs">
@@ -213,12 +239,19 @@ export function RelatorioProcesso({ relatorio }: { relatorio: Relatorio }) {
         )}
         {relatorio.fluxo.length > 0 && <Itens itens={relatorio.fluxo} />}
         <div className="space-y-3 print:break-inside-avoid">
-          <h3 className="pt-2 text-sm font-semibold text-foreground">Mapa do processo (BPMN)</h3>
+          <div className="flex items-end justify-between gap-2 pt-2">
+            <h3 className="text-sm font-semibold text-foreground">Mapa do processo (BPMN)</h3>
+            {onEditarMapa && (
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs font-normal print:hidden" onClick={onEditarMapa}>
+                <Workflow className="mr-1 h-3.5 w-3.5" /> Editar mapa
+              </Button>
+            )}
+          </div>
           {relatorio.bpmnAsIs ? <MapaBpmnImagem xml={relatorio.bpmnAsIs} /> : <NaoInformado texto="O mapa BPMN AS IS ainda não foi gerado." />}
         </div>
       </Secao>
 
-      <Secao numero={proxima()} titulo="Medição e indicadores">
+      <Secao numero={proxima()} titulo="Medição e indicadores" onEditar={editar("medicao")}>
         <Itens itens={relatorio.medicao} />
         {relatorio.indicadores.length > 0 && (
           <div className="overflow-x-auto rounded-md border print:overflow-visible">
@@ -252,7 +285,7 @@ export function RelatorioProcesso({ relatorio }: { relatorio: Relatorio }) {
         {relatorio.diagnostico ? <DiagnosticoView diagnostico={relatorio.diagnostico} /> : <NaoInformado texto="O diagnóstico ainda não foi gerado." />}
       </Secao>
 
-      <Secao numero={proxima()} titulo="Plano de melhoria">
+      <Secao numero={proxima()} titulo="Plano de melhoria" onEditar={relatorio.plano ? editar("plano") : undefined}>
         {relatorio.plano ? <PlanoView plano={relatorio.plano} /> : <NaoInformado texto="O plano de melhoria ainda não foi definido." />}
       </Secao>
 

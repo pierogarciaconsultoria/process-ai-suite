@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, Loader2, Search, Eye, Pencil, Trash2 } from "lucide-react";
+import { Bot, Loader2, Search, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, PROCESSO_STATUS, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
@@ -280,11 +280,14 @@ const Processos = () => {
                           <Bot className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}`)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Abrir processo"
+                        aria-label={`Abrir ${processo.nome || "processo sem nome"}`}
+                        onClick={() => navigate(`/processos/${processo.id}`)}
+                      >
                         <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => navigate(`/processos/${processo.id}/editar`)}>
-                        <Pencil className="h-4 w-4" />
                       </Button>
                       {processo.status === "Em entrevista" && (
                         <Button
