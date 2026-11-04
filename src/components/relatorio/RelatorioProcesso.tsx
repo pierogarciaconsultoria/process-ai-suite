@@ -1,10 +1,11 @@
-import { ListChecks, Pencil, Workflow } from "lucide-react";
+import { Gauge, ListChecks, Pencil, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DiagnosticoView, PlanoView } from "@/components/entrevista/AnaliseRoteiro";
 import { MapaBpmnImagem } from "@/components/relatorio/MapaBpmnImagem";
 import type { SecaoEditavel } from "@/lib/edicao-processo";
+import { formatarMeta, formatarValor, rotuloPeriodo, ROTULO_SITUACAO, situacao, type Indicador, type Medicao } from "@/lib/indicadores";
 import { estaAtrasada, formatarPrazo, type Acao } from "@/lib/plano-de-acao";
 import type { ItemRelatorio, RelatorioProcesso as Relatorio } from "@/lib/relatorio-processo";
 
@@ -190,8 +191,57 @@ function ExecucaoDoPlano({ acoes }: { acoes: Acao[] }) {
   );
 }
 
+export type IndicadorAcompanhado = { indicador: Indicador; ultima?: Medicao };
+
+// Indicadores acompanhados no módulo Indicadores, com o último resultado lançado.
+function IndicadoresAcompanhados({ itens }: { itens: IndicadorAcompanhado[] }) {
+  return (
+    <div className="overflow-x-auto rounded-md border print:overflow-visible">
+      <Table className="min-w-[620px] text-xs print:min-w-0">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Indicador</TableHead>
+            <TableHead>Fórmula</TableHead>
+            <TableHead>Meta</TableHead>
+            <TableHead>Último resultado</TableHead>
+            <TableHead>Situação</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {itens.map(({ indicador, ultima }) => (
+            <TableRow key={indicador.id} className="print:break-inside-avoid">
+              <TableCell className="font-medium">{indicador.nome}</TableCell>
+              <TableCell>{indicador.formula || "—"}</TableCell>
+              <TableCell className="whitespace-nowrap">{formatarMeta(indicador)}</TableCell>
+              <TableCell className="whitespace-nowrap">{ultima ? `${formatarValor(ultima.valor, indicador.unidade)} (${rotuloPeriodo(ultima.periodo)})` : "—"}</TableCell>
+              <TableCell>{ROTULO_SITUACAO[situacao(indicador, ultima?.valor)]}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// Aviso para levar ao módulo o que ainda está só no mapeamento, ou abrir o módulo; some no PDF.
+function AvisoModulo({ icone: Icone, pendentes, singular, plural, acompanhado, rotuloEnviar, rotuloAbrir, onEnviar, onAbrir }: {
+  icone: typeof ListChecks; pendentes: number; singular: string; plural: string; acompanhado: string;
+  rotuloEnviar: string; rotuloAbrir: string; onEnviar?: () => void; onAbrir?: () => void;
+}) {
+  if (!(onEnviar && pendentes > 0) && !onAbrir) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-sm print:hidden">
+      <Icone className="h-4 w-4 text-primary" aria-hidden />
+      <span className="flex-1 text-muted-foreground">{pendentes > 0 ? (pendentes === 1 ? singular : plural.replace("{n}", String(pendentes))) : acompanhado}</span>
+      {onEnviar && pendentes > 0 && <Button size="sm" onClick={onEnviar}>{rotuloEnviar}</Button>}
+      {onAbrir && <Button size="sm" variant="outline" onClick={onAbrir}>{rotuloAbrir}</Button>}
+    </div>
+  );
+}
+
 // Com `onEditar`, cada seção ganha o botão Editar (página do processo); sem ele, o relatório é só leitura.
 // Com `acoes`, o plano mostra a execução no Plano de Ação; `acoesPendentes` são as do 5W2H ainda não enviadas.
+// O mesmo vale para `indicadores` (módulo Indicadores) e `indicadoresPendentes`.
 export function RelatorioProcesso({
   relatorio,
   onEditar,
@@ -200,6 +250,10 @@ export function RelatorioProcesso({
   acoesPendentes = 0,
   onEnviarAcoes,
   onAbrirPlanoDeAcao,
+  indicadores = [],
+  indicadoresPendentes = 0,
+  onEnviarIndicadores,
+  onAbrirIndicadores,
 }: {
   relatorio: Relatorio;
   onEditar?: (secao: SecaoEditavel) => void;
@@ -208,8 +262,13 @@ export function RelatorioProcesso({
   acoesPendentes?: number;
   onEnviarAcoes?: () => void;
   onAbrirPlanoDeAcao?: () => void;
+  indicadores?: IndicadorAcompanhado[];
+  indicadoresPendentes?: number;
+  onEnviarIndicadores?: () => void;
+  onAbrirIndicadores?: () => void;
 }) {
   const emExecucao = acoes.length > 0;
+  const medido = indicadores.length > 0;
   let secao = 0;
   const proxima = () => ++secao;
   const editar = (alvo: SecaoEditavel) => (onEditar ? () => onEditar(alvo) : undefined);
@@ -298,7 +357,19 @@ export function RelatorioProcesso({
 
       <Secao numero={proxima()} titulo="Medição e indicadores" onEditar={editar("medicao")}>
         <Itens itens={relatorio.medicao} />
-        {relatorio.indicadores.length > 0 && (
+        {medido && <IndicadoresAcompanhados itens={indicadores} />}
+        <AvisoModulo
+          icone={Gauge}
+          pendentes={indicadoresPendentes}
+          singular="1 indicador do mapeamento ainda não está em Indicadores, onde os resultados são lançados mês a mês."
+          plural="{n} indicadores do mapeamento ainda não estão em Indicadores, onde os resultados são lançados mês a mês."
+          acompanhado="Os resultados destes indicadores são lançados em Indicadores."
+          rotuloEnviar="Acompanhar em Indicadores"
+          rotuloAbrir="Abrir Indicadores"
+          onEnviar={onEnviarIndicadores}
+          onAbrir={medido ? onAbrirIndicadores : undefined}
+        />
+        {!medido && relatorio.indicadores.length > 0 && (
           <div className="overflow-x-auto rounded-md border print:overflow-visible">
             <Table className="text-xs">
               <TableHeader>
@@ -333,18 +404,17 @@ export function RelatorioProcesso({
       <Secao numero={proxima()} titulo="Plano de melhoria" onEditar={relatorio.plano && !emExecucao ? editar("plano") : undefined}>
         {relatorio.plano ? <PlanoView plano={relatorio.plano} semPlanoAcao={emExecucao} /> : <NaoInformado texto="O plano de melhoria ainda não foi definido." />}
         {emExecucao && <ExecucaoDoPlano acoes={acoes} />}
-        {(onEnviarAcoes && acoesPendentes > 0) || (onAbrirPlanoDeAcao && emExecucao) ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-sm print:hidden">
-            <ListChecks className="h-4 w-4 text-primary" aria-hidden />
-            <span className="flex-1 text-muted-foreground">
-              {acoesPendentes > 0
-                ? `${acoesPendentes === 1 ? "1 ação do plano ainda não está" : `${acoesPendentes} ações do plano ainda não estão`} no Plano de Ação, onde são acompanhadas até a conclusão.`
-                : "As ações deste plano são acompanhadas no Plano de Ação."}
-            </span>
-            {onEnviarAcoes && acoesPendentes > 0 && <Button size="sm" onClick={onEnviarAcoes}>Enviar ao Plano de Ação</Button>}
-            {onAbrirPlanoDeAcao && emExecucao && <Button size="sm" variant="outline" onClick={onAbrirPlanoDeAcao}>Abrir Plano de Ação</Button>}
-          </div>
-        ) : null}
+        <AvisoModulo
+          icone={ListChecks}
+          pendentes={acoesPendentes}
+          singular="1 ação do plano ainda não está no Plano de Ação, onde são acompanhadas até a conclusão."
+          plural="{n} ações do plano ainda não estão no Plano de Ação, onde são acompanhadas até a conclusão."
+          acompanhado="As ações deste plano são acompanhadas no Plano de Ação."
+          rotuloEnviar="Enviar ao Plano de Ação"
+          rotuloAbrir="Abrir Plano de Ação"
+          onEnviar={onEnviarAcoes}
+          onAbrir={emExecucao ? onAbrirPlanoDeAcao : undefined}
+        />
       </Secao>
 
       {relatorio.proximosPassos.length > 0 && (

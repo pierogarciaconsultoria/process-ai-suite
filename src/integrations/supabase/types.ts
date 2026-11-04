@@ -951,6 +951,138 @@ export type Database = {
           },
         ]
       }
+      indicador_medicoes: {
+        Row: {
+          id: string
+          company_id: string
+          indicador_id: string
+          periodo: string
+          valor: number
+          comentario: string
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          indicador_id: string
+          periodo: string
+          valor: number
+          comentario?: string
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          indicador_id?: string
+          periodo?: string
+          valor?: number
+          comentario?: string
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicador_medicoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indicador_medicoes_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "indicadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      indicadores: {
+        Row: {
+          id: string
+          company_id: string
+          processo_id: string | null
+          chave_origem: string | null
+          nome: string
+          objetivo: string
+          formula: string
+          unidade: string
+          sentido: string
+          meta: number | null
+          meta_texto: string
+          periodicidade: string
+          responsavel: string
+          ativo: boolean
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          processo_id?: string | null
+          chave_origem?: string | null
+          nome: string
+          objetivo?: string
+          formula?: string
+          unidade?: string
+          sentido?: string
+          meta?: number | null
+          meta_texto?: string
+          periodicidade?: string
+          responsavel?: string
+          ativo?: boolean
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          processo_id?: string | null
+          chave_origem?: string | null
+          nome?: string
+          objetivo?: string
+          formula?: string
+          unidade?: string
+          sentido?: string
+          meta?: number | null
+          meta_texto?: string
+          periodicidade?: string
+          responsavel?: string
+          ativo?: boolean
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indicadores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "indicadores_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interview_sessions: {
         Row: {
           applied: boolean

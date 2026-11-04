@@ -116,11 +116,14 @@ export function EditorSecao({
   secao,
   onFechar,
   onSalvar,
+  indicadoresNoModulo = false,
 }: {
   processo: Tables<"processos">;
   secao: SecaoEditavel | null;
   onFechar: () => void;
   onSalvar: (secao: SecaoEditavel, rascunho: RascunhoSecao) => Promise<boolean>;
+  // Os indicadores já são acompanhados no módulo Indicadores e são editados lá.
+  indicadoresNoModulo?: boolean;
 }) {
   const [rascunho, setRascunho] = useState<RascunhoSecao | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -204,7 +207,12 @@ export function EditorSecao({
             {/* No AS IS, primeiro as atividades e depois as regras do fluxo, como no relatório. */}
             {secao === "atividades" && camposDeTexto}
 
-            {secao === "medicao" && (
+            {secao === "medicao" && indicadoresNoModulo && (
+              <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                Os indicadores deste processo são editados em Indicadores, onde também são lançados os resultados.
+              </p>
+            )}
+            {secao === "medicao" && !indicadoresNoModulo && (
               <ListaEditavel
                 titulo="Indicadores"
                 itens={rascunho.indicadores}

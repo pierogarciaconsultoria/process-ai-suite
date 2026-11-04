@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   outros: [] as Record<string, unknown>[],
   acoes: [] as Record<string, unknown>[],
   inserts: [] as Record<string, unknown>[][],
+  indicadores: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
@@ -19,11 +20,14 @@ vi.mock("@/integrations/supabase/client", () => {
     order: async () => ({ data: mocks.outros, error: null }),
   };
   const filtroAcoes = { eq: () => filtroAcoes, order: async () => ({ data: mocks.acoes, error: null }) };
+  const filtroIndicadores = { eq: () => filtroIndicadores, in: () => filtroIndicadores, order: async () => ({ data: mocks.indicadores, error: null }) };
+  const filtroMedicoes = { in: () => filtroMedicoes, order: async () => ({ data: [], error: null }) };
+  const filtros: Record<string, unknown> = { acoes: filtroAcoes, indicadores: filtroIndicadores, indicador_medicoes: filtroMedicoes };
   return {
     supabase: {
       auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
       from: (tabela: string) => ({
-        select: () => (tabela === "acoes" ? filtroAcoes : filtroSelect),
+        select: () => filtros[tabela] ?? filtroSelect,
         insert: (linhas: Record<string, unknown>[]) => {
           mocks.inserts.push(linhas);
           return {
@@ -79,6 +83,22 @@ describe("Tela do processo — ciclo de vida", () => {
     mocks.outros = [];
     mocks.acoes = [];
     mocks.inserts.length = 0;
+    mocks.indicadores = [];
+  });
+
+  it("envia os indicadores do mapeamento para Indicadores e mostra o último resultado no relatório", async () => {
+    mocks.linha = {
+      ...linha("Implementado"),
+      indicadores: [{ nome: "Entregas no prazo", objetivo: "", formulaCalculo: "no prazo ÷ total", meta: "≥ 95%", periodicidade: "Mensal", responsavel: "Ana" }],
+    };
+    renderizar();
+    expect(await screen.findByText(/1 indicador do mapeamento ainda não está em Indicadores/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Acompanhar em Indicadores" }));
+    await waitFor(() => expect(mocks.inserts).toHaveLength(1));
+    expect(mocks.inserts[0][0]).toMatchObject({ nome: "Entregas no prazo", meta: 95, sentido: "maior", unidade: "%", processo_id: "proc-1" });
+    expect(await screen.findByText("Último resultado")).toBeInTheDocument();
+    expect(screen.getByText("Sem resultado")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir Indicadores" })).toBeInTheDocument();
   });
 
   it("envia o 5W2H ao Plano de Ação e passa a mostrar a execução no relatório", async () => {
