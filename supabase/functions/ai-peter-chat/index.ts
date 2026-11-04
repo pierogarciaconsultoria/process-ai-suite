@@ -186,7 +186,8 @@ serve(async (req: Request) => {
       conversaId = nova.id as string;
     }
     const { data: gravadas, error: erroGravar } = await client.from("peter_mensagens").insert([
-      { conversa_id: conversaId, user_id: user.id, role: "user", conteudo: mensagem },
+      // As duas linhas com as mesmas colunas: numa inserção múltipla, coluna ausente vira null.
+      { conversa_id: conversaId, user_id: user.id, role: "user", conteudo: mensagem, extras: {} },
       { conversa_id: conversaId, user_id: user.id, role: "assistant", conteudo: resposta.resposta, extras: { atalhos: resposta.atalhos, convite: resposta.convite } },
     ]).select("*");
     if (erroGravar) throw erroGravar;

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   escolherRelevantes,
   lerRespostaChat,
@@ -88,5 +90,12 @@ describe("Chat do Peter", () => {
       { tipo: "ol", itens: ["Primeiro", "Segundo"] },
       { tipo: "titulo", texto: "Próximos passos" },
     ]);
+  });
+
+  it("grava pergunta e resposta com as mesmas colunas (inserção múltipla não usa o valor padrão)", () => {
+    const funcao = readFileSync(resolve(process.cwd(), "supabase/functions/ai-peter-chat/index.ts"), "utf8");
+    expect(funcao).toContain('role: "user", conteudo: mensagem, extras: {} }');
+    const migration = readFileSync(resolve(process.cwd(), "supabase/migrations/202611040004_conversas_peter_extras.sql"), "utf8");
+    expect(migration).toContain("new.extras := coalesce(new.extras, '{}'::jsonb);");
   });
 });
