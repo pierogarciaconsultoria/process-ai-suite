@@ -179,18 +179,24 @@ serve(async (req: Request) => {
     }
 
     // Só grava depois da resposta, para uma falha não deixar pergunta sem resposta na conversa.
+    let conversaNova = false;
     if (!conversaId) {
       const { data: nova, error } = await client.from("peter_conversas")
         .insert({ company_id: companyId, user_id: user.id, titulo: tituloDaConversa(mensagem) }).select("id").single();
       if (error) throw error;
       conversaId = nova.id as string;
+      conversaNova = true;
     }
     const { data: gravadas, error: erroGravar } = await client.from("peter_mensagens").insert([
       // As duas linhas com as mesmas colunas: numa inserção múltipla, coluna ausente vira null.
       { conversa_id: conversaId, user_id: user.id, role: "user", conteudo: mensagem, extras: {} },
       { conversa_id: conversaId, user_id: user.id, role: "assistant", conteudo: resposta.resposta, extras: { atalhos: resposta.atalhos, convite: resposta.convite } },
     ]).select("*");
-    if (erroGravar) throw erroGravar;
+    if (erroGravar) {
+      // Sem as mensagens, a conversa recém-criada ficaria vazia na lista.
+      if (conversaNova) await client.from("peter_conversas").delete().eq("id", conversaId);
+      throw erroGravar;
+    }
 
     return new Response(JSON.stringify({ conversa_id: conversaId, mensagens: gravadas ?? [] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
