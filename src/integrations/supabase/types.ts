@@ -1164,28 +1164,28 @@ export type Database = {
       }
       peter_conversas: {
         Row: {
-          id: string
           company_id: string
-          user_id: string
-          titulo: string
           created_at: string
+          id: string
+          titulo: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
           company_id: string
-          user_id?: string
-          titulo?: string
           created_at?: string
+          id?: string
+          titulo?: string
           updated_at?: string
+          user_id?: string
         }
         Update: {
-          id?: string
           company_id?: string
-          user_id?: string
-          titulo?: string
           created_at?: string
+          id?: string
+          titulo?: string
           updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -1199,31 +1199,31 @@ export type Database = {
       }
       peter_mensagens: {
         Row: {
-          id: string
-          conversa_id: string
-          user_id: string
-          role: string
           conteudo: string
-          extras: Json
+          conversa_id: string
           created_at: string
+          extras: Json
+          id: string
+          role: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          conversa_id: string
-          user_id?: string
-          role: string
           conteudo: string
-          extras?: Json
+          conversa_id: string
           created_at?: string
+          extras?: Json
+          id?: string
+          role: string
+          user_id?: string
         }
         Update: {
-          id?: string
-          conversa_id?: string
-          user_id?: string
-          role?: string
           conteudo?: string
-          extras?: Json
+          conversa_id?: string
           created_at?: string
+          extras?: Json
+          id?: string
+          role?: string
+          user_id?: string
         }
         Relationships: [
           {
