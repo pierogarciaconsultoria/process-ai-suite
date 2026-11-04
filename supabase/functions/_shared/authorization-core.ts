@@ -7,7 +7,7 @@ export class HttpError extends Error {
   }
 }
 
-type QueryResult<T> = Promise<{ data: T | null; error: { message?: string } | null }>;
+type QueryResult<T> = PromiseLike<{ data: T | null; error: { message?: string } | null }>;
 
 export type AuthorizationClient = {
   from(table: string): {

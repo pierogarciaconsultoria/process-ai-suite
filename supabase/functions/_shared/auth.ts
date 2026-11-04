@@ -30,7 +30,7 @@ export function errorResponse(error: unknown, corsHeaders: Record<string, string
   const status = error instanceof HttpError ? error.status : 500;
   const message = mensagemDoErro(error);
   if (status >= 500) console.error(`[${status}]`, message, error);
-  const retryHeaders = error instanceof HttpError && error.retryAfter
+  const retryHeaders: Record<string, string> = error instanceof HttpError && error.retryAfter
     ? { "Retry-After": String(error.retryAfter) }
     : {};
   return new Response(JSON.stringify({ error: message }), {
