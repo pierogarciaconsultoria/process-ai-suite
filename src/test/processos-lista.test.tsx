@@ -5,7 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   linhas: [] as Record<string, unknown>[],
   excluidos: [] as Array<Record<string, string>>,
+  podeGerenciar: true,
 }));
+
+vi.mock("@/lib/perfil", () => ({ usePodeGerenciar: () => mocks.podeGerenciar }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
 vi.mock("@/integrations/supabase/client", () => ({
@@ -52,6 +55,7 @@ function renderizar() {
 describe("Lista de processos", () => {
   beforeEach(() => {
     mocks.excluidos.length = 0;
+    mocks.podeGerenciar = true;
     mocks.linhas = [
       linha("p1", "COOPERA - PÓS VENDAS - AS IS", "Implementado", "2026-10-29T12:00:00Z"),
       linha("p2", "COOPERA - PÓS VENDAS - AS IS", "Em entrevista", "2026-10-28T12:00:00Z"),
@@ -85,5 +89,13 @@ describe("Lista de processos", () => {
     fireEvent.click(within(confirmacao).getByRole("button", { name: "Excluir" }));
     await waitFor(() => expect(screen.getAllByText("COOPERA - PÓS VENDAS - AS IS")).toHaveLength(1));
     expect(mocks.excluidos).toEqual([{ id: "p2", company_id: "empresa-1", status: "Em entrevista" }]);
+  });
+
+  it("a Equipe não vê o botão de excluir", async () => {
+    mocks.podeGerenciar = false;
+    renderizar();
+    await screen.findAllByText("COOPERA - PÓS VENDAS - AS IS");
+    expect(screen.queryByRole("button", { name: /Excluir entrevista/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Retomar entrevista/ })).toBeInTheDocument();
   });
 });

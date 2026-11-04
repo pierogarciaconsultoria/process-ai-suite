@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { estaAtrasada, formatarPrazo, ORIGEM_ACAO, resumirAcoes, STATUS_ACAO, type Acao } from "@/lib/plano-de-acao";
+import { usePodeGerenciar } from "@/lib/perfil";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 
 const TODOS = "todos";
@@ -50,6 +51,8 @@ const PlanoDeAcao = () => {
   const { toast } = useToast();
   const [parametros] = useSearchParams();
   const [companyId, setCompanyId] = useState<string | null>(null);
+  // A Equipe cria e atualiza ações; excluir é de Consultor e Gestor.
+  const podeGerenciar = usePodeGerenciar(companyId);
   const [userId, setUserId] = useState<string | null>(null);
   const [acoes, setAcoes] = useState<Acao[]>([]);
   const [processos, setProcessos] = useState<Array<{ id: string; nome: string }>>([]);
@@ -247,9 +250,11 @@ const PlanoDeAcao = () => {
                           <Button variant="ghost" size="icon" title="Editar ação" aria-label={`Editar ${acao.oque}`} onClick={() => setEditando({ acao })}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" title="Excluir ação" aria-label={`Excluir ${acao.oque}`} onClick={() => setExcluindo(acao)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {podeGerenciar && (
+                            <Button variant="ghost" size="icon" title="Excluir ação" aria-label={`Excluir ${acao.oque}`} onClick={() => setExcluindo(acao)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

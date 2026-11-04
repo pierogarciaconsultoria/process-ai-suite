@@ -1374,9 +1374,9 @@ export default function DocumentationWorkspace() {
                   <Select value={activeTemplate.approvalVersioning.approverRole} onValueChange={(value) => updateActiveTemplate((template) => ({ ...template, approvalVersioning: { ...template.approvalVersioning, approverRole: value } }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="admin">Consultor</SelectItem>
                       <SelectItem value="gestor">Gestor</SelectItem>
-                      <SelectItem value="analista">Analista</SelectItem>
+                      <SelectItem value="analista">Equipe</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

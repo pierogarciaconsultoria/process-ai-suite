@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Plus, Search } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { DESCRICAO_PERFIL, ROTULO_PERFIL } from "@/lib/perfil";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,7 +32,7 @@ const perfilColors: Record<string, string> = {
   analista: "bg-muted text-muted-foreground",
 };
 
-const perfilLabels: Record<Membro["perfil"], string> = { admin: "Admin", gestor: "Gestor", analista: "Analista" };
+const perfilLabels: Record<Membro["perfil"], string> = { admin: ROTULO_PERFIL.admin, gestor: ROTULO_PERFIL.gestor, analista: ROTULO_PERFIL.analista };
 
 const inviteStatusLabel = (invite: Invite) => {
   if (invite.status === "accepted") return "Aceito";
@@ -168,11 +169,12 @@ const Usuarios = () => {
                 <Select value={invPerfil} onValueChange={(v) => setInvPerfil(v as Membro["perfil"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="admin">{ROTULO_PERFIL.admin}</SelectItem>
                     <SelectItem value="gestor">Gestor</SelectItem>
-                    <SelectItem value="analista">Analista</SelectItem>
+                    <SelectItem value="analista">{ROTULO_PERFIL.analista}</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">{DESCRICAO_PERFIL[invPerfil]}</p>
               </div>
               <Button className="w-full" onClick={handleInvite} disabled={loadingInvite}>{loadingInvite ? "Enviando..." : "Enviar convite"}</Button>
             </div>

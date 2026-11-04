@@ -22,6 +22,7 @@ import { Bot, Loader2, Search, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, PROCESSO_STATUS, type ProcessoListItem, type ProcessoStatus } from "@/lib/processos";
+import { usePodeGerenciar } from "@/lib/perfil";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 import { entrevistaEmAberto, STATUS_CORES } from "@/lib/ciclo-processo";
 
@@ -40,6 +41,8 @@ const Processos = () => {
   const [lista, setLista] = useState<ProcessoListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  // Excluir entrevistas é de Consultor e Gestor.
+  const podeGerenciar = usePodeGerenciar(companyId);
   // Entrevistas paradas mostradas antes de começar outra, para não mapear o mesmo processo duas vezes.
   const [escolhendoInicio, setEscolhendoInicio] = useState(false);
   const [paraExcluir, setParaExcluir] = useState<ProcessoListItem | null>(null);
@@ -289,7 +292,7 @@ const Processos = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {processo.status === "Em entrevista" && (
+                      {processo.status === "Em entrevista" && podeGerenciar && (
                         <Button
                           variant="ghost"
                           size="icon"
