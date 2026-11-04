@@ -2,6 +2,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { loginRedirectFor } from "@/lib/auth-navigation";
+import { useEmpresaAtiva } from "@/lib/empresa-ativa";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
@@ -11,6 +12,8 @@ export function AppLayout() {
   // Telas de conversa ocupam a altura toda e rolam só por dentro.
   const isInterviewRoute = /\/processos\/(?:novo|[^/]+)\/entrevista$/.test(location.pathname) || location.pathname === "/inicio";
   const [authState, setAuthState] = useState<"loading" | "authenticated" | "anonymous">("loading");
+  // Trocar a empresa recarrega a tela aberta com os dados da nova empresa.
+  const empresaAtiva = useEmpresaAtiva();
 
   useEffect(() => {
     let active = true;
@@ -56,7 +59,7 @@ export function AppLayout() {
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
           <main className={`min-h-0 flex-1 p-3 sm:p-6 print:overflow-visible print:p-0 ${isInterviewRoute ? "overflow-hidden" : "overflow-auto"}`}>
-            <Outlet />
+            <Outlet key={empresaAtiva ?? "sem-empresa"} />
           </main>
         </div>
       </div>

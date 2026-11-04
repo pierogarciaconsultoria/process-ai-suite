@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { lerEmpresaAtiva, trocarEmpresaAtiva, useEmpresaAtiva } from "@/lib/empresa-ativa";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 
@@ -58,6 +59,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const isActive = (path: string) => location.pathname.startsWith(path);
+  const empresaAtiva = useEmpresaAtiva();
   const [empresas, setEmpresas] = useState<EmpresaOption[]>([]);
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [empresaId, setEmpresaId] = useState<string | undefined>(() => {
@@ -69,6 +71,15 @@ export function AppSidebar() {
       return undefined;
     }
   });
+  // O painel "Minhas empresas" também troca a empresa: o seletor acompanha.
+  useEffect(() => {
+    if (empresaAtiva && empresaAtiva !== empresaId) setEmpresaId(empresaAtiva);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empresaAtiva]);
+  // Quem acompanha mais de uma empresa (o consultor) vê o painel da carteira.
+  const itensDoMenu = empresas.length > 1
+    ? [mainItems[0], { title: "Minhas empresas", url: "/minhas-empresas", icon: Building2 }, ...mainItems.slice(1)]
+    : mainItems;
 
   useEffect(() => {
     let isMounted = true;
@@ -106,18 +117,11 @@ export function AppSidebar() {
       setEmpresas(list);
       setLoadingEmpresas(false);
       if (list.length === 0) return;
-      setEmpresaId((prev) => {
-        const exists = prev && list.some((e) => e.id === prev);
-        const nextId = exists ? prev! : list[0].id;
-        try {
-          window.localStorage.setItem("process:activeEmpresaId", nextId);
-          const nome = list.find((e) => e.id === nextId)?.nome ?? "";
-          window.localStorage.setItem("process:activeEmpresaNome", nome);
-        } catch (err) {
-          void err;
-        }
-        return nextId;
-      });
+      const guardada = lerEmpresaAtiva();
+      const nextId = guardada && list.some((e) => e.id === guardada) ? guardada : list[0].id;
+      setEmpresaId(nextId);
+      // Só avisa as telas se a empresa guardada não existia mais (troca de verdade).
+      if (nextId !== guardada) trocarEmpresaAtiva(nextId, list.find((e) => e.id === nextId)?.nome ?? "");
     };
 
     const loadEmpresas = (session: Session | null) => {
@@ -189,13 +193,7 @@ export function AppSidebar() {
                   // "removeChild ... not a child of this node" DOM error.
                   queueMicrotask(() => {
                     setEmpresaId(value);
-                    try {
-                      window.localStorage.setItem("process:activeEmpresaId", value);
-                      const nome = empresas.find((e) => e.id === value)?.nome ?? "";
-                      window.localStorage.setItem("process:activeEmpresaNome", nome);
-                    } catch (err) {
-                      void err;
-                    }
+                    trocarEmpresaAtiva(value, empresas.find((e) => e.id === value)?.nome ?? "");
                   });
                 }}
               >
@@ -240,7 +238,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {itensDoMenu.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
