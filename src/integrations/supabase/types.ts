@@ -14,6 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
+      acoes: {
+        Row: {
+          id: string
+          company_id: string
+          processo_id: string | null
+          origem: string
+          chave_origem: string | null
+          oque: string
+          porque: string
+          onde: string
+          como: string
+          quem: string
+          prazo: string | null
+          quando_texto: string
+          custo: string
+          status: string
+          concluida_em: string | null
+          resultado: string
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          processo_id?: string | null
+          origem?: string
+          chave_origem?: string | null
+          oque: string
+          porque?: string
+          onde?: string
+          como?: string
+          quem?: string
+          prazo?: string | null
+          quando_texto?: string
+          custo?: string
+          status?: string
+          concluida_em?: string | null
+          resultado?: string
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          processo_id?: string | null
+          origem?: string
+          chave_origem?: string | null
+          oque?: string
+          porque?: string
+          onde?: string
+          como?: string
+          quem?: string
+          prazo?: string | null
+          quando_texto?: string
+          custo?: string
+          status?: string
+          concluida_em?: string | null
+          resultado?: string
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acoes_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_configurations: {
         Row: {
           company_id: string

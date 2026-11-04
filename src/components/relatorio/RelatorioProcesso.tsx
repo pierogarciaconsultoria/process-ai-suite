@@ -1,10 +1,11 @@
-import { Pencil, Workflow } from "lucide-react";
+import { ListChecks, Pencil, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DiagnosticoView, PlanoView } from "@/components/entrevista/AnaliseRoteiro";
 import { MapaBpmnImagem } from "@/components/relatorio/MapaBpmnImagem";
 import type { SecaoEditavel } from "@/lib/edicao-processo";
+import { estaAtrasada, formatarPrazo, type Acao } from "@/lib/plano-de-acao";
 import type { ItemRelatorio, RelatorioProcesso as Relatorio } from "@/lib/relatorio-processo";
 
 function formatarData(data: string): string {
@@ -156,15 +157,59 @@ function TabelaSipoc({ sipoc }: { sipoc: Relatorio["sipoc"] }) {
 }
 
 // Com `onEditar`, cada seção ganha o botão Editar (página do processo); sem ele, o relatório é só leitura.
+// Execução do plano: as ações que já estão no Plano de Ação, com status e prazo.
+function ExecucaoDoPlano({ acoes }: { acoes: Acao[] }) {
+  return (
+    <div className="space-y-2 print:break-inside-avoid">
+      <h3 className="text-sm font-semibold text-foreground">Execução do plano de ação</h3>
+      <div className="overflow-x-auto rounded-md border print:overflow-visible">
+        <Table className="min-w-[560px] text-xs print:min-w-0">
+          <TableHeader>
+            <TableRow>
+              <TableHead>O quê</TableHead>
+              <TableHead>Quem</TableHead>
+              <TableHead>Prazo</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {acoes.map((acao) => (
+              <TableRow key={acao.id} className="print:break-inside-avoid">
+                <TableCell className="font-medium">{acao.oque}</TableCell>
+                <TableCell>{acao.quem || "[a definir]"}</TableCell>
+                <TableCell className={estaAtrasada(acao) ? "font-medium text-destructive" : ""}>
+                  {formatarPrazo(acao)}{estaAtrasada(acao) ? " (atrasada)" : ""}
+                </TableCell>
+                <TableCell>{acao.status}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+// Com `onEditar`, cada seção ganha o botão Editar (página do processo); sem ele, o relatório é só leitura.
+// Com `acoes`, o plano mostra a execução no Plano de Ação; `acoesPendentes` são as do 5W2H ainda não enviadas.
 export function RelatorioProcesso({
   relatorio,
   onEditar,
   onEditarMapa,
+  acoes = [],
+  acoesPendentes = 0,
+  onEnviarAcoes,
+  onAbrirPlanoDeAcao,
 }: {
   relatorio: Relatorio;
   onEditar?: (secao: SecaoEditavel) => void;
   onEditarMapa?: () => void;
+  acoes?: Acao[];
+  acoesPendentes?: number;
+  onEnviarAcoes?: () => void;
+  onAbrirPlanoDeAcao?: () => void;
 }) {
+  const emExecucao = acoes.length > 0;
   let secao = 0;
   const proxima = () => ++secao;
   const editar = (alvo: SecaoEditavel) => (onEditar ? () => onEditar(alvo) : undefined);
@@ -285,8 +330,21 @@ export function RelatorioProcesso({
         {relatorio.diagnostico ? <DiagnosticoView diagnostico={relatorio.diagnostico} /> : <NaoInformado texto="O diagnóstico ainda não foi gerado." />}
       </Secao>
 
-      <Secao numero={proxima()} titulo="Plano de melhoria" onEditar={relatorio.plano ? editar("plano") : undefined}>
-        {relatorio.plano ? <PlanoView plano={relatorio.plano} /> : <NaoInformado texto="O plano de melhoria ainda não foi definido." />}
+      <Secao numero={proxima()} titulo="Plano de melhoria" onEditar={relatorio.plano && !emExecucao ? editar("plano") : undefined}>
+        {relatorio.plano ? <PlanoView plano={relatorio.plano} semPlanoAcao={emExecucao} /> : <NaoInformado texto="O plano de melhoria ainda não foi definido." />}
+        {emExecucao && <ExecucaoDoPlano acoes={acoes} />}
+        {(onEnviarAcoes && acoesPendentes > 0) || (onAbrirPlanoDeAcao && emExecucao) ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-sm print:hidden">
+            <ListChecks className="h-4 w-4 text-primary" aria-hidden />
+            <span className="flex-1 text-muted-foreground">
+              {acoesPendentes > 0
+                ? `${acoesPendentes === 1 ? "1 ação do plano ainda não está" : `${acoesPendentes} ações do plano ainda não estão`} no Plano de Ação, onde são acompanhadas até a conclusão.`
+                : "As ações deste plano são acompanhadas no Plano de Ação."}
+            </span>
+            {onEnviarAcoes && acoesPendentes > 0 && <Button size="sm" onClick={onEnviarAcoes}>Enviar ao Plano de Ação</Button>}
+            {onAbrirPlanoDeAcao && emExecucao && <Button size="sm" variant="outline" onClick={onAbrirPlanoDeAcao}>Abrir Plano de Ação</Button>}
+          </div>
+        ) : null}
       </Secao>
 
       {relatorio.proximosPassos.length > 0 && (
