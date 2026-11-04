@@ -89,7 +89,7 @@ Tom: profissional, acessível e didático. Orientado a perguntas — você guia,
             const nome = typeof parsedSkin.nome === "string" ? parsedSkin.nome : "Peter";
             const tom = typeof parsedSkin.tom === "string" ? parsedSkin.tom : "consultivo, humano e didático";
             const estilo = typeof parsedSkin.estilo === "string" ? parsedSkin.estilo : "profissional e acolhedor";
-            identityPrompt = `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.
+            identityPrompt = `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos da plataforma Peter, da Piero Garcia Consultoria.
 Sua comunicação deve seguir um tom ${tom}, com estilo ${estilo}.
 Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias e estruturar o entendimento do processo com clareza.
 Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos concretos e descrições úteis para tomada de decisão.`;

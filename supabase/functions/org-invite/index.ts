@@ -104,7 +104,7 @@ async function sendInviteEmail(args: {
   const safePerfil = escapeHtml(args.perfil);
   const html = `
     <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
-      <h2>Voce recebeu um convite para acessar o Process Intelligence</h2>
+      <h2>Voce recebeu um convite para acessar o Peter</h2>
       <p><strong>${safeInviter}</strong> convidou voce para acessar a empresa <strong>${safeCompany}</strong> com o perfil <strong>${safePerfil}</strong>.</p>
       <p>Use o link abaixo para aceitar o convite:</p>
       <p><a href="${inviteUrl}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;">Aceitar convite</a></p>
@@ -114,7 +114,7 @@ async function sendInviteEmail(args: {
     </div>
   `;
   const text = [
-    "Voce recebeu um convite para acessar o Process Intelligence.",
+    "Voce recebeu um convite para acessar o Peter.",
     `${args.invitedByName} convidou voce para a empresa ${args.companyName} com o perfil ${args.perfil}.`,
     `Aceite o convite em: ${inviteUrl}`,
     `Expiracao: ${expiresLabel}`,
