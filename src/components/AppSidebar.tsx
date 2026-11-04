@@ -8,6 +8,7 @@ import {
   LogOut,
   Building2,
   ListChecks,
+  Gauge,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -34,6 +35,7 @@ const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Processos", url: "/processos", icon: ClipboardList },
   { title: "Documentos", url: "/documentos", icon: FileText },
+  { title: "Indicadores", url: "/indicadores", icon: Gauge },
   { title: "Plano de Ação", url: "/plano-de-acao", icon: ListChecks },
   { title: "Relatórios", url: "/relatorios", icon: FileText },
 ];

@@ -32,6 +32,7 @@ const EntrevistaProcesso = React.lazy(() => import("./pages/EntrevistaProcesso")
 const ProcessoResultadoGuiado = React.lazy(() => import("./pages/ProcessoResultadoGuiado"));
 const ProcessoMapa = React.lazy(() => import("./pages/ProcessoMapa"));
 const PlanoDeAcao = React.lazy(() => import("./pages/PlanoDeAcao"));
+const Indicadores = React.lazy(() => import("./pages/Indicadores"));
 
 // O formulário e o diagnóstico antigos deram lugar à página do processo, que edita por seção.
 function ParaPaginaDoProcesso() {
@@ -97,6 +98,7 @@ const App = () => (
                 <Route path="/processos/:id" element={<ProcessoDetalhe />} />
                 <Route path="/documentos" element={<Documentos />} />
                 <Route path="/plano-de-acao" element={<PlanoDeAcao />} />
+                <Route path="/indicadores" element={<Indicadores />} />
               <Route path="/processos/:id/editar" element={<ParaPaginaDoProcesso />} />
               <Route path="/processos/:id/diagnostico" element={<ParaPaginaDoProcesso />} />
                 <Route path="/arquitetura" element={<Arquitetura />} />

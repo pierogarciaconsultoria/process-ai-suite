@@ -12,6 +12,7 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { atualizacaoDaAcao, DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao, type AcaoCiclo } from "@/lib/ciclo-processo";
 import { atualizacaoDaSecao, type RascunhoSecao, type SecaoEditavel } from "@/lib/edicao-processo";
 import { buscarProcessoComMesmoNome, chaveDoNome, mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
+import { indicadoresAindaNaoEnviados, ultimaMedicao, type Indicador, type Medicao } from "@/lib/indicadores";
 import { acoesAindaNaoEnviadas, type Acao } from "@/lib/plano-de-acao";
 import { montarRelatorio } from "@/lib/relatorio-processo";
 import type { Tables } from "@/integrations/supabase/types";
@@ -36,6 +37,8 @@ const ProcessoDetalhe = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [editando, setEditando] = useState<SecaoEditavel | null>(null);
   const [acoes, setAcoes] = useState<Acao[]>([]);
+  const [indicadores, setIndicadores] = useState<Indicador[]>([]);
+  const [medicoes, setMedicoes] = useState<Medicao[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,6 +99,25 @@ const ProcessoDetalhe = () => {
         if (error) console.warn("Plano de Ação indisponível:", error);
         else if (ativo) setAcoes(data ?? []);
       });
+    void supabase
+      .from("indicadores")
+      .select("*")
+      .eq("processo_id", processoId)
+      .eq("company_id", empresaDoProcesso)
+      .order("nome")
+      .then(async ({ data, error }) => {
+        if (error) {
+          console.warn("Indicadores indisponíveis:", error);
+          return;
+        }
+        const lista = data ?? [];
+        const { data: resultados } = lista.length
+          ? await supabase.from("indicador_medicoes").select("*").in("indicador_id", lista.map((item) => item.id)).order("periodo")
+          : { data: [] as Medicao[] };
+        if (!ativo) return;
+        setIndicadores(lista);
+        setMedicoes(resultados ?? []);
+      });
     return () => {
       ativo = false;
     };
@@ -103,6 +125,28 @@ const ProcessoDetalhe = () => {
 
   const relatorio = useMemo(() => (processo ? montarRelatorio(processo) : null), [processo]);
   const acoesPendentes = useMemo(() => (processo ? acoesAindaNaoEnviadas(processo, acoes, "").length : 0), [processo, acoes]);
+  const indicadoresPendentes = useMemo(() => (processo ? indicadoresAindaNaoEnviados(processo, indicadores, "").length : 0), [processo, indicadores]);
+  const acompanhados = useMemo(
+    () => indicadores.map((indicador) => ({ indicador, ultima: ultimaMedicao(medicoes, indicador.id) })),
+    [indicadores, medicoes],
+  );
+
+  const enviarIndicadores = async () => {
+    if (!processo) return;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sessão expirada. Entre de novo.");
+      const novos = indicadoresAindaNaoEnviados(processo, indicadores, auth.user.id);
+      if (novos.length === 0) return;
+      const { data, error } = await supabase.from("indicadores").insert(novos).select("*");
+      if (error) throw error;
+      setIndicadores((atuais) => [...atuais, ...(data ?? [])]);
+      toast({ title: `${novos.length === 1 ? "1 indicador enviado" : `${novos.length} indicadores enviados`} para Indicadores`, description: "Confira a meta de cada um antes de lançar os resultados." });
+    } catch (error) {
+      console.error("Erro ao enviar indicadores:", error);
+      toast({ title: "Não foi possível enviar os indicadores", description: mensagemDoErroDoProcesso(error, "Tente novamente."), variant: "destructive" });
+    }
+  };
 
   const enviarAcoes = async () => {
     if (!processo) return;
@@ -232,8 +276,12 @@ const ProcessoDetalhe = () => {
             acoesPendentes={acoesPendentes}
             onEnviarAcoes={() => void enviarAcoes()}
             onAbrirPlanoDeAcao={() => navigate(`/plano-de-acao?processo=${id}`)}
+            indicadores={acompanhados}
+            indicadoresPendentes={indicadoresPendentes}
+            onEnviarIndicadores={() => void enviarIndicadores()}
+            onAbrirIndicadores={() => navigate(`/indicadores?processo=${id}`)}
           />
-          <EditorSecao processo={processo!} secao={editando} onFechar={() => setEditando(null)} onSalvar={salvarSecao} />
+          <EditorSecao processo={processo!} secao={editando} onFechar={() => setEditando(null)} onSalvar={salvarSecao} indicadoresNoModulo={indicadores.length > 0} />
         </>
       )}
     </div>
