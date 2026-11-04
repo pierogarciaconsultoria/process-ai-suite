@@ -1400,14 +1400,15 @@ export default function Documentos() {
       </Card>
 
       <Dialog open={isNewDocumentOpen} onOpenChange={setIsNewDocumentOpen}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
+        {/* Cabe em qualquer tela: cabeçalho e botões fixos, o meio rola. */}
+        <DialogContent className="flex max-h-[95dvh] w-[calc(100vw-1rem)] max-w-5xl flex-col gap-0 p-0 sm:w-[calc(100vw-2rem)]">
+          <DialogHeader className="shrink-0 border-b px-4 py-4 pr-12 text-left sm:px-6">
             <DialogTitle>Novo Documento</DialogTitle>
-            <DialogDescription>Escolha entre procedimento vinculado a processo ou procedimento independente. O template ativo vem exclusivamente de Configurações → Documentação do Processo.</DialogDescription>
+            <DialogDescription>Vincule a um processo mapeado ou crie um procedimento independente.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-2">
+            <div className="min-w-0 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setSourceMode("linked_process")}
@@ -1526,10 +1527,13 @@ export default function Documentos() {
                 </CardContent>
               </Card>
             </div>
-            <div className="space-y-2">
-              <Label>Conteúdo do procedimento</Label>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="conteudo-procedimento">Conteúdo do procedimento</Label>
+              {/* Sem quebra de linha: tabelas em markdown ficam legíveis e o texto rola na horizontal. */}
               <Textarea
-                className="min-h-[420px] font-mono text-xs"
+                id="conteudo-procedimento"
+                wrap="off"
+                className="min-h-[300px] overflow-x-auto whitespace-pre font-mono text-xs lg:min-h-[420px]"
                 value={previewMarkdown}
                 onChange={(e) => setPreviewMarkdown(e.target.value)}
                 placeholder="A prévia do procedimento aparecerá aqui."
@@ -1542,7 +1546,7 @@ export default function Documentos() {
               ) : null}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 gap-2 border-t px-4 py-3 sm:px-6">
             <Button variant="outline" onClick={() => setIsNewDocumentOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveDocument} disabled={!previewMarkdown.trim() || isPersisting}>
               <CheckCircle2 className="mr-2 h-4 w-4" /> {isPersisting ? "Salvando..." : "Salvar documento"}
