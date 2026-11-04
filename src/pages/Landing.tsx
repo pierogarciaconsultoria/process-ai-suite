@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check, FileText, MessageSquare, Network, Workflow } from "lucide-react";
+import { ArrowRight, Check, FileText, Mail, MessageSquare, Network, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,8 +133,11 @@ export default function Landing() {
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto max-w-6xl px-4 py-6 text-sm text-muted-foreground sm:px-6">
-          © {new Date().getFullYear()} Process Intelligence · Piero Garcia Consultoria
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span>© {new Date().getFullYear()} Process Intelligence · Piero Garcia Consultoria</span>
+          <a href="mailto:contato@pierogarcia.com.br" className="inline-flex items-center gap-2 hover:text-foreground hover:underline">
+            <Mail className="h-4 w-4" aria-hidden /> contato@pierogarcia.com.br
+          </a>
         </div>
       </footer>
     </div>
