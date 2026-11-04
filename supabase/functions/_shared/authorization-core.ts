@@ -9,17 +9,11 @@ export class HttpError extends Error {
 
 type QueryResult<T> = PromiseLike<{ data: T | null; error: { message?: string } | null }>;
 
+// O cliente Supabase tem tipos muito profundos; aceitamos qualquer cliente com .from()
+// e conferimos o formato dos resultados em runtime (PromiseLike cobre PostgrestBuilder).
 export type AuthorizationClient = {
-  from(table: string): {
-    select(columns: string): {
-      eq(column: string, value: string): {
-        eq(column: string, value: string): {
-          maybeSingle(): QueryResult<Record<string, unknown>>;
-        };
-        maybeSingle(): QueryResult<Record<string, unknown>>;
-      };
-    };
-  };
+  // deno-lint-ignore no-explicit-any
+  from(table: string): any;
 };
 
 // Mensagem de qualquer erro, inclusive os objetos de erro do Supabase (PostgrestError), que não são Error.
