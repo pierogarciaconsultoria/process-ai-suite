@@ -11,6 +11,23 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { lerExtras, rotaDoAtalho, SUGESTOES, type Conversa, type MensagemChat } from "@/lib/peter-chat";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 
+// Erro da chamada à função ai-peter-chat em português: sem conexão com a função ou a causa que ela devolveu.
+async function mensagemDaFalha(error: unknown): Promise<string> {
+  const falha = error as { name?: string; message?: string; context?: { json?: () => Promise<unknown> } };
+  if (falha?.name === "FunctionsFetchError" || /Failed to send a request/i.test(falha?.message ?? "")) {
+    return "O Peter não está disponível agora. Tente de novo em instantes; se continuar, avise o suporte.";
+  }
+  if (falha?.name === "FunctionsHttpError" && typeof falha.context?.json === "function") {
+    try {
+      const corpo = (await falha.context.json()) as { error?: unknown };
+      if (typeof corpo?.error === "string" && corpo.error) return corpo.error;
+    } catch {
+      // Sem corpo legível: segue para a mensagem padrão.
+    }
+  }
+  return mensagemDoErroDoProcesso(error, "Não consegui falar com o Peter. Tente de novo.");
+}
+
 function ListaDeConversas({
   conversas,
   atual,
@@ -84,6 +101,13 @@ const PeterChat = () => {
     })();
     return () => {
       ativo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.dataset.conversaPeter = "true";
+    return () => {
+      delete document.body.dataset.conversaPeter;
     };
   }, []);
 
@@ -167,7 +191,7 @@ const PeterChat = () => {
     } catch (error) {
       setMensagens((atuais) => atuais.filter((item) => item.id !== "enviando"));
       setTexto(mensagem);
-      setErro(mensagemDoErroDoProcesso(error, "Não consegui falar com o Peter. Tente de novo."));
+      setErro(await mensagemDaFalha(error));
     } finally {
       setPensando(false);
     }
@@ -194,9 +218,12 @@ const PeterChat = () => {
           </Button>
           <Bot className="h-5 w-5 text-primary" aria-hidden />
           <h1 className="text-lg font-semibold text-foreground">Peter</h1>
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => mapear()}>
-            Mapear um processo <ArrowRight className="ml-1 h-4 w-4" />
-          </Button>
+          {/* Na conversa vazia, o convite já está no centro da tela. */}
+          {mensagens.length > 0 && (
+            <Button variant="outline" size="sm" className="ml-auto" onClick={() => mapear()}>
+              Mapear um processo <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
         </header>
 
         <div ref={rolagemRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5">

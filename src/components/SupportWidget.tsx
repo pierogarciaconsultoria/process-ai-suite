@@ -78,7 +78,8 @@ const SupportWidget = () => {
 
   return (
     <>
-      <div className="no-print fixed bottom-6 right-6 z-50">
+      {/* Some na tela de conversa com o Peter, onde cobriria o botão Enviar. */}
+      <div className="no-print fixed bottom-6 right-6 z-50 [body[data-conversa-peter]_&]:hidden">
         <Button size="icon" className="h-14 w-14 rounded-full shadow-lg" onClick={() => setOpen((v) => !v)}>
           <MessageCircle className="h-6 w-6" />
         </Button>
