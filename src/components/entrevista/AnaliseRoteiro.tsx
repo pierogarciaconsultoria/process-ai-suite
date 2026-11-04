@@ -89,7 +89,8 @@ export function DiagnosticoView({ diagnostico }: { diagnostico: DiagnosticoRotei
   );
 }
 
-export function PlanoView({ plano }: { plano: PlanoMelhoriaRoteiro }) {
+// `semPlanoAcao`: o 5W2H já está no Plano de Ação e a execução é mostrada no lugar da proposta.
+export function PlanoView({ plano, semPlanoAcao = false }: { plano: PlanoMelhoriaRoteiro; semPlanoAcao?: boolean }) {
   return (
     <div className="space-y-5">
       {plano.resumoToBe && (
@@ -116,7 +117,7 @@ export function PlanoView({ plano }: { plano: PlanoMelhoriaRoteiro }) {
         </Secao>
       )}
 
-      {plano.planoAcao.length > 0 && (
+      {plano.planoAcao.length > 0 && !semPlanoAcao && (
         <Secao titulo="Plano de ação (5W2H)" junto>
           <div className="overflow-x-auto rounded-md border print:overflow-visible">
             <Table className="min-w-[720px] text-xs print:min-w-0">

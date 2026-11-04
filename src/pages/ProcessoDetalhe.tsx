@@ -12,6 +12,7 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { atualizacaoDaAcao, DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao, type AcaoCiclo } from "@/lib/ciclo-processo";
 import { atualizacaoDaSecao, type RascunhoSecao, type SecaoEditavel } from "@/lib/edicao-processo";
 import { buscarProcessoComMesmoNome, chaveDoNome, mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
+import { acoesAindaNaoEnviadas, type Acao } from "@/lib/plano-de-acao";
 import { montarRelatorio } from "@/lib/relatorio-processo";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -34,6 +35,7 @@ const ProcessoDetalhe = () => {
   const [processo, setProcesso] = useState<Tables<"processos"> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editando, setEditando] = useState<SecaoEditavel | null>(null);
+  const [acoes, setAcoes] = useState<Acao[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -78,7 +80,46 @@ const ProcessoDetalhe = () => {
     };
   }, [id]);
 
+  // As ações do processo no Plano de Ação; sem a tabela (migration ainda não aplicada), o relatório segue sem elas.
+  const processoId = processo?.id;
+  const empresaDoProcesso = processo?.company_id;
+  useEffect(() => {
+    if (!processoId || !empresaDoProcesso) return;
+    let ativo = true;
+    void supabase
+      .from("acoes")
+      .select("*")
+      .eq("processo_id", processoId)
+      .eq("company_id", empresaDoProcesso)
+      .order("created_at")
+      .then(({ data, error }) => {
+        if (error) console.warn("Plano de Ação indisponível:", error);
+        else if (ativo) setAcoes(data ?? []);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [processoId, empresaDoProcesso]);
+
   const relatorio = useMemo(() => (processo ? montarRelatorio(processo) : null), [processo]);
+  const acoesPendentes = useMemo(() => (processo ? acoesAindaNaoEnviadas(processo, acoes, "").length : 0), [processo, acoes]);
+
+  const enviarAcoes = async () => {
+    if (!processo) return;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sessão expirada. Entre de novo.");
+      const novas = acoesAindaNaoEnviadas(processo, acoes, auth.user.id);
+      if (novas.length === 0) return;
+      const { data, error } = await supabase.from("acoes").insert(novas).select("*");
+      if (error) throw error;
+      setAcoes((atuais) => [...atuais, ...(data ?? [])]);
+      toast({ title: `${novas.length === 1 ? "1 ação enviada" : `${novas.length} ações enviadas`} ao Plano de Ação` });
+    } catch (error) {
+      console.error("Erro ao enviar ações:", error);
+      toast({ title: "Não foi possível enviar as ações", description: mensagemDoErroDoProcesso(error, "Tente novamente."), variant: "destructive" });
+    }
+  };
   const entrevistaEmAndamento = relatorio?.entrevista ? !relatorio.entrevista.concluida : false;
   const documentacaoLiberada = podeGerarDocumentacao(processo?.status);
 
@@ -183,7 +224,15 @@ const ProcessoDetalhe = () => {
       ) : (
         <>
           <CicloProcesso status={processo!.status} onAcao={executarAcao} />
-          <RelatorioProcesso relatorio={relatorio} onEditar={setEditando} onEditarMapa={() => navigate(`/processos/${id}/mapa`)} />
+          <RelatorioProcesso
+            relatorio={relatorio}
+            onEditar={setEditando}
+            onEditarMapa={() => navigate(`/processos/${id}/mapa`)}
+            acoes={acoes}
+            acoesPendentes={acoesPendentes}
+            onEnviarAcoes={() => void enviarAcoes()}
+            onAbrirPlanoDeAcao={() => navigate(`/plano-de-acao?processo=${id}`)}
+          />
           <EditorSecao processo={processo!} secao={editando} onFechar={() => setEditando(null)} onSalvar={salvarSecao} />
         </>
       )}

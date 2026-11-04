@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   linha: null as Record<string, unknown> | null,
   updates: [] as Record<string, unknown>[],
   outros: [] as Record<string, unknown>[],
+  acoes: [] as Record<string, unknown>[],
+  inserts: [] as Record<string, unknown>[][],
 }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
@@ -16,11 +18,21 @@ vi.mock("@/integrations/supabase/client", () => {
     maybeSingle: async () => ({ data: mocks.linha, error: null }),
     order: async () => ({ data: mocks.outros, error: null }),
   };
+  const filtroAcoes = { eq: () => filtroAcoes, order: async () => ({ data: mocks.acoes, error: null }) };
   return {
     supabase: {
       auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },
-      from: () => ({
-        select: () => filtroSelect,
+      from: (tabela: string) => ({
+        select: () => (tabela === "acoes" ? filtroAcoes : filtroSelect),
+        insert: (linhas: Record<string, unknown>[]) => {
+          mocks.inserts.push(linhas);
+          return {
+            select: async () => ({
+              data: linhas.map((linha, indice) => ({ ...linha, id: `acao-${indice}`, status: "A fazer", created_at: "2026-11-04T00:00:00Z" })),
+              error: null,
+            }),
+          };
+        },
         update: (payload: Record<string, unknown>) => {
           mocks.updates.push(payload);
           const filtro = {
@@ -35,6 +47,8 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 import { Toaster } from "@/components/ui/toaster";
+import { ROTEIRO_PADRAO } from "../../supabase/functions/_shared/roteiro-entrevista";
+import { iniciarRoteiro } from "../../supabase/functions/_shared/roteiro-engine";
 import ProcessoDetalhe from "@/pages/ProcessoDetalhe";
 
 function linha(status: string) {
@@ -63,6 +77,35 @@ describe("Tela do processo — ciclo de vida", () => {
   beforeEach(() => {
     mocks.updates.length = 0;
     mocks.outros = [];
+    mocks.acoes = [];
+    mocks.inserts.length = 0;
+  });
+
+  it("envia o 5W2H ao Plano de Ação e passa a mostrar a execução no relatório", async () => {
+    const estado = iniciarRoteiro(ROTEIRO_PADRAO);
+    estado.analises.plano_melhoria = {
+      resumoToBe: "Compras com cotação no ERP",
+      melhorias: [{ titulo: "Cotação no ERP", problema: "", solucao: "", beneficio: "", prioridade: "Alta" }],
+      planoAcao: [
+        { oque: "Configurar cotação no ERP", porque: "", quem: "[a definir]", quando: "[a definir]", onde: "", como: "", custo: "" },
+        { oque: "Treinar compradores", porque: "", quem: "Coordenadora", quando: "12/2026", onde: "", como: "", custo: "" },
+      ],
+    };
+    mocks.linha = { ...linha("Melhorias aprovadas"), entrevista_roteiro: estado };
+    renderizar();
+
+    expect(await screen.findByText(/2 ações do plano ainda não estão no Plano de Ação/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar Plano de melhoria" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Enviar ao Plano de Ação" }));
+
+    await waitFor(() => expect(mocks.inserts).toHaveLength(1));
+    expect(mocks.inserts[0].map((acao) => acao.oque)).toEqual(["Configurar cotação no ERP", "Treinar compradores"]);
+    expect(mocks.inserts[0][1]).toMatchObject({ origem: "plano_processo", processo_id: "proc-1", prazo: "2026-12-31", created_by: "user-1" });
+    expect(await screen.findByText("Execução do plano de ação")).toBeInTheDocument();
+    expect(screen.getByText("31/12/2026")).toBeInTheDocument();
+    // O plano agora é acompanhado no Plano de Ação, não editado no relatório.
+    expect(screen.queryByRole("button", { name: "Editar Plano de melhoria" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir Plano de Ação" })).toBeInTheDocument();
   });
 
   it("edita uma seção no painel lateral e o relatório mostra a correção", async () => {
