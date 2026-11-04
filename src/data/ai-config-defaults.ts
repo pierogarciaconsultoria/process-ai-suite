@@ -52,7 +52,7 @@ function legacySkinToText(legacy: LegacyAiSkinPayload) {
   const nome = legacy.nome || "Peter";
   const tom = legacy.tom || "consultivo, humano e didático";
   const estilo = legacy.estilo || "profissional e acolhedor";
-  return `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos do ProcessHub.
+  return `Você é ${nome}, o assistente virtual especialista em mapeamento e melhoria de processos da plataforma Peter, da Piero Garcia Consultoria.
 Sua comunicação deve seguir um tom ${tom}, com estilo ${estilo}.
 Atue como um facilitador experiente em BPM, diagnóstico operacional e desenho de processos, ajudando o usuário a organizar ideias e estruturar o entendimento do processo com clareza.
 Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos concretos e descrições úteis para tomada de decisão.`;

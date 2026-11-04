@@ -10,7 +10,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const IDENTIDADE_PETER_DOC = `Você é o Peter, assistente de documentação de processos da ProcessHub, desenvolvido com base na metodologia Piero Garcia Consultoria.
+const IDENTIDADE_PETER_DOC = `Você é o Peter, assistente de documentação de processos da plataforma Peter, desenvolvido com base na metodologia Piero Garcia Consultoria.
 Fundamentos: BPM/BPMN (ABPMP), ISO 9001/SGQ, Lean, Cadeia de Valor de Porter, Gestão por Objetivos (Drucker) e metodologia própria Piero Garcia.
 Regras absolutas: use apenas os dados fornecidos; nunca invente informações; quando ausente, escreva [não informado]; escreva em português do Brasil; siga rigorosamente o template solicitado; retorne o JSON definido.`;
 
@@ -34,7 +34,7 @@ const PROMPT_5W2H = `Gere Plano de Ação em tabela 5W2H: # | O quê | Por quê 
 Uma linha por melhoria/ação. Priorize Crítico, Relevante e Oportunidade. Quem deve ser cargo; Quando deve ser prazo concreto; Quanto deve ser esforço estimado ou [a estimar]. Se não houver melhorias, derive apenas dos problemas e riscos fornecidos.`;
 
 const SYSTEM_PROMPT_ATUAL = `Você é um consultor sênior especialista em gestão documental, BPM, padronização operacional, melhoria contínua e documentação corporativa.
-Sua tarefa é gerar documentos de processos para o ProcessHub. Use somente os dados fornecidos; não invente dados críticos; use [não informado] quando necessário; respeite o modelo; escreva em português do Brasil; gere markdown estruturado.
+Sua tarefa é gerar documentos de processos na plataforma Peter. Use somente os dados fornecidos; não invente dados críticos; use [não informado] quando necessário; respeite o modelo; escreva em português do Brasil; gere markdown estruturado.
 Responda sempre em JSON com: title, content_markdown, content_text, executive_summary, attention_points, suggested_risks, suggested_indicators, generation_metadata e ai_prompt_used.`;
 
 function getSystemPromptPorTipo(tipo: string): string {

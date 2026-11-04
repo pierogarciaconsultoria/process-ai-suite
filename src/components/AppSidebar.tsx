@@ -167,7 +167,7 @@ export function AppSidebar() {
                 </div>
                 <div>
                   <h2 className="text-sm font-bold tracking-tight text-sidebar-foreground">
-                    Process Intelligence
+                    Peter
                   </h2>
                   <p className="text-[10px] text-sidebar-foreground/60">by Piero Garcia</p>
                 </div>

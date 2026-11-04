@@ -149,7 +149,7 @@ const ConviteAceite = () => {
             <Network className="h-7 w-7 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Aceite de Convite</h1>
-          <p className="text-sm text-muted-foreground mt-1">Process Intelligence</p>
+          <p className="text-sm text-muted-foreground mt-1">Peter</p>
         </div>
 
         <Card>

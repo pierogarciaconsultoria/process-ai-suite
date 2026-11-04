@@ -46,7 +46,7 @@ export default function Landing() {
               <Network className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold text-foreground">Process Intelligence</h1>
+              <h1 className="truncate text-lg font-bold text-foreground">Peter</h1>
               <p className="text-xs text-muted-foreground">by Piero Garcia</p>
             </div>
           </div>
@@ -134,7 +134,7 @@ export default function Landing() {
 
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© {new Date().getFullYear()} Process Intelligence · Piero Garcia Consultoria</span>
+          <span>© {new Date().getFullYear()} Peter · Piero Garcia Consultoria</span>
           <a href="mailto:contato@pierogarcia.com.br" className="inline-flex items-center gap-2 hover:text-foreground hover:underline">
             <Mail className="h-4 w-4" aria-hidden /> contato@pierogarcia.com.br
           </a>
