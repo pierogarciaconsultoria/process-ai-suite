@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,9 +14,7 @@ const Landing = React.lazy(() => import("./pages/Landing"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Empresas = React.lazy(() => import("./pages/Empresas"));
 const Processos = React.lazy(() => import("./pages/Processos"));
-const ProcessoFormulario = React.lazy(() => import("./pages/ProcessoFormulario"));
 const ProcessoDetalhe = React.lazy(() => import("./pages/ProcessoDetalhe"));
-const ProcessoDiagnostico = React.lazy(() => import("./pages/ProcessoDiagnostico"));
 const Documentos = React.lazy(() => import("./pages/Documentos"));
 const Arquitetura = React.lazy(() => import("./pages/Arquitetura"));
 const Usuarios = React.lazy(() => import("./pages/Usuarios"));
@@ -33,6 +31,12 @@ const NotFound = React.lazy(() => import("./pages/NotFound"));
 const EntrevistaProcesso = React.lazy(() => import("./pages/EntrevistaProcesso"));
 const ProcessoResultadoGuiado = React.lazy(() => import("./pages/ProcessoResultadoGuiado"));
 const ProcessoMapa = React.lazy(() => import("./pages/ProcessoMapa"));
+
+// O formulário e o diagnóstico antigos deram lugar à página do processo, que edita por seção.
+function ParaPaginaDoProcesso() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/processos/${id}`} replace />;
+}
 
 const queryClient = new QueryClient();
 
@@ -88,11 +92,11 @@ const App = () => (
                 <Route path="/processos/:id/resultado-guiado" element={<ProcessoResultadoGuiado />} />
                 <Route path="/processos/:id/mapa" element={<ProcessoMapa />} />
                 <Route path="/processos/entrevista" element={<Navigate to="/processos/novo/entrevista" replace />} />
-                <Route path="/processos/diagnostico" element={<ProcessoDiagnostico />} />
+                <Route path="/processos/diagnostico" element={<Navigate to="/processos" replace />} />
                 <Route path="/processos/:id" element={<ProcessoDetalhe />} />
                 <Route path="/documentos" element={<Documentos />} />
-              <Route path="/processos/:id/editar" element={<ProcessoFormulario />} />
-              <Route path="/processos/:id/diagnostico" element={<ProcessoDiagnostico />} />
+              <Route path="/processos/:id/editar" element={<ParaPaginaDoProcesso />} />
+              <Route path="/processos/:id/diagnostico" element={<ParaPaginaDoProcesso />} />
                 <Route path="/arquitetura" element={<Arquitetura />} />
               <Route path="/relatorios" element={<Relatorios />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />

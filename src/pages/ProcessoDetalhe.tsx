@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Download, FileText, GitBranch, Loader2, MessageSquare, Pencil, Workflow } from "lucide-react";
+import { ArrowLeft, Download, FileText, GitBranch, Loader2, MessageSquare, Workflow } from "lucide-react";
 import { CicloProcesso } from "@/components/processo/CicloProcesso";
+import { EditorSecao } from "@/components/relatorio/EditorSecao";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { atualizacaoDaAcao, DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao, type AcaoCiclo } from "@/lib/ciclo-processo";
+import { atualizacaoDaSecao, type RascunhoSecao, type SecaoEditavel } from "@/lib/edicao-processo";
+import { buscarProcessoComMesmoNome, chaveDoNome, mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 import { montarRelatorio } from "@/lib/relatorio-processo";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -30,6 +33,7 @@ const ProcessoDetalhe = () => {
   const { toast } = useToast();
   const [processo, setProcesso] = useState<Tables<"processos"> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editando, setEditando] = useState<SecaoEditavel | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,6 +81,35 @@ const ProcessoDetalhe = () => {
   const relatorio = useMemo(() => (processo ? montarRelatorio(processo) : null), [processo]);
   const entrevistaEmAndamento = relatorio?.entrevista ? !relatorio.entrevista.concluida : false;
   const documentacaoLiberada = podeGerarDocumentacao(processo?.status);
+
+  const salvarSecao = async (secao: SecaoEditavel, rascunho: RascunhoSecao): Promise<boolean> => {
+    if (!processo) return false;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sessão expirada. Entre de novo.");
+      const atualizacao = atualizacaoDaSecao(processo, secao, rascunho, auth.user.id);
+      if (typeof atualizacao.nome === "string") {
+        if (!chaveDoNome(atualizacao.nome)) throw new Error("Informe o nome do processo.");
+        const existente = await buscarProcessoComMesmoNome(processo.company_id, atualizacao.nome, processo.id);
+        if (existente) throw new Error(`Já existe um processo chamado "${existente.nome}" nesta empresa. Use outro nome.`);
+      }
+      const { data, error } = await supabase
+        .from("processos")
+        .update(atualizacao)
+        .eq("id", processo.id)
+        .eq("company_id", processo.company_id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      setProcesso(data);
+      toast({ title: "Alterações salvas" });
+      return true;
+    } catch (error) {
+      console.error("Erro ao salvar a seção:", error);
+      toast({ title: "Não foi possível salvar", description: mensagemDoErroDoProcesso(error, "Tente novamente."), variant: "destructive" });
+      return false;
+    }
+  };
 
   const executarAcao = async (acao: AcaoCiclo) => {
     if (!processo) return;
@@ -130,9 +163,6 @@ const ProcessoDetalhe = () => {
             >
               <FileText className="mr-2 h-4 w-4" /> Criar procedimento
             </Button>
-            <Button variant="outline" onClick={() => navigate(`/processos/${id}/editar`)}>
-              <Pencil className="mr-2 h-4 w-4" /> Editar
-            </Button>
           </>
         )}
       </div>
@@ -153,7 +183,8 @@ const ProcessoDetalhe = () => {
       ) : (
         <>
           <CicloProcesso status={processo!.status} onAcao={executarAcao} />
-          <RelatorioProcesso relatorio={relatorio} />
+          <RelatorioProcesso relatorio={relatorio} onEditar={setEditando} onEditarMapa={() => navigate(`/processos/${id}/mapa`)} />
+          <EditorSecao processo={processo!} secao={editando} onFechar={() => setEditando(null)} onSalvar={salvarSecao} />
         </>
       )}
     </div>
