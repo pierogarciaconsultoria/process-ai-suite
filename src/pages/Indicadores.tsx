@@ -35,6 +35,7 @@ import {
   type Indicador,
   type Medicao,
 } from "@/lib/indicadores";
+import { usePodeGerenciar } from "@/lib/perfil";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 
 const TODOS = "todos";
@@ -45,6 +46,8 @@ const Indicadores = () => {
   const { toast } = useToast();
   const [parametros] = useSearchParams();
   const [companyId, setCompanyId] = useState<string | null>(null);
+  // A Equipe lança resultados; criar, mudar e excluir indicadores é de Consultor e Gestor.
+  const podeGerenciar = usePodeGerenciar(companyId);
   const [userId, setUserId] = useState<string | null>(null);
   const [indicadores, setIndicadores] = useState<Indicador[]>([]);
   const [medicoes, setMedicoes] = useState<Medicao[]>([]);
@@ -171,9 +174,11 @@ const Indicadores = () => {
           <h1 className="text-2xl font-bold text-foreground">Indicadores</h1>
           <p className="text-muted-foreground">Os resultados de cada processo comparados com a meta, mês a mês.</p>
         </div>
-        <Button onClick={() => setEditando({ indicador: null })} disabled={!companyId}>
-          <Plus className="mr-2 h-4 w-4" /> Novo indicador
-        </Button>
+        {podeGerenciar && (
+          <Button onClick={() => setEditando({ indicador: null })} disabled={!companyId}>
+            <Plus className="mr-2 h-4 w-4" /> Novo indicador
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -270,12 +275,16 @@ const Indicadores = () => {
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right">
                           <Button size="sm" variant="outline" onClick={() => setLancando({ indicador, periodo: periodoDe(new Date()) })}>Lançar</Button>
-                          <Button variant="ghost" size="icon" title="Editar indicador" aria-label={`Editar ${indicador.nome}`} onClick={() => setEditando({ indicador })}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" title="Excluir indicador" aria-label={`Excluir ${indicador.nome}`} onClick={() => setExcluindo(indicador)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {podeGerenciar && (
+                            <>
+                              <Button variant="ghost" size="icon" title="Editar indicador" aria-label={`Editar ${indicador.nome}`} onClick={() => setEditando({ indicador })}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" title="Excluir indicador" aria-label={`Excluir ${indicador.nome}`} onClick={() => setExcluindo(indicador)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

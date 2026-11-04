@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mensagemDoErro } from "../_shared/authorization-core.ts";
 import nodemailer from "npm:nodemailer@6.9.16";
 
+// Nomes dos perfis na tela e no e-mail (os valores gravados continuam admin/gestor/analista).
+const ROTULO_PERFIL: Record<string, string> = { admin: "Consultor", gestor: "Gestor", analista: "Equipe" };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -101,7 +104,7 @@ async function sendInviteEmail(args: {
   const expiresLabel = new Date(args.expiresAt).toLocaleString("pt-BR");
   const safeCompany = escapeHtml(args.companyName);
   const safeInviter = escapeHtml(args.invitedByName);
-  const safePerfil = escapeHtml(args.perfil);
+  const safePerfil = escapeHtml(ROTULO_PERFIL[args.perfil] ?? args.perfil);
   const html = `
     <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
       <h2>Voce recebeu um convite para acessar o Peter</h2>
@@ -115,7 +118,7 @@ async function sendInviteEmail(args: {
   `;
   const text = [
     "Voce recebeu um convite para acessar o Peter.",
-    `${args.invitedByName} convidou voce para a empresa ${args.companyName} com o perfil ${args.perfil}.`,
+    `${args.invitedByName} convidou voce para a empresa ${args.companyName} com o perfil ${ROTULO_PERFIL[args.perfil] ?? args.perfil}.`,
     `Aceite o convite em: ${inviteUrl}`,
     `Expiracao: ${expiresLabel}`,
   ].join("\n");
