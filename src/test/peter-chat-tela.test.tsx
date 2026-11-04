@@ -102,6 +102,17 @@ describe("Tela inicial do Peter", () => {
     await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("ai-peter-chat", { body: { company_id: "empresa-1", conversa_id: "c9", mensagem: "E em novembro?" } }));
   });
 
+  it("explica em português quando a função do Peter não responde", async () => {
+    mocks.invoke.mockResolvedValue({ data: null, error: Object.assign(new Error("Failed to send a request to the Edge Function"), { name: "FunctionsFetchError" }) });
+    renderizar();
+    await screen.findByText("Olá! Sou o Peter.");
+    await waitFor(() => expect(screen.getByPlaceholderText("Pergunte ao Peter…")).not.toBeDisabled());
+    fireEvent.change(screen.getByPlaceholderText("Pergunte ao Peter…"), { target: { value: "Oi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("O Peter não está disponível agora.");
+    expect(document.body.dataset.conversaPeter).toBe("true");
+  });
+
   it("mostra o erro e devolve a pergunta ao campo", async () => {
     mocks.invoke.mockResolvedValue({ data: { error: "Limite de IA excedido." }, error: null });
     renderizar();
