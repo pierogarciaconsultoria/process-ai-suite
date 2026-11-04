@@ -16,70 +16,70 @@ export type Database = {
     Tables: {
       acoes: {
         Row: {
-          id: string
-          company_id: string
-          processo_id: string | null
-          origem: string
           chave_origem: string | null
-          oque: string
-          porque: string
-          onde: string
           como: string
-          quem: string
-          prazo: string | null
-          quando_texto: string
-          custo: string
-          status: string
+          company_id: string
           concluida_em: string | null
-          resultado: string
-          created_by: string | null
-          updated_by: string | null
           created_at: string
+          created_by: string | null
+          custo: string
+          id: string
+          onde: string
+          oque: string
+          origem: string
+          porque: string
+          prazo: string | null
+          processo_id: string | null
+          quando_texto: string
+          quem: string
+          resultado: string
+          status: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
-          id?: string
-          company_id: string
-          processo_id?: string | null
-          origem?: string
           chave_origem?: string | null
-          oque: string
-          porque?: string
-          onde?: string
           como?: string
-          quem?: string
-          prazo?: string | null
-          quando_texto?: string
-          custo?: string
-          status?: string
+          company_id: string
           concluida_em?: string | null
-          resultado?: string
-          created_by?: string | null
-          updated_by?: string | null
           created_at?: string
+          created_by?: string | null
+          custo?: string
+          id?: string
+          onde?: string
+          oque: string
+          origem?: string
+          porque?: string
+          prazo?: string | null
+          processo_id?: string | null
+          quando_texto?: string
+          quem?: string
+          resultado?: string
+          status?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
-          id?: string
-          company_id?: string
-          processo_id?: string | null
-          origem?: string
           chave_origem?: string | null
-          oque?: string
-          porque?: string
-          onde?: string
           como?: string
-          quem?: string
-          prazo?: string | null
-          quando_texto?: string
-          custo?: string
-          status?: string
+          company_id?: string
           concluida_em?: string | null
-          resultado?: string
-          created_by?: string | null
-          updated_by?: string | null
           created_at?: string
+          created_by?: string | null
+          custo?: string
+          id?: string
+          onde?: string
+          oque?: string
+          origem?: string
+          porque?: string
+          prazo?: string | null
+          processo_id?: string | null
+          quando_texto?: string
+          quem?: string
+          resultado?: string
+          status?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -953,40 +953,40 @@ export type Database = {
       }
       indicador_medicoes: {
         Row: {
-          id: string
+          comentario: string
           company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
           indicador_id: string
           periodo: string
-          valor: number
-          comentario: string
-          created_by: string | null
-          updated_by: string | null
-          created_at: string
           updated_at: string
+          updated_by: string | null
+          valor: number
         }
         Insert: {
-          id?: string
+          comentario?: string
           company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
           indicador_id: string
           periodo: string
-          valor: number
-          comentario?: string
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
           updated_at?: string
+          updated_by?: string | null
+          valor: number
         }
         Update: {
-          id?: string
+          comentario?: string
           company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
           indicador_id?: string
           periodo?: string
-          valor?: number
-          comentario?: string
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
           updated_at?: string
+          updated_by?: string | null
+          valor?: number
         }
         Relationships: [
           {
@@ -1007,64 +1007,64 @@ export type Database = {
       }
       indicadores: {
         Row: {
-          id: string
-          company_id: string
-          processo_id: string | null
+          ativo: boolean
           chave_origem: string | null
-          nome: string
-          objetivo: string
+          company_id: string
+          created_at: string
+          created_by: string | null
           formula: string
-          unidade: string
-          sentido: string
+          id: string
           meta: number | null
           meta_texto: string
+          nome: string
+          objetivo: string
           periodicidade: string
+          processo_id: string | null
           responsavel: string
-          ativo: boolean
-          created_by: string | null
-          updated_by: string | null
-          created_at: string
+          sentido: string
+          unidade: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
-          id?: string
-          company_id: string
-          processo_id?: string | null
+          ativo?: boolean
           chave_origem?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          formula?: string
+          id?: string
+          meta?: number | null
+          meta_texto?: string
           nome: string
           objetivo?: string
-          formula?: string
-          unidade?: string
-          sentido?: string
-          meta?: number | null
-          meta_texto?: string
           periodicidade?: string
+          processo_id?: string | null
           responsavel?: string
-          ativo?: boolean
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
+          sentido?: string
+          unidade?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
-          id?: string
-          company_id?: string
-          processo_id?: string | null
+          ativo?: boolean
           chave_origem?: string | null
-          nome?: string
-          objetivo?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
           formula?: string
-          unidade?: string
-          sentido?: string
+          id?: string
           meta?: number | null
           meta_texto?: string
+          nome?: string
+          objetivo?: string
           periodicidade?: string
+          processo_id?: string | null
           responsavel?: string
-          ativo?: boolean
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
+          sentido?: string
+          unidade?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1326,6 +1326,7 @@ export type Database = {
             }[]
           }
         | { Args: { p_company_id: string }; Returns: boolean }
+      chave_nome_processo: { Args: { _nome: string }; Returns: string }
       complete_ai_request: {
         Args: {
           _company_id: string
