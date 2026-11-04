@@ -29,7 +29,7 @@ import {
   textoDoPasso,
   validarArquivo,
 } from "../../supabase/functions/_shared/roteiro-peter";
-import { INSTRUCOES_POR_ACAO, SCHEMA_DIAGNOSTICO, SCHEMA_PLANO } from "../../supabase/functions/_shared/roteiro-analise";
+import { INSTRUCOES_POR_ACAO, normalizarPlano, SCHEMA_DIAGNOSTICO, SCHEMA_PLANO } from "../../supabase/functions/_shared/roteiro-analise";
 
 const roteiro = ROTEIRO_PADRAO;
 const persona = { identidade: "Você é o Peter.", regras: "- Seja claro.", orientacoesEmpresa: "- Nenhuma." };
@@ -386,6 +386,31 @@ describe("Peter no roteiro — turnos", () => {
     expect(instrucoes).toContain('Se nada disso foi informado, escreva "[a definir]"');
     expect(instrucoes).toContain('"quando": derivado apenas do prazo de implantação informado. Sem prazo informado, escreva "[a definir]"');
     expect(instrucoes).toContain("Nunca crie um cargo que não apareceu na entrevista");
+  });
+
+  it("sugere indicadores no plano sem inventar meta", () => {
+    const instrucoes = INSTRUCOES_POR_ACAO.plano_melhoria(roteiro, iniciarRoteiro(roteiro));
+    expect(instrucoes).toContain('"indicadores": de 2 a 4 indicadores para acompanhar se o processo otimizado funciona');
+    expect(instrucoes).toContain('Sem número informado, escreva "[a definir]". Nunca invente uma meta.');
+    expect(instrucoes).toContain("Se o entrevistado citou indicadores, comece por eles");
+  });
+
+  it("lê os indicadores sugeridos no plano e aceita planos antigos sem eles", () => {
+    const plano = normalizarPlano({
+      resumoToBe: "Compras com cotação no ERP",
+      melhorias: [],
+      planoAcao: [],
+      indicadores: [
+        { nome: "Pedidos entregues no prazo", formula: "no prazo ÷ total × 100", sentido: "maior", meta: "", periodicidade: "Mensal", responsavel: "", motivo: "Atrasos" },
+        { nome: "", formula: "", sentido: "maior", meta: "", periodicidade: "", responsavel: "", motivo: "" },
+        { nome: "Tempo de cotação", formula: "", sentido: "qualquer", meta: "≤ 2 dias", periodicidade: "", responsavel: "Comprador", motivo: "" },
+      ],
+    });
+    expect(plano?.indicadores).toEqual([
+      { nome: "Pedidos entregues no prazo", formula: "no prazo ÷ total × 100", sentido: "maior", meta: "[a definir]", periodicidade: "Mensal", responsavel: "[a definir]", motivo: "Atrasos" },
+      { nome: "Tempo de cotação", formula: "", sentido: "maior", meta: "≤ 2 dias", periodicidade: "Mensal", responsavel: "Comprador", motivo: "" },
+    ]);
+    expect(normalizarPlano({ resumoToBe: "Plano antigo", melhorias: [], planoAcao: [] })?.indicadores).toEqual([]);
   });
 
   it("monta o prompt com a pergunta atual e o critério de suficiência", () => {

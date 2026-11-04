@@ -20,6 +20,7 @@ import {
   restaurarMensagens,
   type MensagemEntrevista,
 } from "@/lib/entrevista-roteiro";
+import { criarAcompanhamento } from "@/lib/acompanhamento";
 import { statusPelaEntrevista } from "@/lib/ciclo-processo";
 import { moderarEntrada } from "@/lib/peter-moderation";
 import {
@@ -154,6 +155,14 @@ function Mensagem({ mensagem }: { mensagem: MensagemEntrevista }) {
   );
 }
 
+function textoDoAcompanhamento({ indicadores, acoes }: { indicadores: number; acoes: number }): string {
+  const partes = [
+    indicadores ? `${indicadores === 1 ? "1 indicador criado" : `${indicadores} indicadores criados`} em Indicadores` : "",
+    acoes ? `${acoes === 1 ? "1 ação criada" : `${acoes} ações criadas`} no Plano de Ação` : "",
+  ].filter(Boolean);
+  return partes.length ? `✓ ${partes.join(" e ")}.` : "Os indicadores e as ações do plano já estavam nos módulos.";
+}
+
 type Carregamento = "carregando" | "sem_empresa" | "erro" | "pronto";
 
 function EntrevistaProcessoPage() {
@@ -175,6 +184,8 @@ function EntrevistaProcessoPage() {
   // Outro processo da empresa já tem o nome informado: nada é salvo até o entrevistado decidir.
   const [duplicado, setDuplicado] = useState<ProcessoExistente | null>(null);
   const [novoNome, setNovoNome] = useState<string | null>(null);
+  // Resultado da criação dos indicadores e ações ao aprovar o plano.
+  const [acompanhamento, setAcompanhamento] = useState<{ indicadores: number; acoes: number } | "erro" | null>(null);
   const processIdRef = useRef<string | null>(routeProcessId ?? routeState?.processId ?? null);
   const criadoAquiRef = useRef(false);
   // Chave do último nome já conferido (ou salvo), para não consultar o banco a cada resposta.
@@ -282,7 +293,8 @@ function EntrevistaProcessoPage() {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth.user?.id;
       if (!userId || !companyId) throw new Error("Usuário ou empresa não identificados para salvar.");
-      const statusFinal = status ?? statusPelaEntrevista(estadoAtual, statusRef.current);
+      const statusAnterior = statusRef.current;
+      const statusFinal = status ?? statusPelaEntrevista(estadoAtual, statusAnterior);
       const comum = { form: formAtual, userId, status: statusFinal, interviewMessages: mensagensAtuais, entrevistaRoteiro: estadoAtual };
 
       const chave = chaveDoNome(formAtual.nomeProcesso);
@@ -318,6 +330,15 @@ function EntrevistaProcessoPage() {
       }
       statusRef.current = statusFinal;
       nomeConferidoRef.current = chave;
+
+      // Plano aprovado agora: indicadores sugeridos e ações do 5W2H vão para os módulos.
+      if (statusFinal === "Melhorias aprovadas" && statusAnterior !== statusFinal && processIdRef.current) {
+        const processo = { ...buildProcessInsertPayload({ ...comum, companyId }), id: processIdRef.current } as unknown as Tables<"processos">;
+        void criarAcompanhamento(processo, userId).then(setAcompanhamento, (error) => {
+          console.error("Não foi possível criar indicadores e ações do plano:", error);
+          setAcompanhamento("erro");
+        });
+      }
     });
     saveQueueRef.current = tarefa.then(
       () => setSaveStatus("saved"),
@@ -763,7 +784,14 @@ function EntrevistaProcessoPage() {
             )}
 
             {passo?.tipo === "concluido" && (
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end">
+                {acompanhamento && (
+                  <p className={`text-sm ${acompanhamento === "erro" ? "text-destructive" : "text-muted-foreground"}`} role="status">
+                    {acompanhamento === "erro"
+                      ? "Não consegui criar os indicadores e as ações. Use os botões do relatório para enviá-los."
+                      : textoDoAcompanhamento(acompanhamento)}
+                  </p>
+                )}
                 <Button onClick={() => void verResultado()} disabled={ocupado}>
                   Ver relatório e mapa AS IS <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

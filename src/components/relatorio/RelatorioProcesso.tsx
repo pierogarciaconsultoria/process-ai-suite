@@ -402,7 +402,7 @@ export function RelatorioProcesso({
       </Secao>
 
       <Secao numero={proxima()} titulo="Plano de melhoria" onEditar={relatorio.plano && !emExecucao ? editar("plano") : undefined}>
-        {relatorio.plano ? <PlanoView plano={relatorio.plano} semPlanoAcao={emExecucao} /> : <NaoInformado texto="O plano de melhoria ainda não foi definido." />}
+        {relatorio.plano ? <PlanoView plano={relatorio.plano} semPlanoAcao={emExecucao} semIndicadores={medido} /> : <NaoInformado texto="O plano de melhoria ainda não foi definido." />}
         {emExecucao && <ExecucaoDoPlano acoes={acoes} />}
         <AvisoModulo
           icone={ListChecks}

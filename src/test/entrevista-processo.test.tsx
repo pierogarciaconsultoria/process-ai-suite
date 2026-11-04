@@ -9,7 +9,7 @@ import {
   registrarResposta,
   type EstadoRoteiro,
 } from "../../supabase/functions/_shared/roteiro-engine";
-import { aplicarAnalise, aplicarAvaliacao, aplicarExtracao, sanitizarEstado } from "../../supabase/functions/_shared/roteiro-peter";
+import { aplicarAnalise, aplicarAvaliacao, aplicarConfirmacao, aplicarExtracao, sanitizarEstado } from "../../supabase/functions/_shared/roteiro-peter";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -19,7 +19,10 @@ const mocks = vi.hoisted(() => ({
   // Outros processos da empresa, usados na conferência de nome repetido.
   outros: [] as Record<string, unknown>[],
   excluidos: [] as string[],
+  criarAcompanhamento: vi.fn(),
 }));
+
+vi.mock("@/lib/acompanhamento", () => ({ criarAcompanhamento: mocks.criarAcompanhamento }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
 vi.mock("@/integrations/supabase/client", () => {
@@ -82,6 +85,9 @@ function servidor(analise?: unknown) {
       };
     }
     const passo = proximoPasso(roteiro, estado);
+    if (passo.tipo === "confirmar_etapa") {
+      return { data: aplicarConfirmacao(roteiro, estado, { confirmou: true, pedeAjuste: false, comentario: "Plano aprovado.", correcoes: [], campos: {} }, String(body.resposta)), error: null };
+    }
     if (passo.tipo !== "pergunta") throw new Error(`passo inesperado: ${passo.tipo}`);
     const resposta = String(body.resposta);
     return {
@@ -129,6 +135,52 @@ describe("Entrevista guiada — tela", () => {
     mocks.linhaSalva = null;
     mocks.outros = [];
     mocks.excluidos.length = 0;
+    mocks.criarAcompanhamento.mockReset();
+  });
+
+  it("ao aprovar o plano, cria os indicadores sugeridos e as ações nos módulos", async () => {
+    const diagnostico = {
+      resumo: "Processo informal.", pontosFortes: [], desperdiciosLean: [], riscosIso: [], lacunas: [],
+      achados: [{ prioridade: "critico", descricao: "Cotação lenta", impacto: "Atrasos", causaProvavel: "E-mail", fundamento: "Lean — Espera" }],
+      maturidade: { nivel: "Inicial", justificativa: "Sem padrão" },
+    };
+    const plano = {
+      resumoToBe: "Cotação no ERP.",
+      melhorias: [{ titulo: "Cotação no ERP", problema: "Cotação lenta", solucao: "ERP", beneficio: "Prazo", prioridade: "Alta" }],
+      planoAcao: [{ oque: "Configurar cotação no ERP", porque: "Prazo", quem: "[a definir]", quando: "[a definir]", onde: "", como: "", custo: "" }],
+      indicadores: [{ nome: "Tempo de cotação", formula: "dias entre requisição e cotação", sentido: "menor", meta: "≤ 2 dias", periodicidade: "Mensal", responsavel: "Comprador", motivo: "Cotação lenta" }],
+    };
+    let estado: EstadoRoteiro = iniciarRoteiro(roteiro);
+    for (let i = 0; i < 300; i++) {
+      const passo = proximoPasso(roteiro, estado);
+      if (passo.tipo === "pergunta") estado = registrarResposta(roteiro, estado, { perguntaId: passo.pergunta.id, texto: "ok", suficiente: true, valor: "nao", encerraRepeticao: true });
+      else if (passo.tipo === "acao_ia") estado = aplicarAnalise(roteiro, estado, passo.acao === "diagnostico_as_is" ? diagnostico : plano).estado;
+      else if (passo.tipo === "confirmar_etapa" && estado.etapaAtual < 6) estado = confirmarEtapa(roteiro, estado);
+      else break;
+    }
+    expect(proximoPasso(roteiro, estado)).toMatchObject({ tipo: "confirmar_etapa", etapa: { numero: 6 } });
+    mocks.linhaSalva = {
+      id: "proc-1", company_id: "empresa-1", status: "Diagnosticado", nome: "Compras", entrevista_roteiro: estado,
+      interview_messages: [
+        { role: "assistant", tipo: "analise", acao: "plano_melhoria", content: JSON.stringify(estado.analises.plano_melhoria) },
+        { role: "assistant", content: "Esse plano está bom?" },
+      ],
+      data_mapeamento: "2026-11-04", indicadores: [], etapas: [], entradas: [], saidas: [],
+    };
+    mocks.invoke.mockImplementation(servidor());
+    mocks.criarAcompanhamento.mockResolvedValue({ indicadores: 1, acoes: 1 });
+
+    renderizar("/processos/proc-1/entrevista");
+    expect(await screen.findByText("Indicadores sugeridos pelo Peter")).toBeInTheDocument();
+    expect(screen.getByText("Tempo de cotação")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Está correto" }));
+
+    await waitFor(() => expect(mocks.criarAcompanhamento).toHaveBeenCalledTimes(1));
+    const [processo, usuario] = mocks.criarAcompanhamento.mock.calls[0];
+    expect(usuario).toBe("user-1");
+    expect(processo).toMatchObject({ id: "proc-1", company_id: "empresa-1", status: "Melhorias aprovadas" });
+    expect(await screen.findByText("✓ 1 indicador criado em Indicadores e 1 ação criada no Plano de Ação.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ver relatório e mapa AS IS/ })).toBeInTheDocument();
   });
 
   async function chegarAoNomeRepetido() {

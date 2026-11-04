@@ -1,6 +1,8 @@
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
+import { lerEstadoDoProcesso } from "@/lib/edicao-processo";
 import { chaveDoNome } from "@/lib/processo-duplicado";
+import { normalizarPlano } from "../../supabase/functions/_shared/roteiro-analise";
 
 // Indicadores dos processos e seus resultados por período (migration 202611040002).
 
@@ -57,28 +59,48 @@ function periodicidade(texto: string): string {
   return PERIODICIDADES.find((opcao) => limpo.startsWith(opcao.toLowerCase().slice(0, 4))) ?? "Mensal";
 }
 
-// Indicadores definidos no mapeamento do processo, prontos para acompanhar; a chave evita importar duas vezes.
+type DefinicaoIndicador = { nome: string; objetivo: string; formula: string; meta: string; periodicidade: string; responsavel: string; sentido?: "maior" | "menor" };
+
+// Indicadores do processo, prontos para acompanhar: os citados na entrevista e os sugeridos pelo
+// Peter no plano de melhoria. A chave pelo nome evita importar duas vezes.
 export function indicadoresDoProcesso(processo: Tables<"processos">, userId: string): TablesInsert<"indicadores">[] {
+  const citados: DefinicaoIndicador[] = mapProcessRowToForm(processo).indicadores.map((indicador) => ({
+    nome: indicador.nome ?? "",
+    objetivo: indicador.objetivo ?? "",
+    formula: indicador.formulaCalculo ?? "",
+    meta: indicador.meta ?? "",
+    periodicidade: indicador.periodicidade ?? "",
+    responsavel: indicador.responsavel ?? "",
+  }));
+  const sugeridos: DefinicaoIndicador[] = (normalizarPlano(lerEstadoDoProcesso(processo)?.analises.plano_melhoria)?.indicadores ?? []).map((indicador) => ({
+    nome: indicador.nome,
+    objetivo: indicador.motivo,
+    formula: indicador.formula,
+    meta: indicador.meta,
+    periodicidade: indicador.periodicidade,
+    responsavel: indicador.responsavel,
+    sentido: indicador.sentido,
+  }));
   const vistas = new Set<string>();
-  return mapProcessRowToForm(processo).indicadores.flatMap((indicador) => {
+  return [...citados, ...sugeridos].flatMap((indicador) => {
     const chaveNome = chaveDoNome(indicador.nome);
     const chave = `processo:${processo.id}:${chaveNome}`;
     if (!chaveNome || vistas.has(chave)) return [];
     vistas.add(chave);
-    const lida = lerMeta(indicador.meta ?? "");
+    const lida = lerMeta(indicador.meta);
     return [{
       company_id: processo.company_id,
       processo_id: processo.id,
       chave_origem: chave,
       nome: indicador.nome.trim(),
-      objetivo: (indicador.objetivo ?? "").trim(),
-      formula: (indicador.formulaCalculo ?? "").trim(),
+      objetivo: indicador.objetivo.trim(),
+      formula: indicador.formula.trim(),
       unidade: lida.unidade,
-      sentido: lida.sentido,
+      sentido: indicador.sentido ?? lida.sentido,
       meta: lida.meta,
-      meta_texto: lida.meta === null ? (indicador.meta ?? "").trim() : "",
-      periodicidade: periodicidade(indicador.periodicidade ?? ""),
-      responsavel: (indicador.responsavel ?? "").trim(),
+      meta_texto: lida.meta === null ? indicador.meta.trim() : "",
+      periodicidade: periodicidade(indicador.periodicidade),
+      responsavel: indicador.responsavel.trim(),
       created_by: userId,
       updated_by: userId,
     }];

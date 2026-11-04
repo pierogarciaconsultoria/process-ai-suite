@@ -55,10 +55,23 @@ export interface AcaoPlano {
   custo: string;
 }
 
+// Indicador sugerido pelo Peter para acompanhar o processo otimizado; vira indicador no
+// módulo Indicadores quando o entrevistado aprova o plano.
+export interface IndicadorSugerido {
+  nome: string;
+  formula: string;
+  sentido: "maior" | "menor";
+  meta: string;
+  periodicidade: string;
+  responsavel: string;
+  motivo: string;
+}
+
 export interface PlanoMelhoriaRoteiro {
   resumoToBe: string;
   melhorias: MelhoriaProposta[];
   planoAcao: AcaoPlano[];
+  indicadores: IndicadorSugerido[];
 }
 
 // ─── Schemas (modo strict) ──────────────────────────────────────────────────
@@ -107,6 +120,18 @@ export const SCHEMA_PLANO = objeto({
   planoAcao: {
     type: "array",
     items: objeto({ oque: texto, porque: texto, quem: texto, quando: texto, onde: texto, como: texto, custo: texto }),
+  },
+  indicadores: {
+    type: "array",
+    items: objeto({
+      nome: texto,
+      formula: texto,
+      sentido: { type: "string", enum: ["maior", "menor"] },
+      meta: texto,
+      periodicidade: { type: "string", enum: ["Mensal", "Bimestral", "Trimestral", "Semestral", "Anual"] },
+      responsavel: texto,
+      motivo: texto,
+    }),
   },
 });
 
@@ -173,6 +198,18 @@ export function normalizarPlano(raw: unknown): PlanoMelhoriaRoteiro | null {
     }),
     planoAcao: lista(raw.planoAcao, (item) => (str(item.oque)
       ? { oque: str(item.oque), porque: str(item.porque), quem: str(item.quem), quando: str(item.quando), onde: str(item.onde), como: str(item.como), custo: str(item.custo) }
+      : null)),
+    // Planos gerados antes dos indicadores sugeridos chegam sem a lista.
+    indicadores: lista(raw.indicadores, (item) => (str(item.nome)
+      ? {
+        nome: str(item.nome),
+        formula: str(item.formula),
+        sentido: umDe(item.sentido, ["maior", "menor"] as const) ?? "maior",
+        meta: str(item.meta) || "[a definir]",
+        periodicidade: str(item.periodicidade) || "Mensal",
+        responsavel: str(item.responsavel) || "[a definir]",
+        motivo: str(item.motivo),
+      }
       : null)),
   };
   return plano.resumoToBe || plano.melhorias.length > 0 ? plano : null;
@@ -277,6 +314,14 @@ ${JSON.stringify(estado.analises.diagnostico_as_is ?? null)}
   - "quem": o responsável pelas mudanças informado na entrevista, ou um cargo ou área que o entrevistado citou como responsável por aquela parte do processo. Se nada disso foi informado, escreva "[a definir]". Nunca crie um cargo que não apareceu na entrevista (por exemplo, "Gestor de TI").
   - "quando": derivado apenas do prazo de implantação informado. Sem prazo informado, escreva "[a definir]".
   - "custo": o valor informado; sem valor informado, uma estimativa qualitativa precedida de "Estimativa:" (Baixo, Médio ou Alto).
+- "indicadores": de 2 a 4 indicadores para acompanhar se o processo otimizado funciona (ISO 9001, 9.1). Se o entrevistado citou indicadores, comece por eles, com os dados que ele deu. Complete com indicadores tirados das informações coletadas: a saída principal entregue no prazo, o prazo ou SLA, os erros e o retrabalho, as reclamações, o volume, e o que as melhorias pretendem mudar.
+  - "nome": curto e mensurável (ex.: "Pedidos entregues no prazo").
+  - "formula": como calcular com os dados que o processo já gera (ex.: "pedidos entregues no prazo ÷ pedidos entregues × 100").
+  - "sentido": "maior" quando quanto maior, melhor; "menor" quando quanto menor, melhor.
+  - "meta": só com número informado na entrevista (ex.: SLA de 2 dias informado → "≤ 2 dias"). Sem número informado, escreva "[a definir]". Nunca invente uma meta.
+  - "periodicidade": Mensal, salvo se a frequência do processo indicar outra.
+  - "responsavel": mesma regra de "quem" do plano de ação.
+  - "motivo": o achado ou a melhoria que o indicador acompanha.
 - Respeite as restrições informadas (orçamento, prazo, pessoas, tecnologia).
 - Use "processo otimizado", nunca "processo perfeito".${blocoObservacoes(estado, 6, estado.analises.plano_melhoria)}`;
 }
