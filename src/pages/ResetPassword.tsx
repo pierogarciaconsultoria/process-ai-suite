@@ -33,7 +33,7 @@ const ResetPassword = () => {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       toast({ title: "Senha alterada", description: "Sua senha foi atualizada com sucesso." });
-      navigate("/dashboard");
+      navigate("/inicio");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       toast({ title: "Erro", description: message, variant: "destructive" });

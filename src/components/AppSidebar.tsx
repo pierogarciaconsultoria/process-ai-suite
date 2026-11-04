@@ -8,6 +8,7 @@ import {
   LogOut,
   Building2,
   ListChecks,
+  Bot,
   Gauge,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -32,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 
 const mainItems = [
+  { title: "Peter", url: "/inicio", icon: Bot },
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Processos", url: "/processos", icon: ClipboardList },
   { title: "Documentos", url: "/documentos", icon: FileText },

@@ -208,7 +208,7 @@ const ConviteAceite = () => {
                   <div className="space-y-3">
                     <p className="text-sm text-foreground">Este convite já foi aceito e a empresa já pode ser acessada na sua conta.</p>
                     <div className="flex gap-3 flex-wrap">
-                      <Button onClick={() => navigate("/dashboard")}>Ir para o dashboard</Button>
+                      <Button onClick={() => navigate("/inicio")}>Ir para o Peter</Button>
                       <Button variant="outline" onClick={handleSignOut}>Sair</Button>
                     </div>
                   </div>

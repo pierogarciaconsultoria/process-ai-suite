@@ -11,6 +11,7 @@ const functions = [
   "ai-review-config",
   "ai-summarize-process",
   "ai-generate-document",
+  "ai-peter-chat",
 ];
 
 describe("Edge Function security contract", () => {

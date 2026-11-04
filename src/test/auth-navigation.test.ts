@@ -8,7 +8,7 @@ describe("safe authentication redirects", () => {
 
   it.each(["//evil.example", "/\\evil.example", "https://evil.example", "javascript:alert(1)"])(
     "rejects unsafe redirect %s",
-    (value) => expect(safeInternalRedirect(value)).toBe("/dashboard"),
+    (value) => expect(safeInternalRedirect(value)).toBe("/inicio"),
   );
 
   it("builds a login URL containing only the internal destination", () => {
