@@ -1,4 +1,4 @@
-export function safeInternalRedirect(value: unknown, fallback = "/dashboard"): string {
+export function safeInternalRedirect(value: unknown, fallback = "/inicio"): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
     return fallback;
   }

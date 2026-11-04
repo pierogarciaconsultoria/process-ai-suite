@@ -8,7 +8,8 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 export function AppLayout() {
   const location = useLocation();
-  const isInterviewRoute = /\/processos\/(?:novo|[^/]+)\/entrevista$/.test(location.pathname);
+  // Telas de conversa ocupam a altura toda e rolam só por dentro.
+  const isInterviewRoute = /\/processos\/(?:novo|[^/]+)\/entrevista$/.test(location.pathname) || location.pathname === "/inicio";
   const [authState, setAuthState] = useState<"loading" | "authenticated" | "anonymous">("loading");
 
   useEffect(() => {

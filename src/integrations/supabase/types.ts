@@ -1162,6 +1162,79 @@ export type Database = {
           },
         ]
       }
+      peter_conversas: {
+        Row: {
+          id: string
+          company_id: string
+          user_id: string
+          titulo: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          user_id?: string
+          titulo?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          user_id?: string
+          titulo?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peter_conversas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      peter_mensagens: {
+        Row: {
+          id: string
+          conversa_id: string
+          user_id: string
+          role: string
+          conteudo: string
+          extras: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversa_id: string
+          user_id?: string
+          role: string
+          conteudo: string
+          extras?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversa_id?: string
+          user_id?: string
+          role?: string
+          conteudo?: string
+          extras?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peter_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "peter_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processos: {
         Row: {
           analista: string
