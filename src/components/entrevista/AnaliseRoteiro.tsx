@@ -89,8 +89,9 @@ export function DiagnosticoView({ diagnostico }: { diagnostico: DiagnosticoRotei
   );
 }
 
-// `semPlanoAcao`: o 5W2H já está no Plano de Ação e a execução é mostrada no lugar da proposta.
-export function PlanoView({ plano, semPlanoAcao = false }: { plano: PlanoMelhoriaRoteiro; semPlanoAcao?: boolean }) {
+// `semPlanoAcao` / `semIndicadores`: o 5W2H e os indicadores já estão nos módulos e o
+// relatório mostra o acompanhamento no lugar da proposta.
+export function PlanoView({ plano, semPlanoAcao = false, semIndicadores = false }: { plano: PlanoMelhoriaRoteiro; semPlanoAcao?: boolean; semIndicadores?: boolean }) {
   return (
     <div className="space-y-5">
       {plano.resumoToBe && (
@@ -142,6 +143,35 @@ export function PlanoView({ plano, semPlanoAcao = false }: { plano: PlanoMelhori
                     <TableCell>{acao.onde}</TableCell>
                     <TableCell>{acao.como}</TableCell>
                     <TableCell>{acao.custo}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Secao>
+      )}
+      {plano.indicadores.length > 0 && !semIndicadores && (
+        <Secao titulo="Indicadores sugeridos pelo Peter" junto>
+          <p className="text-xs text-muted-foreground">Ao aprovar o plano, viram indicadores em Indicadores, onde os resultados são lançados mês a mês.</p>
+          <div className="overflow-x-auto rounded-md border print:overflow-visible">
+            <Table className="min-w-[640px] text-xs print:min-w-0">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Indicador</TableHead>
+                  <TableHead>Fórmula</TableHead>
+                  <TableHead>Meta</TableHead>
+                  <TableHead>Responsável</TableHead>
+                  <TableHead>Acompanha</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {plano.indicadores.map((indicador, indice) => (
+                  <TableRow key={indice} className="print:break-inside-avoid">
+                    <TableCell className="font-medium">{indicador.nome}</TableCell>
+                    <TableCell>{indicador.formula}</TableCell>
+                    <TableCell className="whitespace-nowrap">{indicador.meta}{indicador.meta === "[a definir]" ? "" : ` · ${indicador.periodicidade}`}</TableCell>
+                    <TableCell>{indicador.responsavel}</TableCell>
+                    <TableCell>{indicador.motivo}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

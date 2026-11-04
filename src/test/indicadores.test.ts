@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Tables } from "@/integrations/supabase/types";
+import { ROTEIRO_PADRAO } from "../../supabase/functions/_shared/roteiro-entrevista";
+import { iniciarRoteiro } from "../../supabase/functions/_shared/roteiro-engine";
 import {
   acaoParaResultadoFora,
   formatarMeta,
@@ -64,6 +66,29 @@ describe("Indicadores", () => {
     expect(novos[1]).toMatchObject({ meta: null, meta_texto: "reduzir pela metade", sentido: "menor", periodicidade: "Trimestral" });
     expect(indicadoresAindaNaoEnviados(processo, [indicador({ chave_origem: "processo:proc-1:entregasnoprazo" })], "user-1").map((item) => item.nome))
       .toEqual(["Tempo de cotação"]);
+  });
+
+  it("junta os indicadores citados na entrevista com os sugeridos pelo Peter no plano", () => {
+    const estado = iniciarRoteiro(ROTEIRO_PADRAO);
+    estado.analises.plano_melhoria = {
+      resumoToBe: "Compras com cotação no ERP",
+      melhorias: [],
+      planoAcao: [],
+      indicadores: [
+        { nome: "Entregas no prazo", formula: "repetido", sentido: "maior", meta: "[a definir]", periodicidade: "Mensal", responsavel: "[a definir]", motivo: "" },
+        { nome: "Tempo de cotação", formula: "dias entre requisição e cotação", sentido: "menor", meta: "≤ 2 dias", periodicidade: "Mensal", responsavel: "Comprador", motivo: "Cotação lenta" },
+        { nome: "Retrabalho em pedidos", formula: "pedidos corrigidos ÷ pedidos", sentido: "menor", meta: "[a definir]", periodicidade: "Trimestral", responsavel: "[a definir]", motivo: "Erros de cadastro" },
+      ],
+    };
+    const processo = {
+      id: "proc-1", company_id: "empresa-1", entrevista_roteiro: estado,
+      indicadores: [{ nome: "Entregas no prazo", objetivo: "", formulaCalculo: "no prazo ÷ total", meta: "≥ 95%", periodicidade: "Mensal", responsavel: "Ana" }],
+    } as unknown as Tables<"processos">;
+    const novos = indicadoresDoProcesso(processo, "user-1");
+    expect(novos.map((item) => item.nome)).toEqual(["Entregas no prazo", "Tempo de cotação", "Retrabalho em pedidos"]);
+    expect(novos[0]).toMatchObject({ formula: "no prazo ÷ total", meta: 95 });
+    expect(novos[1]).toMatchObject({ sentido: "menor", meta: 2, unidade: "dias", responsavel: "Comprador", objetivo: "Cotação lenta" });
+    expect(novos[2]).toMatchObject({ sentido: "menor", meta: null, meta_texto: "[a definir]", periodicidade: "Trimestral" });
   });
 
   it("compara o resultado com a meta no sentido certo", () => {
