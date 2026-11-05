@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:security:integration": "node scripts/security-integration.mjs"
+    "test:security:integration": "node scripts/security-integration.mjs",
+    "check:functions": "tsc -p tsconfig.functions.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

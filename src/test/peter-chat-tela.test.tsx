@@ -6,7 +6,10 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   conversas: [] as Record<string, unknown>[],
   mensagens: [] as Record<string, unknown>[],
+  processarArquivo: vi.fn(),
 }));
+
+vi.mock("@/lib/peter-upload", () => ({ processarArquivo: mocks.processarArquivo }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
 vi.mock("@/integrations/supabase/client", () => ({
@@ -52,6 +55,71 @@ describe("Tela inicial do Peter", () => {
     mocks.conversas = [];
     mocks.mensagens = [];
     window.localStorage.clear();
+    mocks.processarArquivo.mockReset();
+  });
+
+  it("anexa Word, PDF ou imagem, manda o conteúdo lido e mostra o nome no balão", async () => {
+    mocks.processarArquivo.mockImplementation(async (arquivo: File) => ({
+      arquivo: arquivo.name.endsWith(".png")
+        ? { nome: arquivo.name, tipo: "image/png", tipoLabel: "Imagem (PNG)", tamanhoBytes: 3, base64: "aWZh", modoEnvio: "image_url", truncado: false }
+        : { nome: arquivo.name, tipo: arquivo.type, tipoLabel: "Word (DOCX)", tamanhoBytes: 3, textoExtraido: "1. Objetivo: comprar no prazo", modoEnvio: "texto_extraido", truncado: true },
+      avisoTruncamento: false,
+    }));
+    mocks.invoke.mockResolvedValue({
+      data: {
+        conversa_id: "c1",
+        mensagens: [
+          { id: "m1", role: "user", conteudo: "Analise o anexo.", extras: { anexos: [{ nome: "PR-001.docx", tipo: "Word (DOCX)" }, { nome: "fluxo.png", tipo: "Imagem (PNG)" }] }, created_at: "" },
+          { id: "m2", role: "assistant", conteudo: "O PR-001 descreve a compra.", extras: {}, created_at: "" },
+        ],
+      },
+      error: null,
+    });
+    renderizar();
+    await screen.findByText("Olá! Sou o Peter.");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Anexar Word, PDF ou imagem" })).not.toBeDisabled());
+
+    const docx = new File(["doc"], "PR-001.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const png = new File(["png"], "fluxo.png", { type: "image/png" });
+    fireEvent.change(screen.getByTestId("anexo-peter"), { target: { files: [docx, png] } });
+    const lista = await screen.findByRole("list", { name: "Arquivos anexados" });
+    await waitFor(() => expect(lista).not.toHaveTextContent("Lendo"));
+    expect(lista).toHaveTextContent("PR-001.docx(só o início)");
+    expect(lista).toHaveTextContent("fluxo.png");
+
+    // Sem texto, a mensagem vai com o pedido padrão.
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("ai-peter-chat", {
+      body: {
+        company_id: "empresa-1", conversa_id: null, mensagem: "Analise o anexo.",
+        anexos: [
+          { nome: "PR-001.docx", tipo: "Word (DOCX)", texto: "1. Objetivo: comprar no prazo", imagem: null },
+          { nome: "fluxo.png", tipo: "Imagem (PNG)", texto: null, imagem: "data:image/png;base64,aWZh" },
+        ],
+      },
+    }));
+    expect(await screen.findByText("O PR-001 descreve a compra.")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Anexos" })).toHaveTextContent("PR-001.docxfluxo.png");
+    expect(screen.queryByRole("list", { name: "Arquivos anexados" })).not.toBeInTheDocument();
+  });
+
+  it("recusa outros formatos e permite remover um anexo", async () => {
+    mocks.processarArquivo.mockResolvedValue({
+      arquivo: { nome: "a.pdf", tipo: "application/pdf", tipoLabel: "PDF", tamanhoBytes: 3, textoExtraido: "texto", modoEnvio: "texto_extraido", truncado: false },
+      avisoTruncamento: false,
+    });
+    renderizar();
+    await screen.findByText("Olá! Sou o Peter.");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Anexar Word, PDF ou imagem" })).not.toBeDisabled());
+
+    fireEvent.change(screen.getByTestId("anexo-peter"), { target: { files: [new File(["x"], "planilha.xlsx", { type: "application/vnd.ms-excel" })] } });
+    expect(await screen.findByRole("alert")).toHaveTextContent('"planilha.xlsx" não é aceito. Anexe Word (.docx), PDF ou imagem (PNG ou JPG).');
+    expect(mocks.processarArquivo).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId("anexo-peter"), { target: { files: [new File(["x"], "a.pdf", { type: "application/pdf" })] } });
+    fireEvent.click(await screen.findByRole("button", { name: "Remover a.pdf" }));
+    expect(screen.queryByRole("list", { name: "Arquivos anexados" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar" })).toBeDisabled();
   });
 
   it("oculta e mostra o histórico de conversas, e lembra a escolha", async () => {

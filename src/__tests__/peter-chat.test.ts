@@ -7,6 +7,10 @@ import {
   promptChat,
   SCHEMA_CHAT,
   sanitizarHistoricoChat,
+  anexosParaGuardar,
+  MAX_TEXTO_ANEXOS_GUARDADO,
+  partesDaMensagem,
+  validarAnexosChat,
   textoDoContexto,
   tituloDaConversa,
   type ContextoEmpresa,
@@ -94,8 +98,56 @@ describe("Chat do Peter", () => {
 
   it("grava pergunta e resposta com as mesmas colunas (inserção múltipla não usa o valor padrão)", () => {
     const funcao = readFileSync(resolve(process.cwd(), "supabase/functions/ai-peter-chat/index.ts"), "utf8");
-    expect(funcao).toContain('role: "user", conteudo: mensagem, extras: {} }');
+    expect(funcao).toContain('role: "user", conteudo: mensagem, extras: anexos.length ? { anexos: anexosParaGuardar(anexos) } : {} }');
     const migration = readFileSync(resolve(process.cwd(), "supabase/migrations/202611040004_conversas_peter_extras.sql"), "utf8");
     expect(migration).toContain("new.extras := coalesce(new.extras, '{}'::jsonb);");
+  });
+
+  it("valida os anexos: tipo, quantidade, imagem PNG/JPG e conteúdo lido", () => {
+    expect(validarAnexosChat(undefined)).toEqual([]);
+    expect(validarAnexosChat([{ nome: "PR.docx", tipo: "Word (DOCX)", texto: " Objetivo ", imagem: null }])).toEqual([{ nome: "PR.docx", tipo: "Word (DOCX)", texto: "Objetivo", imagem: null }]);
+    expect(validarAnexosChat([{ nome: "f.png", tipo: "Imagem (PNG)", imagem: "data:image/png;base64,aWZh" }])[0].imagem).toBe("data:image/png;base64,aWZh");
+    expect(() => validarAnexosChat("x")).toThrow("Anexos inválidos.");
+    expect(() => validarAnexosChat(Array.from({ length: 6 }, () => ({ nome: "a", texto: "b" })))).toThrow("Máximo de 5 anexos");
+    expect(() => validarAnexosChat([{ nome: "f.gif", imagem: "data:image/gif;base64,aWZh" }])).toThrow("deve ser PNG ou JPG");
+    expect(() => validarAnexosChat([{ nome: "vazio.pdf", texto: "  " }])).toThrow('Não foi possível ler o anexo "vazio.pdf"');
+    expect(() => validarAnexosChat([{ nome: "x", texto: "a", imagem: "data:image/png;base64,aWZh" }])).toThrow("inválido");
+    expect(() => validarAnexosChat([{ nome: "longo.pdf", texto: "x".repeat(16_001) }])).toThrow("excede");
+  });
+
+  it("manda a mensagem com os anexos no formato da Responses API", () => {
+    expect(partesDaMensagem("Oi", [])).toBe("Oi");
+    expect(partesDaMensagem("Compare", [
+      { nome: "PR.docx", tipo: "Word (DOCX)", texto: "Objetivo", imagem: null },
+      { nome: "f.png", tipo: "Imagem (PNG)", texto: null, imagem: "data:image/png;base64,aWZh" },
+    ])).toEqual([
+      { type: "input_text", text: "Compare" },
+      { type: "input_text", text: '[Anexo — Word (DOCX): "PR.docx"]\nObjetivo' },
+      { type: "input_text", text: '[Anexo — Imagem (PNG): "f.png"]' },
+      { type: "input_image", image_url: "data:image/png;base64,aWZh", detail: "high" },
+    ]);
+  });
+
+  it("guarda nome, tipo e o texto dos documentos até o limite; a imagem não", () => {
+    const guardados = anexosParaGuardar([
+      { nome: "a.pdf", tipo: "PDF", texto: "x".repeat(MAX_TEXTO_ANEXOS_GUARDADO - 10), imagem: null },
+      { nome: "b.docx", tipo: "Word (DOCX)", texto: "y".repeat(50), imagem: null },
+      { nome: "c.png", tipo: "Imagem (PNG)", texto: null, imagem: "data:image/png;base64,aWZh" },
+      { nome: "d.pdf", tipo: "PDF", texto: "z", imagem: null },
+    ]);
+    expect(guardados.map((item) => [item.nome, item.texto?.length ?? 0])).toEqual([["a.pdf", MAX_TEXTO_ANEXOS_GUARDADO - 10], ["b.docx", 10], ["c.png", 0], ["d.pdf", 0]]);
+  });
+
+  it("no histórico, lista os anexos e repete o texto só da mensagem mais recente que os trouxe", () => {
+    const historico = sanitizarHistoricoChat([
+      { role: "user", conteudo: "Veja o antigo", extras: { anexos: [{ nome: "antigo.pdf", tipo: "PDF", texto: "conteúdo antigo" }] } },
+      { role: "assistant", conteudo: "Ok", extras: {} },
+      { role: "user", conteudo: "Veja o novo", extras: { anexos: [{ nome: "novo.docx", tipo: "Word (DOCX)", texto: "conteúdo novo" }, { nome: "f.png", tipo: "Imagem (PNG)" }] } },
+      { role: "assistant", conteudo: "Ok", extras: {} },
+      { role: "user", conteudo: "E o prazo?", extras: {} },
+    ]);
+    expect(historico[0].content).toBe("Veja o antigo\n\n[Anexos: antigo.pdf (PDF)]");
+    expect(historico[2].content).toBe('Veja o novo\n\n[Anexos: novo.docx (Word (DOCX)), f.png (Imagem (PNG))]\n\n[Conteúdo de "novo.docx"]\nconteúdo novo');
+    expect(historico[4].content).toBe("E o prazo?");
   });
 });

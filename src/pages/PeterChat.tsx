@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Bot, Loader2, MessageSquarePlus, PanelLeft, PanelLeftClose, PanelLeftOpen, Send, Trash2 } from "lucide-react";
+import { ArrowRight, Bot, FileText, Loader2, MessageSquarePlus, PanelLeft, PanelLeftClose, PanelLeftOpen, Paperclip, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,10 @@ import { TextoMarkdown } from "@/components/peter/TextoMarkdown";
 import { emptyProcessoForm } from "@/data/processo-form-types";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
-import { lerExtras, rotaDoAtalho, SUGESTOES, type Conversa, type MensagemChat } from "@/lib/peter-chat";
+import { ACEITOS_NO_CHAT, aceitoNoChat, lerAnexos, lerExtras, rotaDoAtalho, SUGESTOES, type Conversa, type MensagemChat } from "@/lib/peter-chat";
+import { processarArquivo } from "@/lib/peter-upload";
+import { validarArquivo, validarLote } from "../../supabase/functions/_shared/peter-interview-contract";
+import { MAX_ANEXOS_CHAT, type AnexoChat } from "../../supabase/functions/_shared/peter-chat";
 import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 
@@ -30,6 +33,15 @@ function guardarHistoricoOculto(oculto: boolean) {
   } catch {
     // Sem armazenamento: vale só nesta visita.
   }
+}
+
+interface AnexoNaTela {
+  id: string;
+  nome: string;
+  arquivo: File;
+  // null enquanto o navegador lê o arquivo.
+  dados: AnexoChat | null;
+  parcial: boolean;
 }
 
 // Erro da chamada à função ai-peter-chat em português.
@@ -88,6 +100,8 @@ const PeterChat = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [listaAberta, setListaAberta] = useState(false);
   const [historicoOculto, setHistoricoOculto] = useState(lerHistoricoOculto);
+  const [anexos, setAnexos] = useState<AnexoNaTela[]>([]);
+  const arquivoRef = useRef<HTMLInputElement>(null);
   const rolagemRef = useRef<HTMLDivElement>(null);
   const campoRef = useRef<HTMLTextAreaElement>(null);
 
@@ -165,22 +179,72 @@ const PeterChat = () => {
     if (conversa.id === conversaId) novaConversa();
   };
 
+  // Lê cada arquivo no navegador (texto do Word/PDF, com OCR no PDF digitalizado; imagem reduzida).
+  const anexar = async (lista: FileList | null) => {
+    const arquivos = Array.from(lista ?? []);
+    if (arquivoRef.current) arquivoRef.current.value = "";
+    if (arquivos.length === 0) return;
+    setErro(null);
+    const recusado = arquivos.find((arquivo) => !aceitoNoChat(arquivo));
+    if (recusado) {
+      setErro(`"${recusado.name}" não é aceito. Anexe Word (.docx), PDF ou imagem (PNG ou JPG).`);
+      return;
+    }
+    if (anexos.length + arquivos.length > MAX_ANEXOS_CHAT) {
+      setErro(`Máximo de ${MAX_ANEXOS_CHAT} anexos por mensagem.`);
+      return;
+    }
+    const invalido = [...arquivos.map(validarArquivo), validarLote([...anexos.map((anexo) => anexo.arquivo), ...arquivos])].find((item) => !item.valido);
+    if (invalido) {
+      setErro(invalido.erro ?? "Arquivo inválido.");
+      return;
+    }
+    const novos = arquivos.map((arquivo, indice) => ({ id: `${Date.now()}-${indice}-${arquivo.name}`, nome: arquivo.name, arquivo, dados: null, parcial: false }));
+    setAnexos((atuais) => [...atuais, ...novos]);
+    await Promise.all(novos.map(async (novo) => {
+      try {
+        const { arquivo } = await processarArquivo(novo.arquivo);
+        const dados: AnexoChat = {
+          nome: arquivo.nome,
+          tipo: arquivo.tipoLabel,
+          texto: arquivo.modoEnvio === "texto_extraido" ? arquivo.textoExtraido ?? null : null,
+          imagem: arquivo.modoEnvio === "image_url" && arquivo.base64 ? `data:${arquivo.tipo};base64,${arquivo.base64}` : null,
+        };
+        setAnexos((atuais) => atuais.map((item) => (item.id === novo.id ? { ...item, dados, parcial: arquivo.truncado } : item)));
+      } catch (error) {
+        setAnexos((atuais) => atuais.filter((item) => item.id !== novo.id));
+        setErro(error instanceof Error ? error.message : `Não foi possível ler "${novo.nome}".`);
+      }
+    }));
+  };
+
   const mapear = (nomeProcesso = "") =>
     navigate("/processos/novo/entrevista", {
       state: { guidedExperience: true, ...(nomeProcesso ? { formPrefill: { ...emptyProcessoForm, nomeProcesso } } : {}) },
     });
 
+  const lendoAnexo = anexos.some((anexo) => !anexo.dados);
+
   const enviar = async (pergunta: string) => {
-    const mensagem = pergunta.trim();
-    if (!mensagem || pensando || !companyId) return;
+    const prontos = anexos.flatMap((anexo) => (anexo.dados ? [anexo.dados] : []));
+    const mensagem = pergunta.trim() || (prontos.length ? "Analise o anexo." : "");
+    if (!mensagem || pensando || lendoAnexo || !companyId) return;
     setErro(null);
+    const anexosEnviados = anexos;
     setTexto("");
+    setAnexos([]);
     setPensando(true);
-    const provisoria: MensagemChat = { id: "enviando", role: "user", conteudo: mensagem, extras: {}, created_at: new Date().toISOString() };
+    const provisoria: MensagemChat = {
+      id: "enviando",
+      role: "user",
+      conteudo: mensagem,
+      extras: prontos.length ? { anexos: prontos.map((anexo) => ({ nome: anexo.nome, tipo: anexo.tipo })) } : {},
+      created_at: new Date().toISOString(),
+    };
     setMensagens((atuais) => [...atuais, provisoria]);
     try {
       const { data, error } = await supabase.functions.invoke("ai-peter-chat", {
-        body: { company_id: companyId, conversa_id: conversaId, mensagem },
+        body: { company_id: companyId, conversa_id: conversaId, mensagem, ...(prontos.length ? { anexos: prontos } : {}) },
       });
       if (error) throw error;
       if (data?.error) throw new Error(String(data.error));
@@ -198,7 +262,8 @@ const PeterChat = () => {
       }
     } catch (error) {
       setMensagens((atuais) => atuais.filter((item) => item.id !== "enviando"));
-      setTexto(mensagem);
+      setTexto(pergunta.trim());
+      setAnexos(anexosEnviados);
       setErro(await mensagemDaFalha(error));
     } finally {
       setPensando(false);
@@ -284,6 +349,16 @@ const PeterChat = () => {
                 <div key={mensagem.id} className={`w-fit max-w-[min(100%,48rem)] rounded-lg px-4 py-3 ${doPeter ? "bg-muted" : "ml-auto border bg-card"}`}>
                   <div className="mb-1 text-xs text-muted-foreground">{doPeter ? "Peter" : "Você"}</div>
                   <div className="text-[15px] leading-relaxed">{doPeter ? <TextoMarkdown texto={mensagem.conteudo} /> : <p className="whitespace-pre-wrap">{mensagem.conteudo}</p>}</div>
+                  {!doPeter && lerAnexos(mensagem.extras).length > 0 && (
+                    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Anexos">
+                      {lerAnexos(mensagem.extras).map((anexo, indice) => (
+                        <li key={indice} className="inline-flex max-w-full items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                          <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          <span className="truncate">{anexo.nome}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {(atalhos.length > 0 || convite) && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {convite && (
@@ -309,7 +384,47 @@ const PeterChat = () => {
 
         <div className="shrink-0 border-t px-4 py-3">
           {erro && <p className="mb-2 text-sm text-destructive" role="alert">{erro}</p>}
+          {anexos.length > 0 && (
+            <ul className="mb-2 flex flex-wrap gap-2" aria-label="Arquivos anexados">
+              {anexos.map((anexo) => (
+                <li key={anexo.id} className="inline-flex max-w-full items-center gap-1.5 rounded-md border bg-muted/50 py-1 pl-2 pr-1 text-sm">
+                  {anexo.dados ? <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" aria-label="Lendo arquivo" />}
+                  <span className="max-w-[14rem] truncate">{anexo.nome}</span>
+                  {anexo.parcial && <span className="text-xs text-muted-foreground">(só o início)</span>}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setAnexos((atuais) => atuais.filter((item) => item.id !== anexo.id))}
+                    aria-label={`Remover ${anexo.nome}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="flex items-end gap-2">
+            <input
+              ref={arquivoRef}
+              type="file"
+              accept={ACEITOS_NO_CHAT}
+              multiple
+              className="hidden"
+              data-testid="anexo-peter"
+              onChange={(event) => void anexar(event.target.files)}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => arquivoRef.current?.click()}
+              disabled={!companyId || pensando || anexos.length >= MAX_ANEXOS_CHAT}
+              aria-label="Anexar Word, PDF ou imagem"
+              title="Anexar Word, PDF ou imagem"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
             <Textarea
               ref={campoRef}
               rows={1}
@@ -325,12 +440,12 @@ const PeterChat = () => {
                 }
               }}
             />
-            <Button onClick={() => void enviar(texto)} disabled={pensando || !texto.trim() || !companyId} aria-label="Enviar" className="shrink-0">
+            <Button onClick={() => void enviar(texto)} disabled={pensando || lendoAnexo || (!texto.trim() && anexos.length === 0) || !companyId} aria-label="Enviar" className="shrink-0">
               <span className="hidden sm:inline">Enviar</span>
               <Send className="h-4 w-4 sm:ml-2" />
             </Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">O Peter consulta os dados da sua empresa e não altera nada. Confira informações importantes nas telas indicadas.</p>
+          <p className="mt-2 text-xs text-muted-foreground">O Peter consulta os dados da sua empresa e não altera nada. Aceita anexos em Word, PDF e imagem. Confira informações importantes nas telas indicadas.</p>
         </div>
       </section>
 
