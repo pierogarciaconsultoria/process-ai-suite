@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isSuperAdmin } from "@/lib/permissions";
 
 // Perfis na empresa (migration 202611050001). Os valores gravados ficam como estão; a tela usa estes nomes.
 export type PerfilGravado = "admin" | "gestor" | "analista";
@@ -43,4 +44,41 @@ export function usePodeGerenciar(companyId: string | null): boolean {
     };
   }, [companyId]);
   return pode;
+}
+
+// Consultor: dono de alguma empresa, Consultor (admin) em alguma delas, ou o super admin.
+// É quem vê a carteira de empresas ("Minhas empresas", em Configurações).
+export function ehConsultor(entrada: { superAdmin: boolean; donoDeAlguma: boolean; consultorEmAlguma: boolean }): boolean {
+  return entrada.superAdmin || entrada.donoDeAlguma || entrada.consultorEmAlguma;
+}
+
+// null enquanto verifica.
+export function useEhConsultor(): boolean | null {
+  const [consultor, setConsultor] = useState<boolean | null>(null);
+  useEffect(() => {
+    let ativo = true;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth.user;
+      if (!user) {
+        if (ativo) setConsultor(false);
+        return;
+      }
+      const [{ data: empresas }, { data: membros }] = await Promise.all([
+        supabase.from("empresas").select("id").eq("owner_id", user.id).limit(1),
+        supabase.from("membros").select("empresa_id").eq("user_id", user.id).eq("perfil", "admin").limit(1),
+      ]);
+      if (ativo) {
+        setConsultor(ehConsultor({
+          superAdmin: isSuperAdmin(user),
+          donoDeAlguma: (empresas?.length ?? 0) > 0,
+          consultorEmAlguma: (membros?.length ?? 0) > 0,
+        }));
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, []);
+  return consultor;
 }
