@@ -36,3 +36,20 @@ export function rotaDoAtalho(atalho: Atalho): string {
     case "processos": return "/processos";
   }
 }
+
+// Anexos de uma mensagem do usuário (nome e tipo), para mostrar no balão.
+export function lerAnexos(extras: Json | null | undefined): Array<{ nome: string; tipo: string }> {
+  const dados = extras && typeof extras === "object" && !Array.isArray(extras) ? (extras as Record<string, unknown>) : {};
+  return (Array.isArray(dados.anexos) ? dados.anexos : []).flatMap((item) => {
+    const anexo = item as { nome?: unknown; tipo?: unknown } | null;
+    return anexo && typeof anexo.nome === "string" ? [{ nome: anexo.nome, tipo: typeof anexo.tipo === "string" ? anexo.tipo : "" }] : [];
+  });
+}
+
+// Tipos aceitos no chat: Word, PDF e imagem (lidos no navegador pelo mesmo leitor da entrevista).
+export const ACEITOS_NO_CHAT = ".pdf,.docx,.png,.jpg,.jpeg";
+const EXTENSAO_ACEITA = /\.(pdf|docx|png|jpe?g)$/i;
+
+export function aceitoNoChat(arquivo: { name: string }): boolean {
+  return EXTENSAO_ACEITA.test(arquivo.name);
+}

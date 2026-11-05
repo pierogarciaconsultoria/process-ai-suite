@@ -7,15 +7,18 @@ import { checkModeration } from "../_shared/moderation.ts";
 import { carregarPersonaPeter } from "../_shared/peter-persona.ts";
 import { normalizarDiagnostico, normalizarPlano } from "../_shared/roteiro-analise.ts";
 import {
+  anexosParaGuardar,
   escolherRelevantes,
   lerRespostaChat,
   MAX_CONTEUDO_DOCUMENTO,
   MAX_MENSAGEM_CHAT,
   MAX_HISTORICO_CHAT,
+  partesDaMensagem,
   promptChat,
   sanitizarHistoricoChat,
   SCHEMA_CHAT,
   tituloDaConversa,
+  validarAnexosChat,
   type ContextoEmpresa,
   type DetalheProcesso,
 } from "../_shared/peter-chat.ts";
@@ -135,7 +138,9 @@ serve(async (req: Request) => {
     const companyId = requireString(body?.company_id, "company_id");
     await authorizeCompany(client, user.id, companyId);
 
-    const mensagem = typeof body?.mensagem === "string" ? body.mensagem.trim() : "";
+    // Word, PDF e imagem chegam lidos pelo navegador: texto extraído ou imagem em data URL.
+    const anexos = validarAnexosChat(body?.anexos);
+    const mensagem = (typeof body?.mensagem === "string" ? body.mensagem.trim() : "") || (anexos.length ? "Analise o anexo." : "");
     if (!mensagem) throw new HttpError(400, "Mensagem vazia.");
     if (mensagem.length > MAX_MENSAGEM_CHAT) throw new HttpError(400, "Mensagem excede 4.000 caracteres.");
     if (checkModeration(mensagem).blocked) throw new HttpError(422, "Conteúdo inapropriado. Use linguagem profissional.");
@@ -148,7 +153,7 @@ serve(async (req: Request) => {
       if (error) throw error;
       if (!conversa || conversa.company_id !== companyId) throw new HttpError(404, "Conversa não encontrada.");
       const { data: anteriores, error: erroHistorico } = await client
-        .from("peter_mensagens").select("role, conteudo").eq("conversa_id", conversaId)
+        .from("peter_mensagens").select("role, conteudo, extras").eq("conversa_id", conversaId)
         .order("created_at", { ascending: false }).limit(MAX_HISTORICO_CHAT);
       if (erroHistorico) throw erroHistorico;
       historico = sanitizarHistoricoChat([...(anteriores ?? [])].reverse());
@@ -164,12 +169,13 @@ serve(async (req: Request) => {
 
     const quotaLease = await acquireAiQuota(client, "ai-peter-chat", companyId);
     const sistema = promptChat(persona, contexto, primeiraResposta);
-    const consumo = sistema.length + JSON.stringify(historico).length + mensagem.length;
+    const consumo = sistema.length + JSON.stringify(historico).length + mensagem.length
+      + anexos.reduce((total, anexo) => total + (anexo.texto?.length ?? 0) + (anexo.imagem ? 4_000 : 0), 0);
     let resposta;
     try {
       const raw = await callResponsesAPI({
         systemPrompt: sistema,
-        messages: [...historico, { role: "user", content: mensagem }],
+        messages: [...historico, { role: "user", content: partesDaMensagem(mensagem, anexos) }],
         responseSchema: SCHEMA_CHAT,
         openaiApiKey: OPENAI_API_KEY,
       });
@@ -189,7 +195,7 @@ serve(async (req: Request) => {
     }
     const { data: gravadas, error: erroGravar } = await client.from("peter_mensagens").insert([
       // As duas linhas com as mesmas colunas: numa inserção múltipla, coluna ausente vira null.
-      { conversa_id: conversaId, user_id: user.id, role: "user", conteudo: mensagem, extras: {} },
+      { conversa_id: conversaId, user_id: user.id, role: "user", conteudo: mensagem, extras: anexos.length ? { anexos: anexosParaGuardar(anexos) } : {} },
       { conversa_id: conversaId, user_id: user.id, role: "assistant", conteudo: resposta.resposta, extras: { atalhos: resposta.atalhos, convite: resposta.convite } },
     ]).select("*");
     if (erroGravar) {
