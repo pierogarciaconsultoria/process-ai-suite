@@ -56,6 +56,6 @@ describe("Instruções do modelo de documento", () => {
   it("a edge function põe as instruções do modelo antes das regras fixas e do formato JSON", () => {
     expect(documentEdge).toContain("instrucoesDoModelo(template, generationConfig)");
     expect(documentEdge).toContain("promptDoTipo.replace(SYSTEM_PROMPT_ATUAL, `${instrucoes}\\n\\n${SYSTEM_PROMPT_ATUAL}`)");
-    expect(documentEdge).toContain("template: modeloSemInstrucoes(template)");
+    expect(documentEdge).toContain("const { sections: _secoesDoModelo, ...modelo } = modeloSemInstrucoes(template)");
   });
 });

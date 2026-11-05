@@ -11,6 +11,7 @@ import type { DiagnosticoResult, ProcessoFormData } from "@/data/processo-form-t
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { mapProcessRowToForm } from "@/lib/processos";
+import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { mapaVeioDoAnexo, restaurarMensagens } from "@/lib/entrevista-roteiro";
 import { buildMappedProcessPayload } from "@/data/documentation-config";
 import { RelatorioProcesso } from "@/components/relatorio/RelatorioProcesso";
@@ -86,8 +87,8 @@ export default function ProcessoResultadoGuiado() {
 
   const gerarDocumento = async (documentType: "raci" | "ficha_processo" | "pop_v5") => {
     if (!id || !processRow) return;
-    const mappedProcessData = buildMappedProcessPayload(processRow);
-    if (!mappedProcessData) return;
+    // Só processos que podem gerar documentação; o servidor lê o resto do banco.
+    if (!buildMappedProcessPayload(processRow)) return;
     const labels = { raci: "Matriz RACI", ficha_processo: "Ficha do Processo", pop_v5: "POP — Metodologia v5" };
     setDocumentLoading(documentType);
     setErrorMessage(null);
@@ -96,21 +97,20 @@ export default function ProcessoResultadoGuiado() {
         body: {
           template: { id: documentType, name: labels[documentType], type: documentType, documentType },
           sections: [],
-          mappedProcessData,
           manualDescription: null,
           generationConfig: { documentType },
           companyContext: { companyId: processRow.company_id },
           process_id: id,
-          use_peter_assistant: true,
         },
       });
-      if (error || hasFunctionError(data)) throw error || new Error(data.error);
+      if (error) throw error;
+      if (hasFunctionError(data)) throw new Error(data.error);
       setGeneratedDocument({
         title: String(data?.title || labels[documentType]),
         content_markdown: String(data?.content_markdown || ""),
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Não foi possível gerar o documento.");
+      setErrorMessage(await mensagemDaFuncao(error, "Não foi possível gerar o documento."));
     } finally {
       setDocumentLoading(null);
     }
