@@ -84,7 +84,7 @@ async function carregarFontes(client: SupabaseClient, processId: string, company
     ler(client.from("indicadores").select("nome, objetivo, formula, unidade, sentido, meta, meta_texto, periodicidade, responsavel, ativo").eq("company_id", companyId).eq("processo_id", processId).order("nome").limit(50), "indicadores"),
     ler(client.from("acoes").select("oque, quem, prazo, quando_texto, status").eq("company_id", companyId).eq("processo_id", processId).order("prazo", { ascending: true, nullsFirst: false }).limit(40), "acoes"),
   ]);
-  return montarFontesDoProcedimento({ processo: processo as Linha, indicadores, acoes });
+  return montarFontesDoProcedimento({ processo: processo as unknown as Linha, indicadores, acoes });
 }
 
 serve(async (req) => {
