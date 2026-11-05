@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Bot, Loader2, MessageSquarePlus, PanelLeft, Send, Trash2 } from "lucide-react";
+import { ArrowRight, Bot, Loader2, MessageSquarePlus, PanelLeft, PanelLeftClose, PanelLeftOpen, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,26 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { lerExtras, rotaDoAtalho, SUGESTOES, type Conversa, type MensagemChat } from "@/lib/peter-chat";
 import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
+
+// Preferência de quem usa: coluna de conversas oculta na tela larga (no celular ela já abre à parte).
+const CHAVE_HISTORICO_OCULTO = "peter:historicoOculto";
+
+function lerHistoricoOculto(): boolean {
+  try {
+    return window.localStorage.getItem(CHAVE_HISTORICO_OCULTO) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function guardarHistoricoOculto(oculto: boolean) {
+  try {
+    if (oculto) window.localStorage.setItem(CHAVE_HISTORICO_OCULTO, "1");
+    else window.localStorage.removeItem(CHAVE_HISTORICO_OCULTO);
+  } catch {
+    // Sem armazenamento: vale só nesta visita.
+  }
+}
 
 // Erro da chamada à função ai-peter-chat em português.
 const mensagemDaFalha = (error: unknown) => mensagemDaFuncao(error, "Não consegui falar com o Peter. Tente de novo.");
@@ -67,6 +87,7 @@ const PeterChat = () => {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [listaAberta, setListaAberta] = useState(false);
+  const [historicoOculto, setHistoricoOculto] = useState(lerHistoricoOculto);
   const rolagemRef = useRef<HTMLDivElement>(null);
   const campoRef = useRef<HTMLTextAreaElement>(null);
 
@@ -184,6 +205,12 @@ const PeterChat = () => {
     }
   };
 
+  const alternarHistorico = () => {
+    const proximo = !historicoOculto;
+    setHistoricoOculto(proximo);
+    guardarHistoricoOculto(proximo);
+  };
+
   const lista = (
     <ListaDeConversas
       conversas={conversas}
@@ -196,13 +223,28 @@ const PeterChat = () => {
 
   return (
     <div className="flex h-full min-h-0 gap-4 animate-fade-in">
-      <aside className="hidden w-64 shrink-0 md:block">{lista}</aside>
+      {!historicoOculto && <aside className="hidden w-64 shrink-0 md:block">{lista}</aside>}
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card">
         <header className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setListaAberta(true)} aria-label="Conversas anteriores">
             <PanelLeft className="h-4 w-4" />
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            onClick={alternarHistorico}
+            aria-label={historicoOculto ? "Mostrar histórico de conversas" : "Ocultar histórico de conversas"}
+            title={historicoOculto ? "Mostrar histórico de conversas" : "Ocultar histórico de conversas"}
+          >
+            {historicoOculto ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
+          {historicoOculto && (
+            <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={novaConversa} aria-label="Nova conversa" title="Nova conversa">
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
+          )}
           <Bot className="h-5 w-5 text-primary" aria-hidden />
           <h1 className="text-lg font-semibold text-foreground">Peter</h1>
           {/* Na conversa vazia, o convite já está no centro da tela. */}
