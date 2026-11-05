@@ -71,15 +71,11 @@ export function AppSidebar() {
       return undefined;
     }
   });
-  // O painel "Minhas empresas" também troca a empresa: o seletor acompanha.
+  // O painel "Minhas empresas" (Configurações) também troca a empresa: o seletor acompanha.
   useEffect(() => {
     if (empresaAtiva && empresaAtiva !== empresaId) setEmpresaId(empresaAtiva);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaAtiva]);
-  // Quem acompanha mais de uma empresa (o consultor) vê o painel da carteira.
-  const itensDoMenu = empresas.length > 1
-    ? [mainItems[0], { title: "Minhas empresas", url: "/minhas-empresas", icon: Building2 }, ...mainItems.slice(1)]
-    : mainItems;
 
   useEffect(() => {
     let isMounted = true;
@@ -238,7 +234,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {itensDoMenu.map((item) => (
+              {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild

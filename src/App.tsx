@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { SuperAdminRoute } from "@/components/SuperAdminRoute";
+import { ConsultorRoute } from "@/components/ConsultorRoute";
 import SupportWidget from "@/components/SupportWidget";
 const Login = React.lazy(() => import("./pages/Login"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
@@ -87,7 +88,7 @@ const App = () => (
               <Route path="/" element={<Landing />} />
               <Route element={<AppLayout />}>
                 <Route path="/inicio" element={<PeterChat />} />
-                <Route path="/minhas-empresas" element={<MinhasEmpresas />} />
+                <Route path="/minhas-empresas" element={<Navigate to="/configuracoes/minhas-empresas" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empresas" element={<Empresas />} />
                 <Route path="/processos" element={<Processos />} />
@@ -108,6 +109,7 @@ const App = () => (
                 <Route path="/arquitetura" element={<Arquitetura />} />
               <Route path="/relatorios" element={<Relatorios />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/configuracoes/minhas-empresas" element={<ConsultorRoute><MinhasEmpresas /></ConsultorRoute>} />
               <Route path="/configuracoes/empresas" element={<Empresas />} />
               <Route path="/configuracoes/usuarios" element={<Usuarios />} />
               <Route path="/configuracoes/perfil" element={<ConfigPerfil />} />
