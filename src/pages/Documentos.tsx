@@ -17,6 +17,7 @@ import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
 import { DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao } from "@/lib/ciclo-processo";
 import { mensagemDoErro } from "../../supabase/functions/_shared/authorization-core";
+import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import {
   buildMappedProcessPayload,
   formatRevision,
@@ -29,7 +30,6 @@ import {
   type MappedProcessPayload,
   type DocumentPreviewData,
   type DocumentRevisionEntry,
-  type DocumentTemplate,
   type GeneratedDocumentRecord,
   type ProcedureCategory,
 } from "@/data/documentation-config";
@@ -75,10 +75,6 @@ const OPERATIONAL_DOCUMENT_STATUSES = [
 const NO_APPROVED_PROCESSES_MESSAGE = "Nenhum processo com diagnóstico confirmado. Conclua a Etapa 5 da entrevista com o Peter antes de vincular.";
 
 type DbGeneratedDocument = Tables<"generated_documents">;
-
-function normalizeText(value: string) {
-  return value.trim() || "Não informado.";
-}
 
 function parseJsonArray<T>(value: Json | null | undefined): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
@@ -182,109 +178,6 @@ function buildMapVersionLabel(payload: MappedProcessPayload | null) {
   const revision = payload.normalized.mapaRevisao || "Rev.00";
   if (!approvedAt) return "Mapa sem aprovação formal registrada";
   return `Mapa aprovado em ${formatDatePtBr(approvedAt)} — ${revision}`;
-}
-
-function buildLinkedFallbackPreview(template: DocumentTemplate, payload: MappedProcessPayload | null): DocumentPreviewData {
-  const normalized = payload?.normalized;
-  const process = payload?.process;
-  const sections = template.sections
-    .filter((section) => section.isActive && section.includeInFinalDocument)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  const sectionContent = sections.map((section) => {
-    const key = section.sectionTitle.toLowerCase();
-    let content = section.sectionDescription || "Não informado.";
-
-    if (key.includes("objetivo")) content = normalizeText(String(normalized?.objetivo ?? ""));
-    else if (key.includes("respons")) content = normalizeText(process?.responsavel ?? "");
-    else if (key.includes("entradas")) content = normalizeText(String(normalized?.entradas ?? ""));
-    else if (key.includes("saídas") || key.includes("saidas")) content = normalizeText(String(normalized?.saidas ?? ""));
-    else if (key.includes("etapas")) {
-      content = Array.isArray(normalized?.etapas) && normalized.etapas.length > 0
-        ? normalized.etapas.map((step, index) => `${index + 1}. ${step.atividade} | Responsável: ${step.responsavel || "Não informado"} | Sistema: ${step.ferramentaDocumento || "Não informado"}`).join("\n")
-        : "Não informado.";
-    } else if (key.includes("riscos")) {
-      content = Array.isArray(normalized?.riscos) && normalized.riscos.length > 0
-        ? normalized.riscos.map((risk) => `- ${risk.risco || "Risco"}${risk.impacto ? ` | Impacto: ${risk.impacto}` : ""}`).join("\n")
-        : normalizeText(String(normalized?.problemasTexto ?? ""));
-    } else if (key.includes("indicadores")) {
-      content = Array.isArray(normalized?.indicadores) && normalized.indicadores.length > 0
-        ? normalized.indicadores.map((item) => `- ${item.nome || "Indicador"} | Meta: ${item.meta || "Não informado"}`).join("\n")
-        : "Não informado.";
-    } else if (key.includes("descri")) {
-      content = normalizeText(payload?.detailed?.descricao ?? "");
-    }
-
-    return `## ${section.sectionTitle}\n\n${content}`;
-  });
-
-  const contentMarkdown = [
-    `# ${template.name} - ${process?.nome || "Processo"}`,
-    "",
-    `> Prévia operacional gerada a partir do processo mapeado ${process?.nome || ""}.`,
-    "",
-    ...sectionContent,
-  ].join("\n").trim();
-
-  return {
-    title: `Procedimento - ${process?.nome || "Processo"}`,
-    contentMarkdown,
-    contentText: contentMarkdown.replace(/[#>*`-]/g, "").trim(),
-    summary: `Documento operacional gerado para o processo ${process?.nome || "selecionado"}.`,
-    pointsOfAttention: [
-      "Validar aprovador e distribuição antes da publicação.",
-      "Confirmar a revisão do conteúdo com o responsável pelo processo.",
-    ],
-    suggestedRisks: [],
-    suggestedIndicators: [],
-    generationMetadata: {
-      mode: "frontend-fallback",
-      processId: process?.id || null,
-      generatedAt: new Date().toISOString(),
-    },
-  };
-}
-
-function buildIndependentFallbackPreview(template: DocumentTemplate, draft: IndependentDraft): DocumentPreviewData {
-  const contentMarkdown = [
-    `# ${draft.title}`,
-    "",
-    "> Procedimento independente gerado sem vínculo com processo mapeado.",
-    "",
-    "## Classificação",
-    "",
-    `Tipo: ${draft.procedureCategory}`,
-    "",
-    "## Área responsável",
-    "",
-    normalizeText(draft.area),
-    "",
-    "## Responsável pelo documento",
-    "",
-    normalizeText(draft.owner),
-    "",
-    "## Diretriz inicial",
-    "",
-    `Documento criado com apoio do template "${template.name}" para posterior detalhamento operacional.`,
-  ].join("\n").trim();
-
-  return {
-    title: draft.title,
-    contentMarkdown,
-    contentText: contentMarkdown.replace(/[#>*`-]/g, "").trim(),
-    summary: "Procedimento independente preparado para revisão e complementação manual.",
-    pointsOfAttention: [
-      "Validar o conteúdo com a área dona do procedimento.",
-      "Definir aprovador e distribuição antes da publicação.",
-    ],
-    suggestedRisks: [],
-    suggestedIndicators: [],
-    generationMetadata: {
-      mode: "frontend-fallback",
-      sourceMode: "independent",
-      generatedAt: new Date().toISOString(),
-    },
-  };
 }
 
 function statusBadgeVariant(status: GeneratedDocumentRecord["status"]): "default" | "secondary" | "outline" | "destructive" {
@@ -674,7 +567,7 @@ export default function Documentos() {
       const payload = {
         template: activeTemplate,
         sections: activeTemplate.sections.filter((section) => section.isActive && section.includeInFinalDocument),
-        mappedProcessData,
+        // O servidor lê o processo do banco (entrevista, mapa, indicadores); basta o process_id.
         manualDescription: sourceMode === "independent"
           ? {
               title: independentDraft.title,
@@ -698,7 +591,6 @@ export default function Documentos() {
         generationConfig: activeTemplate.promptConfig,
         companyContext,
         process_id: sourceMode === "linked_process" ? selectedProcessId : null,
-        use_peter_assistant: sourceMode === "linked_process",
       };
       const { data, error } = await supabase.functions.invoke("ai-generate-document", { body: payload });
       if (error) throw error;
@@ -718,16 +610,12 @@ export default function Documentos() {
       setPreviewTitle(nextPreview.title);
       setPreviewMarkdown(nextPreview.contentMarkdown);
       toast({ title: "Prévia gerada", description: "Revise o procedimento antes de salvar." });
-    } catch {
-      const fallback = sourceMode === "linked_process"
-        ? buildLinkedFallbackPreview(activeTemplate, selectedProcessPayload)
-        : buildIndependentFallbackPreview(activeTemplate, independentDraft);
-      setPreview(fallback);
-      setPreviewTitle(fallback.title);
-      setPreviewMarkdown(fallback.contentMarkdown);
+    } catch (error) {
+      // Sem prévia "local": um documento montado sem a IA poderia ser salvo como se fosse o procedimento.
       toast({
-        title: "Prévia gerada em modo local",
-        description: "A função de IA não respondeu. Foi montada uma versão operacional para revisão.",
+        title: "Não foi possível gerar o documento",
+        description: await mensagemDaFuncao(error, "A geração falhou. Tente de novo em instantes."),
+        variant: "destructive",
       });
     } finally {
       setIsGenerating(false);

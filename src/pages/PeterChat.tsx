@@ -9,24 +9,11 @@ import { emptyProcessoForm } from "@/data/processo-form-types";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAccessibleCompanyId } from "@/lib/active-company";
 import { lerExtras, rotaDoAtalho, SUGESTOES, type Conversa, type MensagemChat } from "@/lib/peter-chat";
+import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 
-// Erro da chamada à função ai-peter-chat em português: sem conexão com a função ou a causa que ela devolveu.
-async function mensagemDaFalha(error: unknown): Promise<string> {
-  const falha = error as { name?: string; message?: string; context?: { json?: () => Promise<unknown> } };
-  if (falha?.name === "FunctionsFetchError" || /Failed to send a request/i.test(falha?.message ?? "")) {
-    return "O Peter não está disponível agora. Tente de novo em instantes; se continuar, avise o suporte.";
-  }
-  if (falha?.name === "FunctionsHttpError" && typeof falha.context?.json === "function") {
-    try {
-      const corpo = (await falha.context.json()) as { error?: unknown };
-      if (typeof corpo?.error === "string" && corpo.error) return corpo.error;
-    } catch {
-      // Sem corpo legível: segue para a mensagem padrão.
-    }
-  }
-  return mensagemDoErroDoProcesso(error, "Não consegui falar com o Peter. Tente de novo.");
-}
+// Erro da chamada à função ai-peter-chat em português.
+const mensagemDaFalha = (error: unknown) => mensagemDaFuncao(error, "Não consegui falar com o Peter. Tente de novo.");
 
 function ListaDeConversas({
   conversas,

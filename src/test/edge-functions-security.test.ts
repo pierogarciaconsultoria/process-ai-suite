@@ -32,7 +32,7 @@ describe("Edge Function security contract", () => {
     (functionName) => {
       const source = readFileSync(resolve("supabase/functions", functionName, "index.ts"), "utf8");
       const authorizationIndex = source.indexOf("await authorizeCompany(");
-      const assistantIndex = source.indexOf("runConfiguredAssistant(");
+      const assistantIndex = source.search(/(?:runConfiguredAssistant|callResponsesAPI)\(/);
       expect(authorizationIndex).toBeGreaterThanOrEqual(0);
       expect(assistantIndex).toBeGreaterThan(authorizationIndex);
     },

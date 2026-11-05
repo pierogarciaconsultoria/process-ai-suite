@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/active-company", () => ({ resolveAccessibleCompanyId: async () => "empresa-1" }));
+// Consultor ou Gestor: a tela mostra tudo (a regra de perfil é testada em perfil.test.ts).
+vi.mock("@/lib/perfil", () => ({ usePodeGerenciar: () => true }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: { getUser: async () => ({ data: { user: { id: "user-1" } } }) },

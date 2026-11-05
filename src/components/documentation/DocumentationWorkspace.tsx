@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import {
   ArrowDown,
   ArrowUp,
@@ -149,130 +150,6 @@ function StatCard({ title, value, description }: { title: string; value: string;
       </CardContent>
     </Card>
   );
-}
-
-function buildSectionFallbackContent(section: DocumentSection, source: Record<string, unknown>) {
-  const title = section.sectionTitle.toLowerCase();
-  const normalized = source.normalized as Record<string, unknown> | undefined;
-
-  if (title.includes("objetivo")) return String(source.objective ?? normalized?.objetivo ?? "Não informado.");
-  if (title.includes("aplica") || title.includes("descri")) {
-    return String(source.generalDescription ?? normalized?.descricao ?? normalized?.objetivo ?? "Não informado.");
-  }
-  if (title.includes("respons")) return String(source.stakeholders ?? normalized?.donoProcesso ?? "Não informado.");
-  if (title.includes("entradas")) return String(source.inputs ?? normalized?.entradas ?? "Não informado.");
-  if (title.includes("saídas") || title.includes("saidas")) return String(source.outputs ?? normalized?.saidas ?? "Não informado.");
-  if (title.includes("sistemas")) {
-    const systems = source.systems || normalized?.etapas;
-    if (Array.isArray(systems)) {
-      return systems
-        .map((item) => {
-          if (typeof item === "string") return item;
-          if (item && typeof item === "object" && "sistema" in item) return String((item as { sistema?: string }).sistema || "");
-          if (item && typeof item === "object" && "ferramentaDocumento" in item) return String((item as { ferramentaDocumento?: string }).ferramentaDocumento || "");
-          return "";
-        })
-        .filter(Boolean)
-        .join(", ") || "Não informado.";
-    }
-    return String(systems ?? "Não informado.");
-  }
-  if (title.includes("etapas") || title.includes("checklist")) {
-    const steps = normalized?.etapas;
-    if (Array.isArray(steps)) {
-      return steps
-        .map((step, index) => {
-          if (typeof step === "string") return `${index + 1}. ${step}`;
-          if (step && typeof step === "object") {
-            const row = step as { atividade?: string; responsavel?: string; sistema?: string };
-            return `${index + 1}. ${row.atividade || "Atividade"} | Responsável: ${row.responsavel || "Não informado"} | Sistema: ${row.sistema || "Não informado"}`;
-          }
-          return `${index + 1}. Não informado`;
-        })
-        .join("\n");
-    }
-    return String(source.generalDescription ?? "Não informado.");
-  }
-  if (title.includes("riscos")) {
-    const risks = source.knownRisks || normalized?.riscos;
-    if (Array.isArray(risks)) {
-      return risks
-        .map((risk) => {
-          if (typeof risk === "string") return `- ${risk}`;
-          if (risk && typeof risk === "object") {
-            const row = risk as { risco?: string; consequencia?: string; impacto?: string; probabilidade?: string };
-            return `- ${row.risco || "Risco"}${row.consequencia ? ` | Consequência: ${row.consequencia}` : ""}${row.probabilidade ? ` | Probabilidade: ${row.probabilidade}` : ""}${row.impacto ? ` | Impacto: ${row.impacto}` : ""}`;
-          }
-          return "- Não informado";
-        })
-        .join("\n");
-    }
-    return String(risks ?? "Não informado.");
-  }
-  if (title.includes("controle")) return String(source.existingControls ?? "Validar controles existentes com a empresa.");
-  if (title.includes("indicadores")) {
-    const indicators = source.desiredIndicators || normalized?.indicadores;
-    if (Array.isArray(indicators)) {
-      return indicators
-        .map((indicator) => {
-          if (typeof indicator === "string") return `- ${indicator}`;
-          if (indicator && typeof indicator === "object") {
-            const row = indicator as { nome?: string; formula?: string; meta?: string; objetivo?: string };
-            return `- ${row.nome || "Indicador"}${row.objetivo ? ` | Objetivo: ${row.objetivo}` : ""}${row.formula ? ` | Fórmula: ${row.formula}` : ""}${row.meta ? ` | Meta: ${row.meta}` : ""}`;
-          }
-          return "- Não informado";
-        })
-        .join("\n");
-    }
-    return String(indicators ?? "Não informado.");
-  }
-  if (title.includes("anexo")) return "Anexos e evidências devem ser vinculados conforme política documental da empresa.";
-  if (title.includes("histórico")) return "Versão inicial gerada para revisão. Registrar alterações futuras no histórico de revisão.";
-
-  return section.sectionDescription || "Não informado.";
-}
-
-function buildLocalPreview(
-  template: DocumentTemplate,
-  sections: DocumentSection[],
-  origin: DocumentOrigin,
-  mappedProcessData: ReturnType<typeof buildMappedProcessPayload> | null,
-  manualDescription: ManualDescriptionInput,
-): DocumentPreviewData {
-  const source = origin === "mapped_process" ? (mappedProcessData || {}) : manualDescription;
-  const contentMarkdown = [
-    `# ${manualDescription.title || template.name}`,
-    "",
-    `> Documento gerado em modo local para revisão. Origem: ${origin === "mapped_process" ? "processo mapeado" : "descrição livre"}.`,
-    "",
-    ...sections.flatMap((section) => [
-      `## ${section.sectionTitle}`,
-      "",
-      buildSectionFallbackContent(section, source as Record<string, unknown>),
-      "",
-    ]),
-  ].join("\n").trim();
-
-  return {
-    title: manualDescription.title || template.name,
-    contentMarkdown,
-    contentText: contentMarkdown.replace(/[#>*`-]/g, "").trim(),
-    summary: origin === "mapped_process"
-      ? "Prévia gerada com base no processo selecionado. Revise antes de salvar."
-      : "Prévia gerada com base na descrição livre. Revise antes de salvar.",
-    pointsOfAttention: [
-      "Validar dados críticos antes de publicar.",
-      "Confirmar anexos obrigatórios e revisão por responsável.",
-    ],
-    suggestedRisks: [],
-    suggestedIndicators: [],
-    generationMetadata: {
-      mode: "frontend-fallback",
-      origin,
-      sectionsCount: sections.length,
-      generatedAt: new Date().toISOString(),
-    },
-  };
 }
 
 export default function DocumentationWorkspace() {
@@ -712,7 +589,7 @@ export default function DocumentationWorkspace() {
       const payload = {
         template: activeTemplate,
         sections: selectedSections,
-        mappedProcessData: documentOrigin === "mapped_process" ? mappedProcessPayload : null,
+        // O servidor lê o processo do banco (entrevista, mapa, indicadores); basta o process_id.
         manualDescription: documentOrigin === "manual_description" ? manualDescription : null,
         generationConfig: activeTemplate.promptConfig,
         companyContext,
@@ -737,14 +614,12 @@ export default function DocumentationWorkspace() {
       setPreviewTitle(nextPreview.title);
       setPreviewMarkdown(nextPreview.contentMarkdown);
       toast({ title: "Documento gerado", description: "A prévia foi montada e está pronta para revisão." });
-    } catch {
-      const fallback = buildLocalPreview(activeTemplate, selectedSections, documentOrigin, mappedProcessPayload, manualDescription);
-      setPreview(fallback);
-      setPreviewTitle(fallback.title);
-      setPreviewMarkdown(fallback.contentMarkdown);
+    } catch (error) {
+      // Sem prévia "local": um documento montado sem a IA poderia ser salvo como se fosse o definitivo.
       toast({
-        title: "Prévia gerada em modo local",
-        description: "A função de IA não respondeu. Foi criada uma versão incremental para revisão.",
+        title: "Não foi possível gerar o documento",
+        description: await mensagemDaFuncao(error, "A geração falhou. Tente de novo em instantes."),
+        variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
