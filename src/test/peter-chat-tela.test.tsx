@@ -51,6 +51,26 @@ describe("Tela inicial do Peter", () => {
     mocks.invoke.mockReset();
     mocks.conversas = [];
     mocks.mensagens = [];
+    window.localStorage.clear();
+  });
+
+  it("oculta e mostra o histórico de conversas, e lembra a escolha", async () => {
+    const { unmount } = renderizar();
+    expect(await screen.findByRole("navigation", { name: "Conversas anteriores" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ocultar histórico de conversas" }));
+    expect(screen.queryByRole("navigation", { name: "Conversas anteriores" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nova conversa" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("peter:historicoOculto")).toBe("1");
+
+    unmount();
+    renderizar();
+    expect(await screen.findByRole("button", { name: "Mostrar histórico de conversas" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Conversas anteriores" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar histórico de conversas" }));
+    expect(screen.getByRole("navigation", { name: "Conversas anteriores" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("peter:historicoOculto")).toBeNull();
   });
 
   it("abre com a saudação, sugestões e o convite para mapear", async () => {
