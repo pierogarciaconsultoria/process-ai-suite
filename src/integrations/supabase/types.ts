@@ -1162,6 +1162,41 @@ export type Database = {
           },
         ]
       }
+      padroes_documento: {
+        Row: {
+          company_id: string | null
+          conteudo: string
+          id: string
+          tipo: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          conteudo?: string
+          id?: string
+          tipo: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          conteudo?: string
+          id?: string
+          tipo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "padroes_documento_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       peter_conversas: {
         Row: {
           company_id: string

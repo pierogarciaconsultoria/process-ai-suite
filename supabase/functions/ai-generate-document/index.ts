@@ -9,8 +9,26 @@ import {
   lerDocumentoGerado,
   montarFontesDoProcedimento,
   SCHEMA_DOCUMENTO,
+  textoSimples,
+  type DocumentoGerado,
   type FontesDoProcedimento,
 } from "../_shared/procedimento-fontes.ts";
+import {
+  atividadesFaltando,
+  ehProcedimento,
+  inserirDescricao,
+  lerSubsecoes,
+  lotesDeAtividades,
+  MARCADOR_DESCRICAO,
+  promptDasAtividades,
+  promptDoCorpo,
+  SCHEMA_ATIVIDADES,
+  semLinksInventados,
+  subsecaoDosDados,
+  type PadraoProcedimento,
+  type SubsecaoAtividade,
+} from "../_shared/procedimento-padrao.ts";
+import { carregarPadrao } from "../_shared/padrao-banco.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,6 +105,92 @@ async function carregarFontes(client: SupabaseClient, processId: string, company
   return montarFontesDoProcedimento({ processo: processo as unknown as Linha, indicadores, acoes });
 }
 
+async function chamarIA(systemPrompt: string, conteudo: string, schema: object, chave: string): Promise<unknown> {
+  try {
+    return await callResponsesAPI({ systemPrompt, messages: [{ role: "user", content: conteudo }], responseSchema: schema, openaiApiKey: chave });
+  } catch (erro) {
+    console.error("ai-generate-document: falha na IA", erro);
+    throw new HttpError(502, "O Peter não conseguiu gerar o documento agora. Tente de novo em instantes.");
+  }
+}
+
+function hojeEmSaoPaulo(): string {
+  return new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+const IDENTIDADE_PROCEDIMENTO = `Você é o Peter, consultor de processos e de ISO 9001 da plataforma Peter (metodologia Piero Garcia Consultoria). Escreve procedimentos em português do Brasil, prontos para auditoria e para treinar um colaborador novo.`;
+
+// PR/PA e IT: o corpo do documento e a descrição das atividades, em lotes paralelos. Atividade que a
+// IA deixar de fora é pedida de novo; se ainda faltar, entra com os dados do mapeamento e um aviso.
+async function gerarProcedimento(entrada: {
+  dados: FontesDoProcedimento;
+  padrao: PadraoProcedimento;
+  instrucoes: string;
+  empresa: string | null;
+  titulo: string;
+  chave: string;
+  // Tamanho de cada pedido à IA, para a cota (contado mesmo se uma chamada falhar).
+  registrarConsumo: (caracteres: number) => void;
+}): Promise<DocumentoGerado> {
+  const { dados, padrao, chave } = entrada;
+  const total = dados.atividades.length;
+  const conteudo = JSON.stringify({ empresa: entrada.empresa, dadosDoProcesso: dados });
+  const sistemaCorpo = [
+    IDENTIDADE_PROCEDIMENTO,
+    promptDoCorpo(padrao, total > 0, hojeEmSaoPaulo()),
+    entrada.instrucoes ? `## INSTRUÇÕES ADICIONAIS DO MODELO (valem quando não conflitam com o padrão acima)\n${entrada.instrucoes}` : "",
+    GUIA_DE_FONTES,
+    SYSTEM_PROMPT_ATUAL,
+  ].filter(Boolean).join("\n\n");
+
+  const lotes = lotesDeAtividades(total);
+  const escrever = async (lote: { de: number; ate: number }, aviso = "") => {
+    const sistema = `${promptDasAtividades(padrao, lote, total)}${aviso}`;
+    entrada.registrarConsumo(sistema.length + conteudo.length);
+    return lerSubsecoes(await chamarIA(sistema, conteudo, SCHEMA_ATIVIDADES, chave));
+  };
+  entrada.registrarConsumo(sistemaCorpo.length + conteudo.length);
+  const [corpoRaw, ...porLote] = await Promise.all([
+    chamarIA(sistemaCorpo, conteudo, SCHEMA_DOCUMENTO, chave),
+    ...lotes.map((lote) => escrever(lote)),
+  ]);
+
+  const corpo = lerDocumentoGerado(corpoRaw, entrada.titulo);
+  if (!corpo) throw new HttpError(502, "O Peter não devolveu o documento. Tente gerar de novo.");
+
+  // Segunda tentativa, em paralelo, só para os lotes com atividade faltando.
+  const refeitos = await Promise.all(lotes.map((lote, indice) => {
+    const faltando = atividadesFaltando(porLote[indice], lote);
+    return faltando.length
+      ? escrever(lote, `\n\nATENÇÃO: na tentativa anterior faltaram as atividades ${faltando.join(", ")}. Cubra TODAS as ordens de ${lote.de} a ${lote.ate}.`)
+      : Promise.resolve(null);
+  }));
+
+  const avisos: string[] = [];
+  const subsecoes: SubsecaoAtividade[] = [];
+  lotes.forEach((lote, indice) => {
+    const primeira = porLote[indice];
+    const segunda = refeitos[indice];
+    const melhor = segunda && atividadesFaltando(segunda, lote).length < atividadesFaltando(primeira, lote).length ? segunda : primeira;
+    subsecoes.push(...melhor);
+    for (const ordem of atividadesFaltando(melhor, lote)) {
+      const atividade = dados.atividades.find((item) => item.ordem === ordem);
+      if (!atividade) continue;
+      subsecoes.push(subsecaoDosDados(atividade));
+      avisos.push(`A atividade "${atividade.atividade}" foi descrita só com os dados do mapeamento: complete o texto.`);
+    }
+  });
+  subsecoes.sort((a, b) => Math.min(...a.atividades) - Math.min(...b.atividades));
+
+  const markdown = semLinksInventados(total > 0 ? inserirDescricao(corpo.content_markdown, subsecoes) : corpo.content_markdown.replace(MARCADOR_DESCRICAO, ""));
+  return {
+    ...corpo,
+    content_markdown: markdown,
+    content_text: textoSimples(markdown),
+    attention_points: [...avisos, ...corpo.attention_points],
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -128,38 +232,35 @@ serve(async (req) => {
       dadosDoProcesso ? GUIA_DE_FONTES : "",
     ].filter(Boolean).join("\n\n");
 
+    const tituloPadrao = String(manualDescription?.title || (dadosDoProcesso?.identificacao.nome ? `${template.name ?? "Documento"} - ${dadosDoProcesso.identificacao.nome}` : template.name) || "Documento gerado");
     // As seções já vão à parte; o modelo segue sem elas e sem as instruções, que estão no prompt.
     const { sections: _secoesDoModelo, ...modelo } = modeloSemInstrucoes(template);
-    const contextPayload = {
-      template: modelo,
-      sections: (Array.isArray(sections) ? sections : []).map((secao: Linha) => ({
-        titulo: secao?.sectionTitle, descricao: secao?.sectionDescription, obrigatoria: secao?.isRequired === true,
-      })),
-      empresa: companyContext?.companyName ?? null,
-      dadosDoProcesso,
-      manualDescription,
-    };
-    const userContent = JSON.stringify(contextPayload);
-    const tituloPadrao = String(manualDescription?.title || (dadosDoProcesso?.identificacao.nome ? `${template.name ?? "Documento"} - ${dadosDoProcesso.identificacao.nome}` : template.name) || "Documento gerado");
+    const secoes = (Array.isArray(sections) ? sections : []).map((secao: Linha) => ({
+      titulo: secao?.sectionTitle, descricao: secao?.sectionDescription, obrigatoria: secao?.isRequired === true,
+    }));
 
     const lease = await acquireAiQuota(client, "ai-generate-document", companyId);
-    const consumo = userContent.length + systemPrompt.length;
-    let raw: unknown;
+    let consumo = 0;
+    let documento: DocumentoGerado | null;
+    let padraoUsado: PadraoProcedimento["origem"] | null = null;
     try {
-      raw = await callResponsesAPI({
-        systemPrompt,
-        messages: [{ role: "user", content: userContent }],
-        responseSchema: SCHEMA_DOCUMENTO,
-        openaiApiKey: OPENAI_API_KEY,
-      });
-    } catch (erro) {
-      console.error("ai-generate-document: falha na IA", erro);
-      throw new HttpError(502, "O Peter não conseguiu gerar o documento agora. Tente de novo em instantes.");
+      if (dadosDoProcesso && ehProcedimento(tipoDocumento)) {
+        // PR/PA e IT seguem o padrão do Peter (estrutura e manual de escrita); as seções do modelo da tela não valem aqui.
+        const padrao = await carregarPadrao(client, companyId, tipoDocumento);
+        padraoUsado = padrao.origem;
+        documento = await gerarProcedimento({
+          dados: dadosDoProcesso, padrao, instrucoes, empresa: companyContext?.companyName ?? null,
+          titulo: dadosDoProcesso.identificacao.nome || tituloPadrao, chave: OPENAI_API_KEY,
+          registrarConsumo: (caracteres) => { consumo += caracteres; },
+        });
+      } else {
+        const userContent = JSON.stringify({ template: modelo, sections: secoes, empresa: companyContext?.companyName ?? null, dadosDoProcesso, manualDescription });
+        consumo = userContent.length + systemPrompt.length;
+        documento = lerDocumentoGerado(await chamarIA(systemPrompt, userContent, SCHEMA_DOCUMENTO, OPENAI_API_KEY), tituloPadrao);
+      }
     } finally {
       await lease.complete(consumo, Math.max(1, Math.ceil(consumo / 200)));
     }
-
-    const documento = lerDocumentoGerado(raw, tituloPadrao);
     if (!documento) throw new HttpError(502, "O Peter não devolveu o documento. Tente gerar de novo.");
 
     return new Response(JSON.stringify({
@@ -168,7 +269,8 @@ serve(async (req) => {
         mode: "ia",
         ai_model: "gpt-4o",
         template_id: template.id ?? null,
-        sections_count: contextPayload.sections.length,
+        sections_count: secoes.length,
+        padrao: padraoUsado,
         process_id: processId,
         map_revision: dadosDoProcesso?.identificacao.revisaoDoMapa ?? null,
         fontes: dadosDoProcesso

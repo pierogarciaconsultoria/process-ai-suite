@@ -238,7 +238,8 @@ describe("ai-generate-document", () => {
   });
 
   it("exige resposta no formato do documento e não devolve conteúdo montado sem a IA", () => {
-    expect(documentEdge).toContain("responseSchema: SCHEMA_DOCUMENTO");
+    expect(documentEdge).toContain("responseSchema: schema");
+    expect(documentEdge).toContain("chamarIA(systemPrompt, userContent, SCHEMA_DOCUMENTO, OPENAI_API_KEY)");
     expect(documentEdge).toContain('throw new HttpError(502, "O Peter não devolveu o documento. Tente gerar de novo.")');
     expect(documentEdge).not.toContain("fallback");
   });
