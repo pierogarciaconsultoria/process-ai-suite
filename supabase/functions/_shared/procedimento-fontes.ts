@@ -206,8 +206,8 @@ export function montarFontesDoProcedimento(entrada: { processo: Linha; indicador
 export const GUIA_DE_FONTES = `## DE ONDE VEM CADA SEÇÃO (dados em "dadosDoProcesso")
 - Objetivo: identificacao.objetivo e a resposta "Objetivo" da entrevista.
 - Campo de aplicação: identificacao.area e areasEnvolvidas; começa em inicioEFim.gatilho e termina na entrega a inicioEFim.clienteDoProcesso.
-- Referências normativas: somente as normas e exigências citadas na entrevista ("Normas e exigências"); nunca acrescente outras.
-- Definições e siglas: só termos e siglas que aparecem nos dados.
+- Referências normativas: as normas e exigências citadas na entrevista ("Normas e exigências"); cláusulas da ISO 9001 aplicáveis só como sugestão marcada "(sugerido pelo Peter — validar)".
+- Definições e siglas: os termos e siglas que aparecem nos dados (a definição pode vir do conhecimento geral).
 - Responsabilidades: responsáveis das atividades, raias do mapa (mapaAsIs), responsável pelo processo e aprovador citado na entrevista. Use cargos ou áreas.
 - Descrição do processo / das atividades: a sequência de atividades, completada pelo fluxo do mapaAsIs (ordem, quem faz, sistema, documentos usados e gerados) e pelas respostas de sistemas, prazos e atividades terceirizadas.
 - Pontos de decisão e fluxos alternativos: as decisões do mapaAsIs com cada caminho, e as respostas de decisões, aprovações, aprovação negada, atividades em paralelo e o que dá errado; também registrosDoProcesso.decisoes.
@@ -244,6 +244,11 @@ export interface DocumentoGerado {
   suggested_indicators: string[];
 }
 
+// Versão em texto do markdown (busca e indexação).
+export function textoSimples(markdown: string): string {
+  return markdown.replace(/[#*`>|]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 const textos = (valor: unknown) => (Array.isArray(valor) ? valor.filter((item): item is string => typeof item === "string" && item.trim() !== "").map((item) => item.trim()) : []);
 
 // null quando a resposta não traz um documento.
@@ -254,7 +259,7 @@ export function lerDocumentoGerado(raw: unknown, tituloPadrao: string): Document
   return {
     title: str(dados.title, 300) || tituloPadrao,
     content_markdown: markdown,
-    content_text: markdown.replace(/[#*`>|]/g, "").replace(/\n{3,}/g, "\n\n").trim(),
+    content_text: textoSimples(markdown),
     executive_summary: str(dados.executive_summary),
     attention_points: textos(dados.attention_points),
     suggested_risks: textos(dados.suggested_risks),
