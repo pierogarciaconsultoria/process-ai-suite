@@ -106,7 +106,8 @@ export function termos(texto: string): string[] {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .split(/[^a-z0-9-]+/)
+    // "Pós-Vendas" e "PÓS VENDAS" viram os mesmos termos.
+    .split(/[^a-z0-9]+/)
     .filter((palavra) => palavra.length >= 3 && !PALAVRAS_VAZIAS.has(palavra));
 }
 
@@ -212,8 +213,14 @@ ${persona.regras ? `\n## REGRAS DA EMPRESA\n${persona.regras}\n` : ""}${persona.
 ## ATALHOS
 Em "atalhos", liste até 4 referências dos itens citados na resposta (P1, D2, A3, I4) ou dos módulos (PLANO, INDICADORES, PROCESSOS, DOCUMENTOS), com um rótulo curto (ex.: "Abrir COOPERA - Pós-vendas"). Use só referências que existem nos dados.
 
+## PROCESSO JÁ MAPEADO
+Antes de tudo, veja se o assunto (inclusive o processo descrito num anexo) corresponde a um processo da lista, pelo nome, pela área ou pelo assunto, mesmo com grafia diferente ("Pós-vendas" = "COOPERA - PÓS VENDAS"). Se corresponder:
+- diga que esse processo já está mapeado na plataforma e ofereça o atalho para ele;
+- não convide a mapear;
+- se houver um anexo sobre ele, compare o anexo com o mapeamento (atividades, responsáveis, decisões, sistemas, riscos e indicadores): aponte de forma objetiva o que o documento tem e o mapa não tem, e o que o mapa tem e o documento não tem.
+
 ## CONVITE PARA MAPEAR
-Marque "convidarMapear.ativo" = true ${primeiraResposta ? "nesta resposta (é a primeira da conversa) e " : ""}quando o assunto for um processo que não está na lista, que está só "Em entrevista" ou de que faltam dados para responder. Nesse caso, termine a resposta com um convite curto para mapear o processo com você. Em "nomeProcesso", o nome do processo em questão, se souber; senão, "". Fora desses casos, false.
+Marque "convidarMapear.ativo" = true somente quando o assunto for um processo que não está na lista, que está só "Em entrevista" ou de que faltam dados para responder. Nesse caso, termine a resposta com um convite curto para mapear o processo com você. Em "nomeProcesso", o nome do processo em questão, se souber; senão, "".${primeiraResposta ? ' Nesta primeira resposta da conversa, se a pergunta não tiver ligação com nenhum processo mapeado (por exemplo, uma dúvida geral), você também pode terminar com um convite geral para mapear um processo, com "nomeProcesso" = "".' : ""} Fora desses casos, false.
 
 ## DADOS DA EMPRESA
 ${textoDoContexto(contexto)}`;
@@ -261,7 +268,9 @@ export function lerRespostaChat(raw: unknown, contexto: ContextoEmpresa): Respos
     const alvo = mapa.get(ref);
     if (!alvo || vistos.has(ref)) return [];
     vistos.add(ref);
-    return [{ ...alvo, rotulo: texto(registro(item).rotulo, 80) || alvo.rotulo }];
+    // Os módulos têm nome fixo ("Abrir Plano de Ação"); a IA às vezes repetia o código (PLANO).
+    const modulo = alvo.id === null;
+    return [{ ...alvo, rotulo: modulo ? alvo.rotulo : texto(registro(item).rotulo, 80) || alvo.rotulo }];
   }).slice(0, 4);
   const convite = registro(dados.convidarMapear);
   return {

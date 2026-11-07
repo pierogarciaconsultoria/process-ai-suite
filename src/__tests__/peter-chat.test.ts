@@ -7,6 +7,7 @@ import {
   promptChat,
   SCHEMA_CHAT,
   sanitizarHistoricoChat,
+  termos,
   anexosParaGuardar,
   MAX_TEXTO_ANEXOS_GUARDADO,
   partesDaMensagem,
@@ -59,15 +60,20 @@ describe("Chat do Peter", () => {
     const primeira = promptChat(persona, contexto(), true);
     expect(primeira).toContain("Nunca invente processo, documento, ação, indicador, número, nome ou data.");
     expect(primeira).toContain("Você só consulta.");
-    expect(primeira).toContain('nesta resposta (é a primeira da conversa) e quando o assunto for um processo que não está na lista');
-    expect(promptChat(persona, contexto(), false)).not.toContain("é a primeira da conversa");
+    expect(primeira).toContain('Marque "convidarMapear.ativo" = true somente quando o assunto for um processo que não está na lista');
+    expect(primeira).toContain("Nesta primeira resposta da conversa, se a pergunta não tiver ligação com nenhum processo mapeado");
+    expect(promptChat(persona, contexto(), false)).not.toContain("primeira resposta da conversa");
+    // Processo do anexo que já existe: atalho e comparação, sem convite.
+    expect(primeira).toContain('"Pós-vendas" = "COOPERA - PÓS VENDAS"');
+    expect(primeira).toContain("não convide a mapear");
+    expect(primeira).toContain("compare o anexo com o mapeamento");
     expect(SCHEMA_CHAT.required).toEqual(["resposta", "atalhos", "convidarMapear"]);
   });
 
   it("só aceita atalhos que existem nos dados e lê o convite", () => {
     const resposta = lerRespostaChat({
       resposta: "A ação **Configurar cotação no ERP** está atrasada.",
-      atalhos: [{ ref: "a1", rotulo: "Abrir a ação" }, { ref: "P9", rotulo: "Inventado" }, { ref: "PLANO", rotulo: "" }, { ref: "A1", rotulo: "Repetido" }],
+      atalhos: [{ ref: "a1", rotulo: "Abrir a ação" }, { ref: "P9", rotulo: "Inventado" }, { ref: "PLANO", rotulo: "Abrir PLANO" }, { ref: "A1", rotulo: "Repetido" }],
       convidarMapear: { ativo: true, nomeProcesso: "Compras" },
     }, contexto());
     expect(resposta.atalhos).toEqual([
@@ -149,5 +155,14 @@ describe("Chat do Peter", () => {
     expect(historico[0].content).toBe("Veja o antigo\n\n[Anexos: antigo.pdf (PDF)]");
     expect(historico[2].content).toBe('Veja o novo\n\n[Anexos: novo.docx (Word (DOCX)), f.png (Imagem (PNG))]\n\n[Conteúdo de "novo.docx"]\nconteúdo novo');
     expect(historico[4].content).toBe("E o prazo?");
+  });
+
+  it("acha o processo pelo texto com hífen ou sem acento, como num anexo", () => {
+    const processos = [
+      { id: "p1", nome: "COOPERA - PÓS VENDAS - AS IS", area: "Pós Vendas", dono: "", status: "Implementado", objetivo: "", atualizadoEm: "" },
+      { id: "p2", nome: "Compras", area: "Suprimentos", dono: "", status: "Implementado", objetivo: "", atualizadoEm: "" },
+    ];
+    expect(termos("Pós-Vendas")).toEqual(["pos", "vendas"]);
+    expect(escolherRelevantes("Analise o anexo. PA-00X - Pos-vendas.docx Procedimento de pós-vendas da Coopera", processos, []).processos).toEqual(["p1"]);
   });
 });
