@@ -215,6 +215,22 @@ export interface DocumentationState {
   generationSettings: DocumentGenerationSettings;
 }
 
+// Exclui um modelo da biblioteca. Modelos do sistema não são excluídos (só inativados) e a
+// biblioteca nunca fica vazia; null quando não pode. Se o excluído era o padrão, o padrão passa
+// para o primeiro modelo do sistema que sobrar (ou o primeiro da lista).
+export function excluirModelo(state: DocumentationState, templateId: string): DocumentationState | null {
+  const alvo = state.templates.find((template) => template.id === templateId);
+  if (!alvo || alvo.isSystemTemplate || state.templates.length <= 1) return null;
+  const restantes = state.templates.filter((template) => template.id !== templateId);
+  const eraPadrao = state.generationSettings.defaultTemplateId === templateId || alvo.isDefault;
+  if (!eraPadrao) return { ...state, templates: restantes };
+  const novoPadrao = (restantes.find((template) => template.isSystemTemplate) ?? restantes[0]).id;
+  return {
+    templates: restantes.map((template) => ({ ...template, isDefault: template.id === novoPadrao })),
+    generationSettings: { ...state.generationSettings, defaultTemplateId: novoPadrao },
+  };
+}
+
 export interface DocumentPreviewData {
   title: string;
   contentMarkdown: string;

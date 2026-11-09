@@ -9,21 +9,24 @@ import {
 // Padrão de procedimento do Peter (tabela padroes_documento, migration 202611070001).
 // Escopo null = plataforma (todas as empresas); um id = padrão próprio daquela empresa.
 
-export const TIPOS_PADRAO: Array<{ tipo: TipoPadrao; rotulo: string; ajuda: string; exemplo: string }> = [
+export const TIPOS_PADRAO: Array<{ tipo: TipoPadrao; curto: string; rotulo: string; ajuda: string; exemplo: string }> = [
   {
     tipo: "estrutura_pr",
+    curto: "Procedimento (PR/PA)",
     rotulo: "Estrutura do procedimento (PR/PA)",
     ajuda: "As seções, na ordem, com o que cada uma deve conter e as tabelas. Vale para Procedimento e POP.",
     exemplo: ESTRUTURA_PR_PADRAO,
   },
   {
     tipo: "estrutura_it",
+    curto: "Instrução (IT)",
     rotulo: "Estrutura da instrução de trabalho (IT)",
     ajuda: "As seções da IT. Em branco, a IT usa a estrutura genérica de IT do Peter.",
     exemplo: ESTRUTURA_IT_PADRAO,
   },
   {
     tipo: "manual_escrita",
+    curto: "Manual de escrita",
     rotulo: "Manual de escrita",
     ajuda: "Como redigir: verbos, cargo, condição de entrada, decisões, 5S, EPIs, cláusulas padrão. Vale para PR e IT.",
     exemplo: MANUAL_PADRAO,

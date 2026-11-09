@@ -14,6 +14,7 @@ import {
   Plus,
   Save,
   Sparkles,
+  Trash2,
   Upload,
   Wand2,
   type LucideIcon,
@@ -50,6 +51,7 @@ import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
 import { podeGerarDocumentacao } from "@/lib/ciclo-processo";
 import {
   buildMappedProcessPayload,
+  excluirModelo,
   createEmptyManualDescription,
   DOCUMENTATION_TABS,
   DOCUMENT_DETAIL_LEVELS,
@@ -468,6 +470,20 @@ export default function DocumentationWorkspace() {
     };
     persistState(nextState);
     toast({ title: "Modelo padrão atualizado", description: "Este template será sugerido por padrão na geração documental." });
+  };
+
+  const handleDeleteTemplate = () => {
+    if (!state || !activeTemplate || activeTemplate.isSystemTemplate) return;
+    if (state.templates.length <= 1) {
+      toast({ title: "Não é possível excluir", description: "É preciso manter ao menos um modelo.", variant: "destructive" });
+      return;
+    }
+    if (!window.confirm(`Excluir o modelo "${activeTemplate.name}"? Documentos já gerados com ele não são alterados.`)) return;
+    const nextState = excluirModelo(state, activeTemplate.id);
+    if (!nextState) return;
+    persistState(nextState);
+    setSelectedTemplateId(nextState.templates.some((template) => template.id === selectedTemplateId) ? selectedTemplateId : nextState.generationSettings.defaultTemplateId);
+    toast({ title: "Modelo excluído", description: `"${activeTemplate.name}" saiu da biblioteca.` });
   };
 
   const handleToggleTemplateStatus = () => {
@@ -950,6 +966,13 @@ export default function DocumentationWorkspace() {
                     <Button variant="outline" className="w-full" onClick={handleToggleTemplateStatus}>
                       <FileSearch className="mr-2 h-4 w-4" /> {activeTemplate.isActive ? "Inativar modelo" : "Ativar modelo"}
                     </Button>
+                    {activeTemplate.isSystemTemplate ? (
+                      <p className="text-xs text-muted-foreground">Modelo do sistema: pode ser inativado, mas não excluído.</p>
+                    ) : (
+                      <Button variant="outline" className="w-full text-destructive hover:text-destructive" onClick={handleDeleteTemplate}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir modelo
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
