@@ -31,8 +31,10 @@ describe("Edge Function security contract", () => {
     "%s only invokes the configured Peter Assistant after tenant authorization",
     (functionName) => {
       const source = readFileSync(resolve("supabase/functions", functionName, "index.ts"), "utf8");
-      const authorizationIndex = source.indexOf("await authorizeCompany(");
-      const assistantIndex = source.search(/(?:runConfiguredAssistant|callResponsesAPI)\(/);
+      // No handler: a chamada à IA (direta ou pelo chamarIA da função) vem depois da autorização.
+      const handler = source.slice(source.indexOf("serve("));
+      const authorizationIndex = handler.indexOf("await authorizeCompany(");
+      const assistantIndex = handler.search(/(?:runConfiguredAssistant|callResponsesAPI|chamarIA|gerarProcedimento)\(/);
       expect(authorizationIndex).toBeGreaterThanOrEqual(0);
       expect(assistantIndex).toBeGreaterThan(authorizationIndex);
     },
