@@ -18,6 +18,11 @@ vi.mock("@/lib/peter-upload", () => ({ extrairTextoPdf: vi.fn(), extrairTextoDoc
 
 import { PadraoProcedimentoConfig } from "@/components/documentation/PadraoProcedimentoConfig";
 
+// As abas do Radix trocam no mousedown do botão principal.
+function abrirAba(nome: RegExp) {
+  fireEvent.mouseDown(screen.getByRole("tab", { name: nome }), { button: 0, ctrlKey: false });
+}
+
 describe("Padrão de procedimento do Peter (configuração)", () => {
   beforeEach(() => {
     mocks.carregarPadroes.mockReset().mockResolvedValue({ estrutura_pr: "1. OBJETIVO", estrutura_it: "", manual_escrita: "" });
@@ -32,7 +37,10 @@ describe("Padrão de procedimento do Peter (configuração)", () => {
     expect(mocks.carregarPadroes).toHaveBeenCalledWith(null);
     expect(screen.getByRole("button", { name: "Salvar padrão" })).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Manual de escrita"), { target: { value: "Use verbo no infinitivo." } });
+    // Cada parte do padrão fica numa aba; as vazias aparecem como "genérico".
+    expect(screen.getByRole("tab", { name: /Procedimento \(PR\/PA\)\s*preenchido/ })).toBeInTheDocument();
+    abrirAba(/Manual de escrita/);
+    fireEvent.change(await screen.findByLabelText("Manual de escrita"), { target: { value: "Use verbo no infinitivo." } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar padrão" }));
     await waitFor(() => expect(mocks.salvarPadrao).toHaveBeenCalledTimes(1));
     expect(mocks.salvarPadrao).toHaveBeenCalledWith(null, "manual_escrita", "Use verbo no infinitivo.");
@@ -41,8 +49,10 @@ describe("Padrão de procedimento do Peter (configuração)", () => {
 
   it("parte do padrão genérico do Peter", async () => {
     render(<PadraoProcedimentoConfig />);
+    await screen.findByLabelText("Estrutura do procedimento (PR/PA)");
+    abrirAba(/Instrução \(IT\)/);
     await screen.findByLabelText("Estrutura da instrução de trabalho (IT)");
-    fireEvent.click(screen.getAllByRole("button", { name: "Partir do genérico" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Partir do genérico" }));
     expect((screen.getByLabelText("Estrutura da instrução de trabalho (IT)") as HTMLTextAreaElement).value).toContain("1. OBJETIVO — a tarefa que a instrução ensina");
   });
 });

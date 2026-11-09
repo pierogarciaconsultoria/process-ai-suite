@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useEmpresaAtiva } from "@/lib/empresa-ativa";
@@ -33,6 +34,7 @@ export function PadraoProcedimentoConfig() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [importando, setImportando] = useState<TipoPadrao | null>(null);
+  const [aba, setAba] = useState<TipoPadrao>("estrutura_pr");
   const arquivoRef = useRef<HTMLInputElement>(null);
   const alvoRef = useRef<TipoPadrao>("estrutura_pr");
   const companyId = escopo === "empresa" ? empresaAtiva : null;
@@ -122,42 +124,55 @@ export function PadraoProcedimentoConfig() {
         {carregando ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando o padrão...</p>
         ) : (
-          TIPOS_PADRAO.map(({ tipo, rotulo, ajuda, exemplo }) => (
-            <div key={tipo} className="space-y-1.5">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <div>
-                  <Label htmlFor={`padrao-${tipo}`}>{rotulo}</Label>
-                  <p className="text-xs text-muted-foreground">{ajuda}</p>
+          // Uma aba por parte do padrão, para as três ficarem à vista (a página é longa).
+          <Tabs value={aba} onValueChange={(valor) => setAba(valor as TipoPadrao)}>
+            <TabsList className="h-auto flex-wrap justify-start">
+              {TIPOS_PADRAO.map(({ tipo, curto }) => (
+                <TabsTrigger key={tipo} value={tipo} className="gap-2">
+                  {curto}
+                  <span className={`text-xs ${conteudo[tipo].trim() ? "text-primary" : "text-muted-foreground"}`}>
+                    {conteudo[tipo].trim() ? "preenchido" : "genérico"}
+                  </span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {TIPOS_PADRAO.map(({ tipo, rotulo, ajuda, exemplo }) => (
+              <TabsContent key={tipo} value={tipo} className="space-y-1.5">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <Label htmlFor={`padrao-${tipo}`}>{rotulo}</Label>
+                    <p className="text-xs text-muted-foreground">{ajuda}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setConteudo((atual) => ({ ...atual, [tipo]: exemplo }))}>
+                      Partir do genérico
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={importando !== null}
+                      onClick={() => {
+                        alvoRef.current = tipo;
+                        arquivoRef.current?.click();
+                      }}
+                    >
+                      {importando === tipo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileUp className="mr-1 h-4 w-4" />}
+                      Importar PDF ou Word
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setConteudo((atual) => ({ ...atual, [tipo]: exemplo }))}>
-                    Partir do genérico
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={importando !== null}
-                    onClick={() => {
-                      alvoRef.current = tipo;
-                      arquivoRef.current?.click();
-                    }}
-                  >
-                    {importando === tipo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileUp className="mr-1 h-4 w-4" />}
-                    Importar PDF ou Word
-                  </Button>
-                </div>
-              </div>
-              <Textarea
-                id={`padrao-${tipo}`}
-                rows={10}
-                maxLength={LIMITE}
-                value={conteudo[tipo]}
-                placeholder={exemplo}
-                onChange={(event) => setConteudo((atual) => ({ ...atual, [tipo]: event.target.value }))}
-              />
-            </div>
-          ))
+                <Textarea
+                  id={`padrao-${tipo}`}
+                  rows={14}
+                  maxLength={LIMITE}
+                  value={conteudo[tipo]}
+                  placeholder={exemplo}
+                  onChange={(event) => setConteudo((atual) => ({ ...atual, [tipo]: event.target.value }))}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
         )}
 
         <div className="flex justify-end">
