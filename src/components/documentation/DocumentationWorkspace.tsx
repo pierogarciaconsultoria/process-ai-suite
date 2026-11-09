@@ -472,18 +472,19 @@ export default function DocumentationWorkspace() {
     toast({ title: "Modelo padrão atualizado", description: "Este template será sugerido por padrão na geração documental." });
   };
 
-  const handleDeleteTemplate = () => {
-    if (!state || !activeTemplate || activeTemplate.isSystemTemplate) return;
+  // Exclui o modelo do card (lixeira) ou o modelo aberto (ações rápidas).
+  const handleDeleteTemplate = (template: DocumentTemplate | null = activeTemplate) => {
+    if (!state || !template || template.isSystemTemplate) return;
     if (state.templates.length <= 1) {
       toast({ title: "Não é possível excluir", description: "É preciso manter ao menos um modelo.", variant: "destructive" });
       return;
     }
-    if (!window.confirm(`Excluir o modelo "${activeTemplate.name}"? Documentos já gerados com ele não são alterados.`)) return;
-    const nextState = excluirModelo(state, activeTemplate.id);
+    if (!window.confirm(`Excluir o modelo "${template.name}"? Documentos já gerados com ele não são alterados.`)) return;
+    const nextState = excluirModelo(state, template.id);
     if (!nextState) return;
     persistState(nextState);
-    setSelectedTemplateId(nextState.templates.some((template) => template.id === selectedTemplateId) ? selectedTemplateId : nextState.generationSettings.defaultTemplateId);
-    toast({ title: "Modelo excluído", description: `"${activeTemplate.name}" saiu da biblioteca.` });
+    setSelectedTemplateId(nextState.templates.some((item) => item.id === selectedTemplateId) ? selectedTemplateId : nextState.generationSettings.defaultTemplateId);
+    toast({ title: "Modelo excluído", description: `"${template.name}" saiu da biblioteca.` });
   };
 
   const handleToggleTemplateStatus = () => {
@@ -859,8 +860,9 @@ export default function DocumentationWorkspace() {
                   </Button>
                 </div>
                 {state.templates.map((template) => (
+                  // A lixeira fica fora do botão do card (botão dentro de botão não é válido).
+                  <div key={template.id} className="relative">
                   <button
-                    key={template.id}
                     type="button"
                     onClick={() => setSelectedTemplateId(template.id)}
                     className={`w-full rounded-xl border p-4 text-left transition ${selectedTemplateId === template.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
@@ -879,6 +881,20 @@ export default function DocumentationWorkspace() {
                       <span>{template.sections.length} seções</span>
                     </div>
                   </button>
+                  {!template.isSystemTemplate && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute bottom-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteTemplate(template)}
+                      aria-label={`Excluir o modelo ${template.name}`}
+                      title="Excluir modelo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  </div>
                 ))}
               </CardContent>
             </Card>
@@ -969,7 +985,7 @@ export default function DocumentationWorkspace() {
                     {activeTemplate.isSystemTemplate ? (
                       <p className="text-xs text-muted-foreground">Modelo do sistema: pode ser inativado, mas não excluído.</p>
                     ) : (
-                      <Button variant="outline" className="w-full text-destructive hover:text-destructive" onClick={handleDeleteTemplate}>
+                      <Button variant="outline" className="w-full text-destructive hover:text-destructive" onClick={() => handleDeleteTemplate()}>
                         <Trash2 className="mr-2 h-4 w-4" /> Excluir modelo
                       </Button>
                     )}
