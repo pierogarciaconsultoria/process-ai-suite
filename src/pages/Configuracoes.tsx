@@ -11,13 +11,13 @@ const Configuracoes = () => {
   const showRestrictedSettings = isSuperAdmin(user);
   const consultor = useEhConsultor();
   return (
-    <div className="space-y-6 animate-fade-in max-w-2xl">
+    <div className="space-y-6 animate-fade-in max-w-6xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
         <p className="text-muted-foreground">Configurações gerais do sistema</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {consultor && (
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/minhas-empresas")}>
             <CardHeader className="flex-row items-center gap-3">
