@@ -72,6 +72,10 @@ describe("Padrão do procedimento", () => {
     expect(prompt).toContain('marque o ponto com "[detalhar: <o que falta>]"');
     expect(prompt).toContain("## EXEMPLO DO NÍVEL DE DETALHE ESPERADO (imite o formato e a profundidade; não copie os dados)\nEXEMPLO DA EMPRESA");
     expect(prompt).toContain("## DOCUMENTO DE APOIO");
+    // Manual vindo de um prompt de outros usos: só a parte de redação vale.
+    expect(prompt).toContain("Manual X\n\nDo manual acima, use somente o que trata de redação");
+    expect(prompt).toContain("frases de recusa e regras de confidencialidade");
+    expect(promptDoCorpo({ estrutura: "x", manual: "y", origem: "padrao" }, true, "13/11/2026")).toContain("Do manual acima, use somente o que trata de redação");
     expect(promptDasAtividades({ estrutura: "", manual: "", origem: "padrao" }, { de: 1, ate: 1 }, 1)).toContain(EXEMPLO_ATIVIDADE_PADRAO);
     expect(promptDoCorpo({ estrutura: "x", manual: "y", origem: "padrao" }, true, "13/11/2026")).toContain('cada "[detalhar: …]"');
   });
