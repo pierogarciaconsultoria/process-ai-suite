@@ -167,7 +167,8 @@ export function PadraoProcedimentoConfig() {
                   rows={14}
                   maxLength={LIMITE}
                   value={conteudo[tipo]}
-                  placeholder={exemplo}
+                  // O texto genérico como placeholder parecia conteúdo travado: a instrução diz o que fazer.
+                  placeholder={`Em branco: o Peter usa o padrão genérico. Clique em "Partir do genérico" para editar a partir dele, em "Importar PDF ou Word", ou cole o seu texto aqui.`}
                   onChange={(event) => setConteudo((atual) => ({ ...atual, [tipo]: event.target.value }))}
                 />
               </TabsContent>
