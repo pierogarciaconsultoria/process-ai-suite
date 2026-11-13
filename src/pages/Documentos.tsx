@@ -25,10 +25,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildMappedProcessPayload,
   formatRevision,
-  loadDocumentationState,
+  modeloDoPeter,
+  MODELO_DO_PETER,
   recomendarTipoDocumento,
   PROCEDURE_CATEGORIES,
-  type DocumentationState,
+  type TipoProcedimento,
   type DocumentApprovalEntry,
   type DocumentDistributionEntry,
   type MappedProcessPayload,
@@ -197,10 +198,12 @@ export default function Documentos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const guidedSelectionHandled = useRef(false);
   const [companyContext, setCompanyContext] = useState<CompanyContext>(DEFAULT_COMPANY_CONTEXT);
-  const [state, setState] = useState<DocumentationState | null>(null);
   const [documents, setDocuments] = useState<GeneratedDocumentRecord[]>([]);
   const [processRows, setProcessRows] = useState<ProcessoRow[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  // PR ou IT: começa pela recomendação (número de cargos do processo) e pode ser trocado.
+  const [tipoDocumento, setTipoDocumento] = useState<TipoProcedimento>("Procedimento");
+  const [editandoTexto, setEditandoTexto] = useState(false);
+  const [logoDoCliente, setLogoDoCliente] = useState<string | null>(null);
   const [selectedProcessId, setSelectedProcessId] = useState("");
   const [sourceMode, setSourceMode] = useState<SourceMode>("linked_process");
   const [filterProcess, setFilterProcess] = useState("all");
@@ -325,13 +328,8 @@ export default function Documentos() {
         // fallback local
       }
 
-      const nextState = loadDocumentationState(nextContext.companyId, nextContext.userId);
-      const activeTemplates = nextState.templates.filter((template) => template.isActive);
-      const defaultTemplate = activeTemplates.find((template) => template.id === nextState.generationSettings.defaultTemplateId) || activeTemplates[0];
-
       setCompanyContext(nextContext);
-      setState(nextState);
-      setSelectedTemplateId(defaultTemplate?.id || "");
+      void logoComoDataUrl(nextContext.companyId).then(setLogoDoCliente);
       // Nome de quem está logado (perfil ou e-mail), não o código interno do usuário.
       setReviewedBy(nomeDoUsuario);
       setApprovalName(nomeDoUsuario);
@@ -357,16 +355,6 @@ export default function Documentos() {
 
     void loadPage();
   }, [toast]);
-
-  const activeTemplates = useMemo(
-    () => state?.templates.filter((template) => template.isActive) ?? [],
-    [state],
-  );
-
-  const activeTemplate = useMemo(
-    () => activeTemplates.find((template) => template.id === selectedTemplateId) ?? activeTemplates[0] ?? null,
-    [activeTemplates, selectedTemplateId],
-  );
 
   const availableProcesses = useMemo(
     () => processRows.map(mapProcessRowToListItem),
@@ -465,10 +453,8 @@ export default function Documentos() {
   const tipoRecomendado = recomendacao?.documentType;
 
   useEffect(() => {
-    if (!tipoRecomendado) return;
-    const modelo = activeTemplates.find((template) => template.documentType === tipoRecomendado);
-    if (modelo) setSelectedTemplateId(modelo.id);
-  }, [activeTemplates, selectedProcessId, tipoRecomendado]);
+    if (tipoRecomendado === "Procedimento" || tipoRecomendado === "Instrução de Trabalho") setTipoDocumento(tipoRecomendado);
+  }, [selectedProcessId, tipoRecomendado]);
 
   const selectedReviewProcessPayload = useMemo(
     () => buildMappedProcessPayload(selectedReviewProcessRow),
@@ -544,15 +530,6 @@ export default function Documentos() {
   };
 
   const handleGeneratePreview = async () => {
-    if (!activeTemplate) {
-      toast({
-        title: "Dados incompletos",
-        description: "Selecione o template ativo antes de gerar o procedimento.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
         title: "Nenhum processo diagnosticado",
@@ -594,18 +571,20 @@ export default function Documentos() {
 
     setIsGenerating(true);
     try {
+      // Um só modelo: o padrão do Peter (a estrutura de PR/IT de processo mapeado vem do servidor).
+      const modelo = modeloDoPeter(tipoDocumento);
       const payload = {
-        template: activeTemplate,
-        sections: activeTemplate.sections.filter((section) => section.isActive && section.includeInFinalDocument),
+        template: modelo,
+        sections: sourceMode === "independent" ? modelo.sections : [],
         // O servidor lê o processo do banco (entrevista, mapa, indicadores); basta o process_id.
         manualDescription: sourceMode === "independent"
           ? {
               title: independentDraft.title,
-              documentType: activeTemplate.documentType,
-              templateId: activeTemplate.id,
+              documentType: tipoDocumento,
+              templateId: modelo.id,
               area: independentDraft.area,
               objective: independentDraft.title,
-              generalDescription: `Procedimento independente do tipo ${independentDraft.procedureCategory}.`,
+              generalDescription: `${tipoDocumento} independente, sem processo mapeado.`,
               inputs: "",
               outputs: "",
               stakeholders: independentDraft.owner,
@@ -618,7 +597,7 @@ export default function Documentos() {
               additionalNotes: "",
             }
           : null,
-        generationConfig: activeTemplate.promptConfig,
+        generationConfig: { documentType: tipoDocumento },
         companyContext,
         process_id: sourceMode === "linked_process" ? selectedProcessId : null,
         ...(sourceMode === "linked_process" && documentoApoio ? { documento_apoio: documentoApoio } : {}),
@@ -638,9 +617,10 @@ export default function Documentos() {
       };
 
       setPreview(nextPreview);
-      setPreviewTitle(nextPreview.title);
+      // Título: o nome do processo (o código PR/IT vai no cabeçalho ao salvar).
+      setPreviewTitle(sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.nome : independentDraft.title || nextPreview.title);
       setPreviewMarkdown(nextPreview.contentMarkdown);
-      toast({ title: "Prévia gerada", description: "Revise o procedimento antes de salvar." });
+      setEditandoTexto(false);
     } catch (error) {
       // Sem prévia "local": um documento montado sem a IA poderia ser salvo como se fosse o procedimento.
       toast({
@@ -653,8 +633,18 @@ export default function Documentos() {
     }
   };
 
+  const fecharNovoDocumento = () => {
+    setIsNewDocumentOpen(false);
+    setPreview(null);
+    setPreviewTitle("");
+    setPreviewMarkdown("");
+    setEditandoTexto(false);
+    setDocumentoApoio(null);
+    setSourceMode("linked_process");
+  };
+
   const handleSaveDocument = async () => {
-    if (!activeTemplate || !preview) return;
+    if (!preview) return;
     if (sourceMode === "linked_process" && approvedProcesses.length === 0) {
       toast({
         title: "Nenhum processo diagnosticado",
@@ -679,7 +669,8 @@ export default function Documentos() {
     setIsPersisting(true);
     try {
       const revision = formatRevision(0);
-      const categoriaVinculada: ProcedureCategory = activeTemplate.documentType === "Instrução de Trabalho" ? "Instrução de Trabalho" : "Procedimento Operacional";
+      const modelo = MODELO_DO_PETER[tipoDocumento];
+      const categoria: ProcedureCategory = tipoDocumento === "Instrução de Trabalho" ? "Instrução de Trabalho" : "Procedimento Operacional";
       const documentOrigin = sourceMode === "linked_process" ? "mapped_process" : "manual_description";
       const processName = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.nome : "";
       const area = sourceMode === "linked_process" && mappedProcessData ? mappedProcessData.process.area : independentDraft.area;
@@ -698,10 +689,10 @@ export default function Documentos() {
         source_mode: sourceMode,
         area,
         document_owner: documentOwner,
-        procedure_category: sourceMode === "linked_process" ? categoriaVinculada : independentDraft.procedureCategory,
-        template_id: activeTemplate.id,
+        procedure_category: categoria,
+        template_id: modelo.id,
         document_origin: documentOrigin,
-        document_type: activeTemplate.documentType,
+        document_type: tipoDocumento,
         title,
         description_input: sourceMode === "independent" ? independentDraft.title : null,
         content_text: previewMarkdown.replace(/[#>*`-]/g, "").trim(),
@@ -720,19 +711,19 @@ export default function Documentos() {
         linked_map_approved_at: linkedMapApprovedAt,
         map_version_label: mapVersionLabel || null,
         ai_model: String(preview.generationMetadata.ai_model || "ai-generate-document"),
-        ai_prompt_used: activeTemplate.promptConfig.systemPrompt,
+        ai_prompt_used: modelo.nome,
         generation_metadata: {
           ...preview.generationMetadata,
           summary: preview.summary,
           pointsOfAttention: preview.pointsOfAttention,
           suggestedRisks: preview.suggestedRisks,
           suggestedIndicators: preview.suggestedIndicators,
-          templateName: activeTemplate.name,
+          templateName: modelo.nome,
           processStatusAtGeneration: processStatus,
           processName,
           area,
           documentOwner,
-          procedureCategory: sourceMode === "linked_process" ? categoriaVinculada : independentDraft.procedureCategory,
+          procedureCategory: categoria,
           linkedMapRevision,
           linkedMapApprovedAt,
           mapVersionLabel,
@@ -759,11 +750,7 @@ export default function Documentos() {
 
       await refreshDocuments(companyContext.companyId);
 
-      setIsNewDocumentOpen(false);
-      setPreview(null);
-      setPreviewTitle("");
-      setPreviewMarkdown("");
-      setSourceMode("linked_process");
+      fecharNovoDocumento();
       setIndependentDraft({
         title: "",
         area: "",
@@ -1122,7 +1109,7 @@ export default function Documentos() {
     popup.print();
   };
 
-  if (!isLoaded || !state) {
+  if (!isLoaded) {
     return <div className="p-6">Carregando módulo de documentos...</div>;
   }
 
@@ -1136,11 +1123,9 @@ export default function Documentos() {
           </p>
           <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
             <Badge variant="outline">Empresa: {companyContext.companyName}</Badge>
-            <Badge variant="outline">Módulo operacional</Badge>
-            <Badge variant="outline">Sem configurações de template nesta tela</Badge>
           </div>
         </div>
-        <Button onClick={() => setIsNewDocumentOpen(true)} disabled={!activeTemplate}>
+        <Button onClick={() => setIsNewDocumentOpen(true)}>
           <FilePlus2 className="mr-2 h-4 w-4" /> Novo Documento
         </Button>
       </div>
@@ -1318,158 +1303,161 @@ export default function Documentos() {
       </Card>
 
       <Dialog open={isNewDocumentOpen} onOpenChange={setIsNewDocumentOpen}>
-        {/* Cabe em qualquer tela: cabeçalho e botões fixos, o meio rola. */}
-        <DialogContent className="flex max-h-[95dvh] w-[calc(100vw-1rem)] max-w-5xl flex-col gap-0 p-0 sm:w-[calc(100vw-2rem)]">
+        {/* Dois passos: escolher o processo e gerar; depois revisar a prévia (como sai no PDF) e salvar. */}
+        <DialogContent className={`flex max-h-[95dvh] w-[calc(100vw-1rem)] flex-col gap-0 p-0 sm:w-[calc(100vw-2rem)] ${preview ? "max-w-5xl" : "max-w-xl"}`}>
           <DialogHeader className="shrink-0 border-b px-4 py-4 pr-12 text-left sm:px-6">
-            <DialogTitle>Novo Documento</DialogTitle>
-            <DialogDescription>Vincule a um processo mapeado ou crie um procedimento independente.</DialogDescription>
+            <DialogTitle>{preview ? "Revise o procedimento" : "Novo procedimento"}</DialogTitle>
+            <DialogDescription>
+              {preview
+                ? "Confira os pontos marcados e salve como rascunho. Depois ele segue para revisão e aprovação."
+                : "O Peter escreve o procedimento a partir da entrevista e do mapa do processo, no padrão da empresa."}
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-2">
-            <div className="min-w-0 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setSourceMode("linked_process")}
-                  className={`rounded-xl border p-4 text-left transition ${sourceMode === "linked_process" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
-                >
-                  <div className="font-medium">🔗 Vinculado a processo mapeado</div>
-                  <p className="mt-2 text-sm text-muted-foreground">Preenche dados a partir do processo e registra a versão do mapa utilizado.</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSourceMode("independent")}
-                  className={`rounded-xl border p-4 text-left transition ${sourceMode === "independent" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
-                >
-                  <div className="font-medium">📄 Procedimento independente</div>
-                  <p className="mt-2 text-sm text-muted-foreground">Cria um procedimento sem vínculo com processo mapeado.</p>
-                </button>
-              </div>
-              <div className="space-y-2 rounded-xl border bg-muted/30 p-4 text-sm">
-                <Label htmlFor="modelo-documento">Modelo do documento</Label>
-                {activeTemplates.length === 0 ? (
-                  <div className="text-muted-foreground">Nenhum template ativo configurado</div>
-                ) : (
-                  <Select value={activeTemplate?.id ?? ""} onValueChange={setSelectedTemplateId}>
-                    <SelectTrigger id="modelo-documento"><SelectValue placeholder="Selecione o modelo" /></SelectTrigger>
-                    <SelectContent>
-                      {activeTemplates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                          {template.name}{template.documentType === tipoRecomendado ? " • Recomendado" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+            {preview ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="titulo-procedimento">Título</Label>
+                  <Input id="titulo-procedimento" value={previewTitle} onChange={(e) => setPreviewTitle(e.target.value)} />
+                </div>
+                {preview.pointsOfAttention.length > 0 && (
+                  <details className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                    <summary className="cursor-pointer font-medium text-amber-900 dark:text-amber-200">
+                      <AlertTriangle className="mr-1 inline h-4 w-4" /> {preview.pointsOfAttention.length} {preview.pointsOfAttention.length === 1 ? "ponto para revisar" : "pontos para revisar"}
+                    </summary>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-900 dark:text-amber-100">
+                      {preview.pointsOfAttention.map((ponto, indice) => <li key={indice}>{ponto}</li>)}
+                    </ul>
+                  </details>
                 )}
-                {recomendacao ? (
-                  <p className="text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      Recomendado: {recomendacao.documentType === "Procedimento" ? "PR - Procedimento" : "IT - Instrução de Trabalho"}.
-                    </span>{" "}
-                    {recomendacao.motivo}
-                  </p>
-                ) : null}
-                <p className="text-muted-foreground">Os modelos são configurados em Configurações → Documentação do Processo.</p>
-              </div>
-              {sourceMode === "linked_process" ? (
-                <div className="space-y-4">
-                  {approvedProcesses.length === 0 ? (
-                    <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                      {NO_APPROVED_PROCESSES_MESSAGE}
-                    </div>
+                {editandoTexto ? (
+                  <Textarea
+                    aria-label="Texto do procedimento"
+                    wrap="off"
+                    className="min-h-[55vh] overflow-x-auto whitespace-pre font-mono text-xs"
+                    value={previewMarkdown}
+                    onChange={(e) => setPreviewMarkdown(e.target.value)}
+                  />
+                ) : (
+                  <iframe
+                    title="Prévia do procedimento"
+                    sandbox=""
+                    className="h-[55vh] w-full rounded-md border bg-white"
+                    srcDoc={documentoHtml(previewMarkdown, {
+                      titulo: previewTitle,
+                      codigo: `${MODELO_DO_PETER[tipoDocumento].sigla}-___`,
+                      revisao: "00",
+                      aprovadoEm: null,
+                      elaboradoPor: sourceMode === "linked_process" ? selectedProcess?.responsavel ?? "" : independentDraft.owner,
+                      aprovadoPor: "",
+                      logo: logoDoCliente,
+                    })}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                {sourceMode === "linked_process" ? (
+                  approvedProcesses.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">{NO_APPROVED_PROCESSES_MESSAGE}</div>
                   ) : (
-                    <div className="space-y-2">
-                      <Label>Processo mapeado</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="processo-procedimento">Processo</Label>
                       <Select value={selectedProcessId} onValueChange={setSelectedProcessId}>
-                        <SelectTrigger><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
+                        <SelectTrigger id="processo-procedimento"><SelectValue placeholder="Selecione o processo" /></SelectTrigger>
                         <SelectContent>
                           {approvedProcesses.map((processo) => (
-                            <SelectItem key={processo.id} value={processo.id}>
-                              {processo.nome} • Aprovado
-                            </SelectItem>
+                            <SelectItem key={processo.id} value={processo.id}>{processo.nome}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {selectedProcess && (
+                        <p className="text-xs text-muted-foreground">
+                          {[selectedProcess.responsavel, buildMapVersionLabel(selectedProcessPayload)].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </div>
-                  )}
-                  {selectedProcess && approvedProcesses.length > 0 ? (
-                    <div className="rounded-xl border p-4 text-sm">
-                      <div className="font-medium text-foreground">{selectedProcess.nome}</div>
-                      <div className="mt-2 space-y-1 text-muted-foreground">
-                        <div>Área responsável: {selectedProcess.area}</div>
-                        <div>Responsável / Dono do processo: {selectedProcess.responsavel}</div>
-                        <div>Versão do mapa utilizada: {buildMapVersionLabel(selectedProcessPayload)}</div>
-                      </div>
+                  )
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label htmlFor="nome-independente">Nome do procedimento</Label>
+                      <Input id="nome-independente" value={independentDraft.title} onChange={(e) => setIndependentDraft((current) => ({ ...current, title: e.target.value }))} />
                     </div>
-                  ) : null}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="area-independente">Área responsável</Label>
+                      <Input id="area-independente" value={independentDraft.area} onChange={(e) => setIndependentDraft((current) => ({ ...current, area: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dono-independente">Responsável pelo documento</Label>
+                      <Input id="dono-independente" value={independentDraft.owner} onChange={(e) => setIndependentDraft((current) => ({ ...current, owner: e.target.value }))} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de documento">
+                    {(["Procedimento", "Instrução de Trabalho"] as TipoProcedimento[]).map((tipo) => (
+                      <button
+                        key={tipo}
+                        type="button"
+                        role="radio"
+                        aria-checked={tipoDocumento === tipo}
+                        onClick={() => setTipoDocumento(tipo)}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm transition ${tipoDocumento === tipo ? "border-primary bg-primary/5 font-medium" : "hover:border-primary/40"}`}
+                      >
+                        {tipo} ({MODELO_DO_PETER[tipo].sigla})
+                        {sourceMode === "linked_process" && tipoRecomendado === tipo && <span className="block text-xs font-normal text-muted-foreground">recomendado</span>}
+                      </button>
+                    ))}
+                  </div>
+                  {sourceMode === "linked_process" && recomendacao && <p className="text-xs text-muted-foreground">{recomendacao.motivo}</p>}
                 </div>
-              ) : (
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label>Nome do procedimento</Label>
-                    <Input value={independentDraft.title} onChange={(e) => setIndependentDraft((current) => ({ ...current, title: e.target.value }))} />
+
+                {sourceMode === "linked_process" && <DocumentoDeApoio valor={documentoApoio} onChange={setDocumentoApoio} />}
+
+                {isGenerating && (
+                  <div className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground" role="status">
+                    <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                    <span>Escrevendo o procedimento… as atividades são escritas em paralelo e pode levar até 1 minuto.</span>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Área responsável</Label>
-                    <Input value={independentDraft.area} onChange={(e) => setIndependentDraft((current) => ({ ...current, area: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Responsável pelo documento</Label>
-                    <Input value={independentDraft.owner} onChange={(e) => setIndependentDraft((current) => ({ ...current, owner: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tipo</Label>
-                    <Select value={independentDraft.procedureCategory} onValueChange={(value) => setIndependentDraft((current) => ({ ...current, procedureCategory: value as ProcedureCategory }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {PROCEDURE_CATEGORIES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Prévia operacional</CardTitle>
-                  <CardDescription>
-                    O documento nasce com o template ativo e pode ser vinculado a processo ou criado como procedimento independente.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {sourceMode === "linked_process" && <DocumentoDeApoio valor={documentoApoio} onChange={setDocumentoApoio} />}
-                  <Button onClick={handleGeneratePreview} disabled={isGenerating || !activeTemplate || (sourceMode === "linked_process" && !selectedProcessId)}>
-                    <FilePlus2 className="mr-2 h-4 w-4" /> {isGenerating ? "Gerando..." : "Gerar Procedimento"}
-                  </Button>
-                  <div className="space-y-2">
-                    <Label>Título</Label>
-                    <Input value={previewTitle} onChange={(e) => setPreviewTitle(e.target.value)} placeholder="Título do procedimento" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="conteudo-procedimento">Conteúdo do procedimento</Label>
-              {/* Sem quebra de linha: tabelas em markdown ficam legíveis e o texto rola na horizontal. */}
-              <Textarea
-                id="conteudo-procedimento"
-                wrap="off"
-                className="min-h-[300px] overflow-x-auto whitespace-pre font-mono text-xs lg:min-h-[420px]"
-                value={previewMarkdown}
-                onChange={(e) => setPreviewMarkdown(e.target.value)}
-                placeholder="A prévia do procedimento aparecerá aqui."
-              />
-              {preview ? (
-                <div className="rounded-xl border bg-muted/30 p-4 text-sm">
-                  <p className="font-medium">Resumo</p>
-                  <p className="text-muted-foreground">{preview.summary}</p>
-                </div>
-              ) : null}
-            </div>
+                )}
+              </>
+            )}
           </div>
-          <DialogFooter className="shrink-0 gap-2 border-t px-4 py-3 sm:px-6">
-            <Button variant="outline" onClick={() => setIsNewDocumentOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveDocument} disabled={!previewMarkdown.trim() || isPersisting}>
-              <CheckCircle2 className="mr-2 h-4 w-4" /> {isPersisting ? "Salvando..." : "Salvar documento"}
-            </Button>
+
+          <DialogFooter className="shrink-0 gap-2 border-t px-4 py-3 sm:justify-between sm:px-6">
+            {preview ? (
+              <>
+                <Button variant="ghost" onClick={() => setEditandoTexto((atual) => !atual)}>
+                  {editandoTexto ? <><Eye className="mr-2 h-4 w-4" /> Ver documento</> : <><FileText className="mr-2 h-4 w-4" /> Editar texto</>}
+                </Button>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                  <Button variant="outline" onClick={() => { setPreview(null); setPreviewMarkdown(""); setEditandoTexto(false); }}>Descartar</Button>
+                  <Button onClick={handleSaveDocument} disabled={!previewMarkdown.trim() || isPersisting}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> {isPersisting ? "Salvando..." : "Salvar rascunho"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="link"
+                  className="h-auto px-0 text-muted-foreground"
+                  onClick={() => setSourceMode((atual) => (atual === "linked_process" ? "independent" : "linked_process"))}
+                >
+                  {sourceMode === "linked_process" ? "Criar sem processo mapeado" : "Usar um processo mapeado"}
+                </Button>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                  <Button variant="outline" onClick={() => setIsNewDocumentOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleGeneratePreview} disabled={isGenerating || (sourceMode === "linked_process" && !selectedProcessId)}>
+                    <FilePlus2 className="mr-2 h-4 w-4" /> {isGenerating ? "Gerando..." : "Gerar"}
+                  </Button>
+                </div>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

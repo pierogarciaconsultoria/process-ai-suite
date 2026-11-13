@@ -118,7 +118,7 @@ const Configuracoes = () => {
             <CardTitle>Documentação do Processo</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Defina o modelo texto/anexo da documentação dos processos</p>
+            <p className="text-sm text-muted-foreground">Padrão dos procedimentos: estrutura, manual de escrita e exemplo de atividade</p>
           </CardContent>
         </Card>
           </>

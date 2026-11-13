@@ -9,9 +9,16 @@ export function escaparHtml(texto: string): string {
   return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Pontos que o revisor precisa resolver ou validar, destacados no documento.
+function destacarPendencias(html: string): string {
+  return html
+    .replace(/\[(detalhar:[^\]]*|a definir)\]/gi, '<mark class="pendente">[$1]</mark>')
+    .replace(/\(sugerido pelo Peter — validar\)/g, '<mark class="sugestao">(sugerido pelo Peter — validar)</mark>');
+}
+
 // Negrito, itálico e código dentro da linha (depois de escapar o HTML).
 function inline(texto: string): string {
-  return escaparHtml(texto)
+  return destacarPendencias(escaparHtml(texto))
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>")
     .replace(/__([^_]+?)__/g, "<strong>$1</strong>")
@@ -196,6 +203,8 @@ const ESTILO = `
   .tabela th, .tabela td { border: 1px solid #333; padding: 4px 6px; text-align: left; vertical-align: top; }
   .tabela th { background: #e8e8e8; }
   .tabela tr { break-inside: avoid; }
+  mark.pendente { background: #fde68a; color: inherit; padding: 0 2px; }
+  mark.sugestao { background: #e0f2fe; color: inherit; padding: 0 2px; }
   .rodape-tela { margin-top: 24px; padding-top: 6px; border-top: 1px solid #999; font-size: 8pt; color: #444; text-align: center; }
   @media print { .rodape-tela { display: none; } }
   @media screen { body { padding: 24px; } }
