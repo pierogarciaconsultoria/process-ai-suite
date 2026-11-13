@@ -25,7 +25,7 @@ function abrirAba(nome: RegExp) {
 
 describe("Padrão de procedimento do Peter (configuração)", () => {
   beforeEach(() => {
-    mocks.carregarPadroes.mockReset().mockResolvedValue({ estrutura_pr: "1. OBJETIVO", estrutura_it: "", manual_escrita: "" });
+    mocks.carregarPadroes.mockReset().mockResolvedValue({ estrutura_pr: "1. OBJETIVO", estrutura_it: "", manual_escrita: "", exemplo_atividade: "" });
     mocks.salvarPadrao.mockReset().mockResolvedValue(undefined);
     mocks.toast.mockReset();
   });

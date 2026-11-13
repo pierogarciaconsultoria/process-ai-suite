@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   ESTRUTURA_IT_PADRAO,
   ESTRUTURA_PR_PADRAO,
+  EXEMPLO_ATIVIDADE_PADRAO,
   MANUAL_PADRAO,
   type TipoPadrao,
 } from "../../supabase/functions/_shared/procedimento-padrao";
@@ -31,11 +32,18 @@ export const TIPOS_PADRAO: Array<{ tipo: TipoPadrao; curto: string; rotulo: stri
     ajuda: "Como redigir: verbos, cargo, condição de entrada, decisões, 5S, EPIs, cláusulas padrão. Vale para PR e IT.",
     exemplo: MANUAL_PADRAO,
   },
+  {
+    tipo: "exemplo_atividade",
+    curto: "Exemplo de atividade",
+    rotulo: "Exemplo de atividade bem escrita",
+    ajuda: "Uma ou duas atividades no nível de detalhe que você espera (ex.: um trecho de um procedimento aprovado). O Peter imita o formato e a profundidade, sem copiar os dados.",
+    exemplo: EXEMPLO_ATIVIDADE_PADRAO,
+  },
 ];
 
 export type ConteudoPadrao = Record<TipoPadrao, string>;
 
-export const PADRAO_VAZIO: ConteudoPadrao = { estrutura_pr: "", estrutura_it: "", manual_escrita: "" };
+export const PADRAO_VAZIO: ConteudoPadrao = { estrutura_pr: "", estrutura_it: "", manual_escrita: "", exemplo_atividade: "" };
 
 export async function carregarPadroes(companyId: string | null): Promise<ConteudoPadrao> {
   const consulta = supabase.from("padroes_documento").select("tipo, conteudo");

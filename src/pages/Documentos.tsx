@@ -20,6 +20,7 @@ import { mensagemDoErro } from "../../supabase/functions/_shared/authorization-c
 import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { documentoHtml, markdownParaHtml, tituloDoDocumento, type DadosDoCabecalho } from "@/lib/documento-pdf";
 import { logoComoDataUrl } from "@/lib/logo-empresa";
+import { DocumentoDeApoio, type DocumentoDeApoioValor } from "@/components/documentos/DocumentoDeApoio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildMappedProcessPayload,
@@ -223,6 +224,7 @@ export default function Documentos() {
   });
   const [viewingDoc, setViewingDoc] = useState<GeneratedDocumentRecord | null>(null);
   const [logoDaVisualizacao, setLogoDaVisualizacao] = useState<string | null>(null);
+  const [documentoApoio, setDocumentoApoio] = useState<DocumentoDeApoioValor | null>(null);
   const [editingDoc, setEditingDoc] = useState<GeneratedDocumentRecord | null>(null);
   const [reviewingDoc, setReviewingDoc] = useState<GeneratedDocumentRecord | null>(null);
   const [reviewReason, setReviewReason] = useState("");
@@ -520,6 +522,11 @@ export default function Documentos() {
     };
   }, [empresaDoDocumentoAberto]);
 
+  // O documento de apoio é do processo escolhido: trocar o processo descarta o anexo.
+  useEffect(() => {
+    setDocumentoApoio(null);
+  }, [selectedProcessId]);
+
   const newerApprovedRevision = useMemo(() => {
     if (!viewingDoc || viewingDoc.sourceMode !== "linked_process" || !viewingDoc.processId) return null;
     const currentProcess = processRows.find((item) => item.id === viewingDoc.processId);
@@ -614,6 +621,7 @@ export default function Documentos() {
         generationConfig: activeTemplate.promptConfig,
         companyContext,
         process_id: sourceMode === "linked_process" ? selectedProcessId : null,
+        ...(sourceMode === "linked_process" && documentoApoio ? { documento_apoio: documentoApoio } : {}),
       };
       const { data, error } = await supabase.functions.invoke("ai-generate-document", { body: payload });
       if (error) throw error;
@@ -1427,6 +1435,7 @@ export default function Documentos() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {sourceMode === "linked_process" && <DocumentoDeApoio valor={documentoApoio} onChange={setDocumentoApoio} />}
                   <Button onClick={handleGeneratePreview} disabled={isGenerating || !activeTemplate || (sourceMode === "linked_process" && !selectedProcessId)}>
                     <FilePlus2 className="mr-2 h-4 w-4" /> {isGenerating ? "Gerando..." : "Gerar Procedimento"}
                   </Button>
