@@ -7,7 +7,10 @@ import {
   escolherPadrao,
   ESTRUTURA_IT_PADRAO,
   ESTRUTURA_PR_PADRAO,
+  EXEMPLO_ATIVIDADE_PADRAO,
   inserirDescricao,
+  lerDocumentoDeApoio,
+  MAX_DOCUMENTO_DE_APOIO,
   lerSubsecoes,
   lotesDeAtividades,
   MANUAL_PADRAO,
@@ -38,10 +41,12 @@ describe("Padrão do procedimento", () => {
       { company_id: "empresa-a", tipo: "estrutura_pr", conteudo: "Estrutura do cliente A" },
       { company_id: "empresa-a", tipo: "manual_escrita", conteudo: "   " },
     ];
-    expect(escolherPadrao(linhas, "empresa-a", "Procedimento")).toEqual({ estrutura: "Estrutura do cliente A", manual: "Manual da plataforma", origem: "empresa" });
-    expect(escolherPadrao(linhas, "empresa-b", "Procedimento")).toEqual({ estrutura: "Estrutura da plataforma", manual: "Manual da plataforma", origem: "plataforma" });
+    expect(escolherPadrao(linhas, "empresa-a", "Procedimento")).toEqual({ estrutura: "Estrutura do cliente A", manual: "Manual da plataforma", exemplo: EXEMPLO_ATIVIDADE_PADRAO, origem: "empresa" });
+    expect(escolherPadrao(linhas, "empresa-b", "Procedimento")).toEqual({ estrutura: "Estrutura da plataforma", manual: "Manual da plataforma", exemplo: EXEMPLO_ATIVIDADE_PADRAO, origem: "plataforma" });
     expect(escolherPadrao(linhas, "empresa-b", "Instrução de Trabalho").estrutura).toBe(ESTRUTURA_IT_PADRAO);
-    expect(escolherPadrao([], "empresa-b", "Procedimento")).toEqual({ estrutura: ESTRUTURA_PR_PADRAO, manual: MANUAL_PADRAO, origem: "padrao" });
+    expect(escolherPadrao([], "empresa-b", "Procedimento")).toEqual({ estrutura: ESTRUTURA_PR_PADRAO, manual: MANUAL_PADRAO, exemplo: EXEMPLO_ATIVIDADE_PADRAO, origem: "padrao" });
+    // O exemplo da empresa substitui o genérico.
+    expect(escolherPadrao([{ company_id: null, tipo: "exemplo_atividade", conteudo: "### 8.4 – Separar mercadorias\n\nTexto." }], "empresa-b", "Procedimento").exemplo).toBe("### 8.4 – Separar mercadorias\n\nTexto.");
   });
 
   it("separa dado da empresa de conhecimento técnico e proíbe cortes e links inventados", () => {
@@ -56,6 +61,28 @@ describe("Padrão do procedimento", () => {
     expect(corpo).toContain(`exatamente ${MARCADOR_DESCRICAO}`);
     expect(corpo).toContain('"00 | 07/11/2026 | Emissão inicial do procedimento"');
     expect(promptDoCorpo({ estrutura: "x", manual: "y", origem: "padrao" }, false, "07/11/2026")).not.toContain(MARCADOR_DESCRICAO);
+  });
+
+  it("exige atividades detalhadas, com exemplo, e marca o que falta em vez de inventar", () => {
+    const prompt = promptDasAtividades({ estrutura: "", manual: "Manual X", exemplo: "EXEMPLO DA EMPRESA", origem: "plataforma" }, { de: 1, ate: 8 }, 8);
+    expect(prompt).toContain("## NÍVEL DE DETALHE EXIGIDO EM CADA SUBSEÇÃO");
+    expect(prompt).toContain("Escreva de 2 a 4 parágrafos, com texto descritivo completo, nunca genérico");
+    expect(prompt).toContain("Controles e verificações");
+    expect(prompt).toContain('Proibido: frases vagas como "realizar a atividade"');
+    expect(prompt).toContain('marque o ponto com "[detalhar: <o que falta>]"');
+    expect(prompt).toContain("## EXEMPLO DO NÍVEL DE DETALHE ESPERADO (imite o formato e a profundidade; não copie os dados)\nEXEMPLO DA EMPRESA");
+    expect(prompt).toContain("## DOCUMENTO DE APOIO");
+    expect(promptDasAtividades({ estrutura: "", manual: "", origem: "padrao" }, { de: 1, ate: 1 }, 1)).toContain(EXEMPLO_ATIVIDADE_PADRAO);
+    expect(promptDoCorpo({ estrutura: "x", manual: "y", origem: "padrao" }, true, "13/11/2026")).toContain('cada "[detalhar: …]"');
+  });
+
+  it("aceita o documento de apoio só com texto, com limite de tamanho", () => {
+    expect(lerDocumentoDeApoio(null)).toBeNull();
+    expect(lerDocumentoDeApoio({ nome: "PA.pdf", texto: "   " })).toBeNull();
+    expect(lerDocumentoDeApoio({ texto: "Separar o material." })).toEqual({ nome: "documento de apoio", texto: "Separar o material.", cortado: false });
+    const longo = lerDocumentoDeApoio({ nome: "PA.pdf", texto: "x".repeat(MAX_DOCUMENTO_DE_APOIO + 10) })!;
+    expect(longo.texto).toHaveLength(MAX_DOCUMENTO_DE_APOIO);
+    expect(longo.cortado).toBe(true);
   });
 
   it("divide as atividades em lotes e pede todas as ordens de cada lote", () => {
@@ -119,6 +146,8 @@ describe("ai-generate-document — procedimento", () => {
     expect(documentEdge).toContain("ATENÇÃO: na tentativa anterior faltaram as atividades");
     expect(documentEdge).toContain("subsecoes.push(subsecaoDosDados(atividade))");
     expect(documentEdge).toContain("semLinksInventados(");
+    expect(documentEdge).toContain("const documentoDeApoio = lerDocumentoDeApoio(documento_apoio)");
+    expect(documentEdge).toContain("...(entrada.documentoDeApoio ? { documentoDeApoio: entrada.documentoDeApoio } : {})");
   });
 
   it("a migration guarda um padrão por tipo na plataforma e por empresa, editável só pelo super admin", () => {

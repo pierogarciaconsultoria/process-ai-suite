@@ -7,11 +7,13 @@
 
 import type { FontesDoProcedimento } from "./procedimento-fontes.ts";
 
-export type TipoPadrao = "estrutura_pr" | "estrutura_it" | "manual_escrita";
+export type TipoPadrao = "estrutura_pr" | "estrutura_it" | "manual_escrita" | "exemplo_atividade";
 
 export interface PadraoProcedimento {
   estrutura: string;
   manual: string;
+  // Uma atividade bem escrita, que mostra o nível de detalhe esperado.
+  exemplo?: string;
   origem: "empresa" | "plataforma" | "padrao";
 }
 
@@ -52,6 +54,19 @@ export const MANUAL_PADRAO = `- Escreva para que um colaborador novo, depois de 
 - Seja direto: frases curtas, sem termos genéricos, sem repetir o óbvio.
 - Responsabilidade: "O cumprimento deste procedimento é de responsabilidade dos colaboradores citados. A conscientização e o treinamento são de responsabilidade do dono do processo."`;
 
+// Exemplo fictício do nível de detalhe esperado (a empresa pode trocar pelo seu, na aba "Exemplo de atividade").
+export const EXEMPLO_ATIVIDADE_PADRAO = `### 8.3 – Conferir o pedido separado
+
+Diante do pedido separado na área de conferência, o **Conferente** deve comparar cada item com o Espelho do Pedido, verificando código, descrição, quantidade e a condição da embalagem. A conferência deve ser feita por pessoa diferente de quem separou, mantendo a segunda verificação como controle do processo.
+
+Se houver divergência, o Conferente deve separar o item divergente, interromper a liberação do pedido e comunicar o Separador para a correção; quando a divergência se repetir ou não puder ser corrigida no momento, deve registrar a ocorrência no formulário de não conformidade. Após a correção, o pedido deve ser conferido novamente antes de seguir. Caso não haja divergência, o Conferente deve assinar o Espelho do Pedido e encaminhá-lo, junto com os volumes, para a emissão da Nota Fiscal.
+
+Durante a atividade, manter a bancada organizada, com os pedidos separados entre si, e descartar embalagens danificadas (5S).
+
+**Recursos utilizados:** Espelho do Pedido, área de conferência e formulário de não conformidade.
+
+**Resultado esperado:** pedido conferido item a item, com o Espelho assinado e as divergências corrigidas ou registradas, garantindo a rastreabilidade da conferência.`;
+
 export interface LinhaPadrao {
   company_id: string | null;
   tipo: string;
@@ -72,10 +87,13 @@ export function escolherPadrao(linhas: LinhaPadrao[], companyId: string, tipoDoc
   };
   const estrutura = escolher(tipoEstrutura);
   const manual = escolher("manual_escrita");
+  const exemplo = escolher("exemplo_atividade");
+  const partes = [estrutura, manual, exemplo];
   return {
     estrutura: estrutura?.texto ?? (tipoEstrutura === "estrutura_it" ? ESTRUTURA_IT_PADRAO : ESTRUTURA_PR_PADRAO),
     manual: manual?.texto ?? MANUAL_PADRAO,
-    origem: estrutura?.origem === "empresa" || manual?.origem === "empresa" ? "empresa" : estrutura || manual ? "plataforma" : "padrao",
+    exemplo: exemplo?.texto ?? EXEMPLO_ATIVIDADE_PADRAO,
+    origem: partes.some((parte) => parte?.origem === "empresa") ? "empresa" : partes.some(Boolean) ? "plataforma" : "padrao",
   };
 }
 
@@ -92,6 +110,24 @@ export const REGRAS_DO_CONTEUDO = `## O QUE PODE E O QUE NÃO PODE (vale para to
 - RECURSOS: monte a partir dos dados (cargos = responsáveis das atividades e raias do mapa; sistemas e documentos = ferramentas das atividades, documentos do mapa e respostas da entrevista).
 - Nunca escreva links, endereços de arquivo ou marcadores como "link_to_download", "…", "[continua]" ou "etc.". O mapa BPMN é citado só pelo nome ("Mapa AS IS do processo <nome>").
 - Tabelas em markdown, com cabeçalho.`;
+
+// Documento já existente do processo (procedimento antigo, IT, manual), enviado na geração:
+// fonte do "como fazer"; a ordem e os responsáveis continuam vindo do mapeamento.
+export const REGRAS_DO_DOCUMENTO_DE_APOIO = `## DOCUMENTO DE APOIO ("documentoDeApoio", quando existir)
+- É um documento que a empresa já usa para este processo. Use-o para detalhar COMO cada atividade é executada: telas, campos, verificações, critérios, registros, prazos e responsáveis citados nele.
+- A sequência das atividades e os responsáveis vêm do mapeamento (atividades e mapaAsIs). Se o documento divergir do mapeamento, siga o mapeamento e registre a divergência em attention_points.
+- Não copie trechos inteiros: reescreva no padrão deste procedimento.`;
+
+export const MAX_DOCUMENTO_DE_APOIO = 40_000;
+
+// Documento de apoio enviado pela tela: só nome e texto (já extraído do PDF ou Word), com limite.
+export function lerDocumentoDeApoio(raw: unknown): { nome: string; texto: string; cortado: boolean } | null {
+  const dados = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  const texto = typeof dados?.texto === "string" ? dados.texto.trim() : "";
+  if (!texto) return null;
+  const nome = typeof dados?.nome === "string" && dados.nome.trim() ? dados.nome.trim().slice(0, 200) : "documento de apoio";
+  return { nome, texto: texto.slice(0, MAX_DOCUMENTO_DE_APOIO), cortado: texto.length > MAX_DOCUMENTO_DE_APOIO };
+}
 
 export function promptDoCorpo(padrao: PadraoProcedimento, temAtividades: boolean, hoje: string): string {
   return `## PADRÃO DE ESTRUTURA (siga esta ordem e estes títulos, numerados como no padrão)
@@ -111,7 +147,9 @@ ${REGRAS_DO_CONTEUDO}
 - Indicadores: a lista "indicadores"; registro e meta ausentes ficam "[a definir]".
 - Histórico de revisão: uma linha "00 | ${hoje} | Emissão inicial do procedimento".
 - Controles-chave: os controles que aparecem nos dados (conferências, aprovações, registros, prazos).
-- Em attention_points, liste o que o revisor deve conferir: cada "[a definir]" e cada "(sugerido pelo Peter — validar)".`;
+- Em attention_points, liste o que o revisor deve conferir: cada "[a definir]", cada "[detalhar: …]" e cada "(sugerido pelo Peter — validar)".
+
+${REGRAS_DO_DOCUMENTO_DE_APOIO}`;
 }
 
 // ─── Descrição das atividades, em lotes ─────────────────────────────────────
@@ -146,19 +184,36 @@ export const SCHEMA_ATIVIDADES = {
 };
 
 export function promptDasAtividades(padrao: PadraoProcedimento, lote: { de: number; ate: number }, total: number): string {
-  return `Você é o Peter e escreve a seção de DESCRIÇÃO das atividades de um procedimento, no padrão abaixo.
+  return `Você é o Peter e escreve a seção de DESCRIÇÃO das atividades de um procedimento, no padrão abaixo. Esta seção é a parte mais importante do documento: ela precisa permitir que um colaborador novo, depois de treinado, execute cada atividade só com o texto.
 
 ## MANUAL DE ESCRITA DA EMPRESA
 ${padrao.manual}
 
 ${REGRAS_DO_CONTEUDO}
 
+${REGRAS_DO_DOCUMENTO_DE_APOIO}
+
+## NÍVEL DE DETALHE EXIGIDO EM CADA SUBSEÇÃO
+Escreva de 2 a 4 parágrafos, com texto descritivo completo, nunca genérico, contendo:
+1. Condição de entrada: o que dispara a atividade ("Diante de…", "Ao receber…").
+2. Quem executa: o cargo em negrito, em 3ª pessoa ("O **Analista de Faturamento** deve…").
+3. Como executar, passo a passo: onde (sistema, tela, local), o que consultar, preencher, conferir ou assinar, e em qual documento.
+4. Controles e verificações: o que deve ser checado antes de seguir e o critério de "está certo".
+5. Decisões e exceções: cada caminho com o que fazer ("Se …, …; caso contrário, …"), quem é comunicado e o que é registrado (use as decisões do mapa e as respostas de decisões, aprovação negada, exceções e "O que dá errado").
+6. Segurança e organização (EPIs, 5S) quando a atividade envolver movimentação, armazenagem ou risco físico.
+7. Feche com "**Recursos utilizados:** …" e "**Resultado esperado:** …", dizendo também o que garante a rastreabilidade.
+Proibido: frases vagas como "realizar a atividade", "conforme necessário", "feito pelo responsável", "gerenciar o processo" ou só repetir o nome da atividade.
+Quando um detalhe concreto não estiver nos dados (tela, campo, prazo, critério), não invente: escreva o que se sabe e marque o ponto com "[detalhar: <o que falta>]".
+
+## EXEMPLO DO NÍVEL DE DETALHE ESPERADO (imite o formato e a profundidade; não copie os dados)
+${padrao.exemplo || EXEMPLO_ATIVIDADE_PADRAO}
+
 ## SUA PARTE
 - O processo tem ${total} atividades (lista "atividades" em "dadosDoProcesso", campo "ordem"). Escreva SOMENTE as atividades de ordem ${lote.de} a ${lote.ate}, todas, na ordem.
-- Cada subseção descreve uma atividade ou um grupo de atividades consecutivas e muito ligadas; em "atividades", as ordens que ela cobre. Nenhuma ordem de ${lote.de} a ${lote.ate} pode ficar de fora.
+- Cada subseção descreve uma atividade; junte duas ou mais só quando forem passos curtos e inseparáveis do mesmo cargo. Em "atividades", as ordens que a subseção cobre. Nenhuma ordem de ${lote.de} a ${lote.ate} pode ficar de fora.
 - "titulo": a ação no infinitivo (ex.: "Conferir mercadorias separadas"), sem número.
-- "texto": em markdown, sem título, seguindo o manual: condição de entrada, cargo em negrito, o que fazer, como, onde e com qual sistema; as decisões com cada caminho (use as decisões do mapa e as respostas de decisões, aprovação negada e exceções que se aplicam a esta atividade); EPIs e organização quando couber; e termine com "**Recursos utilizados:** …" e "**Resultado esperado:** …".
-- Use o mapa (mapaAsIs) para a ordem, o responsável e os caminhos; use as respostas da entrevista para detalhes, prazos e regras.
+- "texto": em markdown, sem título, com o nível de detalhe acima.
+- Use o mapa (mapaAsIs) para a ordem, o responsável e os caminhos; use as respostas da entrevista e o documento de apoio para os detalhes, prazos e regras.
 - Descreva o processo como é feito hoje; melhorias planejadas não entram.`;
 }
 

@@ -17,6 +17,7 @@ import {
   atividadesFaltando,
   ehProcedimento,
   inserirDescricao,
+  lerDocumentoDeApoio,
   lerSubsecoes,
   lotesDeAtividades,
   MARCADOR_DESCRICAO,
@@ -127,6 +128,8 @@ async function gerarProcedimento(entrada: {
   padrao: PadraoProcedimento;
   instrucoes: string;
   empresa: string | null;
+  // Procedimento ou instrução que a empresa já usa: fonte do "como fazer".
+  documentoDeApoio: { nome: string; texto: string; cortado: boolean } | null;
   titulo: string;
   chave: string;
   // Tamanho de cada pedido à IA, para a cota (contado mesmo se uma chamada falhar).
@@ -134,7 +137,11 @@ async function gerarProcedimento(entrada: {
 }): Promise<DocumentoGerado> {
   const { dados, padrao, chave } = entrada;
   const total = dados.atividades.length;
-  const conteudo = JSON.stringify({ empresa: entrada.empresa, dadosDoProcesso: dados });
+  const conteudo = JSON.stringify({
+    empresa: entrada.empresa,
+    dadosDoProcesso: dados,
+    ...(entrada.documentoDeApoio ? { documentoDeApoio: entrada.documentoDeApoio } : {}),
+  });
   const sistemaCorpo = [
     IDENTIDADE_PROCEDIMENTO,
     promptDoCorpo(padrao, total > 0, hojeEmSaoPaulo()),
@@ -207,6 +214,7 @@ serve(async (req) => {
       generationConfig = null,
       companyContext = null,
       process_id = null,
+      documento_apoio = null,
     } = body ?? {};
     const companyId = requireString(companyContext?.companyId, "company_id");
     await authorizeCompany(client, user.id, companyId);
@@ -239,6 +247,7 @@ serve(async (req) => {
       titulo: secao?.sectionTitle, descricao: secao?.sectionDescription, obrigatoria: secao?.isRequired === true,
     }));
 
+    const documentoDeApoio = lerDocumentoDeApoio(documento_apoio);
     const lease = await acquireAiQuota(client, "ai-generate-document", companyId);
     let consumo = 0;
     let documento: DocumentoGerado | null;
@@ -250,6 +259,7 @@ serve(async (req) => {
         padraoUsado = padrao.origem;
         documento = await gerarProcedimento({
           dados: dadosDoProcesso, padrao, instrucoes, empresa: companyContext?.companyName ?? null,
+          documentoDeApoio,
           titulo: dadosDoProcesso.identificacao.nome || tituloPadrao, chave: OPENAI_API_KEY,
           registrarConsumo: (caracteres) => { consumo += caracteres; },
         });
@@ -271,6 +281,7 @@ serve(async (req) => {
         template_id: template.id ?? null,
         sections_count: secoes.length,
         padrao: padraoUsado,
+        documento_de_apoio: documentoDeApoio?.nome ?? null,
         process_id: processId,
         map_revision: dadosDoProcesso?.identificacao.revisaoDoMapa ?? null,
         fontes: dadosDoProcesso

@@ -6,7 +6,7 @@ export async function carregarPadrao(client: SupabaseClient, companyId: string, 
   const { data, error } = await client
     .from("padroes_documento")
     .select("company_id, tipo, conteudo")
-    .in("tipo", [tipoDaEstrutura(tipoDocumento), "manual_escrita"])
+    .in("tipo", [tipoDaEstrutura(tipoDocumento), "manual_escrita", "exemplo_atividade"])
     .or(`company_id.is.null,company_id.eq.${companyId}`);
   // Tabela ainda não criada (migration não aplicada): segue com o padrão genérico.
   if (error) console.warn("padroes_documento indisponível", error);
