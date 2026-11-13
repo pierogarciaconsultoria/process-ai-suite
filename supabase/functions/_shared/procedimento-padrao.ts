@@ -118,6 +118,10 @@ export const REGRAS_DO_DOCUMENTO_DE_APOIO = `## DOCUMENTO DE APOIO ("documentoDe
 - A sequência das atividades e os responsáveis vêm do mapeamento (atividades e mapaAsIs). Se o documento divergir do mapeamento, siga o mapeamento e registre a divergência em attention_points.
 - Não copie trechos inteiros: reescreva no padrão deste procedimento.`;
 
+// O manual pode vir de um prompt usado em outros contextos (entrevista, BPMN, relatórios): só a
+// parte de redação e estrutura de documentos vale aqui.
+export const COMO_USAR_O_MANUAL = `Do manual acima, use somente o que trata de redação, estrutura, cabeçalho e estilo de documentos (procedimentos e instruções). Ignore o que for de outros usos: pedidos para coletar dados ou fazer perguntas antes de responder, regras de mapa BPMN, diagnósticos, relatórios, análise crítica, transformação digital, mensagens finais, frases de recusa e regras de confidencialidade. Você está escrevendo o documento agora, com os dados fornecidos.`;
+
 export const MAX_DOCUMENTO_DE_APOIO = 40_000;
 
 // Documento de apoio enviado pela tela: só nome e texto (já extraído do PDF ou Word), com limite.
@@ -135,6 +139,8 @@ ${padrao.estrutura}
 
 ## MANUAL DE ESCRITA DA EMPRESA
 ${padrao.manual}
+
+${COMO_USAR_O_MANUAL}
 
 ${REGRAS_DO_CONTEUDO}
 
@@ -188,6 +194,8 @@ export function promptDasAtividades(padrao: PadraoProcedimento, lote: { de: numb
 
 ## MANUAL DE ESCRITA DA EMPRESA
 ${padrao.manual}
+
+${COMO_USAR_O_MANUAL}
 
 ${REGRAS_DO_CONTEUDO}
 
