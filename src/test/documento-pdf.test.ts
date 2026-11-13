@@ -39,6 +39,12 @@ describe("Formatação do documento", () => {
     expect(markdownParaHtml("Texto\n\n# Título no meio", { semPrimeiroTitulo: true })).toContain("<h1>Título no meio</h1>");
   });
 
+  it("destaca o que o revisor precisa resolver ou validar", () => {
+    expect(markdownParaHtml("Cotar [detalhar: prazo de resposta]; meta [a definir]. ISO 8.4 (sugerido pelo Peter — validar)")).toBe(
+      '<p>Cotar <mark class="pendente">[detalhar: prazo de resposta]</mark>; meta <mark class="pendente">[a definir]</mark>. ISO 8.4 <mark class="sugestao">(sugerido pelo Peter — validar)</mark></p>',
+    );
+  });
+
   it("limpa o marcador do modelo do título", () => {
     expect(tituloDoDocumento("Procedimento PR-XXX - COOPERA - PÓS VENDAS - AS IS")).toBe("COOPERA - PÓS VENDAS - AS IS");
     expect(tituloDoDocumento("IT-XXX - Instrução de Trabalho: COOPERA - Pós Vendas")).toBe("COOPERA - Pós Vendas");

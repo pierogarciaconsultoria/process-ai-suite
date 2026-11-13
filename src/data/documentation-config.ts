@@ -215,22 +215,6 @@ export interface DocumentationState {
   generationSettings: DocumentGenerationSettings;
 }
 
-// Exclui um modelo da biblioteca. Modelos do sistema não são excluídos (só inativados) e a
-// biblioteca nunca fica vazia; null quando não pode. Se o excluído era o padrão, o padrão passa
-// para o primeiro modelo do sistema que sobrar (ou o primeiro da lista).
-export function excluirModelo(state: DocumentationState, templateId: string): DocumentationState | null {
-  const alvo = state.templates.find((template) => template.id === templateId);
-  if (!alvo || alvo.isSystemTemplate || state.templates.length <= 1) return null;
-  const restantes = state.templates.filter((template) => template.id !== templateId);
-  const eraPadrao = state.generationSettings.defaultTemplateId === templateId || alvo.isDefault;
-  if (!eraPadrao) return { ...state, templates: restantes };
-  const novoPadrao = (restantes.find((template) => template.isSystemTemplate) ?? restantes[0]).id;
-  return {
-    templates: restantes.map((template) => ({ ...template, isDefault: template.id === novoPadrao })),
-    generationSettings: { ...state.generationSettings, defaultTemplateId: novoPadrao },
-  };
-}
-
 export interface DocumentPreviewData {
   title: string;
   contentMarkdown: string;
@@ -941,3 +925,26 @@ export function createEmptyManualDescription(defaultTemplateId: string): ManualD
     additionalNotes: "",
   };
 }
+
+// ─── Modelo único: o padrão do Peter ────────────────────────────────────────
+// Procedimentos e instruções seguem um só modelo, o padrão do Peter (Configurações →
+// Documentação do processo). Os ids são fixos para o documento salvo registrar qual tipo o gerou.
+export type TipoProcedimento = Extract<DocumentType, "Procedimento" | "Instrução de Trabalho">;
+
+export const MODELO_DO_PETER: Record<TipoProcedimento, { id: string; nome: string; sigla: "PR" | "IT" }> = {
+  Procedimento: { id: "5e7e0001-0000-4000-8000-000000000001", nome: "Procedimento (padrão do Peter)", sigla: "PR" },
+  "Instrução de Trabalho": { id: "5e7e0001-0000-4000-8000-000000000002", nome: "Instrução de Trabalho (padrão do Peter)", sigla: "IT" },
+};
+
+// O que vai à função de geração. As seções só valem para o procedimento sem processo mapeado;
+// com processo, a estrutura vem do padrão do Peter no servidor.
+export function modeloDoPeter(tipo: TipoProcedimento) {
+  const modelo = MODELO_DO_PETER[tipo];
+  return {
+    id: modelo.id,
+    name: modelo.nome,
+    documentType: tipo,
+    sections: createStandardSections(tipo).filter((section) => section.isActive && section.includeInFinalDocument),
+  };
+}
+
