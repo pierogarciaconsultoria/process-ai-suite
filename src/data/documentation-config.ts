@@ -291,6 +291,8 @@ export interface GeneratedDocumentRecord extends DocumentPreviewData {
   revisionNumber: number;
   approverName: string;
   approverRole: string;
+  // Data da aprovação (vai ao cabeçalho do documento); null enquanto não aprovado.
+  approvedAt?: string | null;
   distributedTo: string[];
   updatedAt: string;
   createdBy: string;

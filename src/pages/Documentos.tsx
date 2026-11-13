@@ -18,6 +18,9 @@ import { mapProcessRowToListItem, type ProcessoRow } from "@/lib/processos";
 import { DOCUMENTACAO_BLOQUEADA, podeGerarDocumentacao } from "@/lib/ciclo-processo";
 import { mensagemDoErro } from "../../supabase/functions/_shared/authorization-core";
 import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
+import { documentoHtml, markdownParaHtml, tituloDoDocumento, type DadosDoCabecalho } from "@/lib/documento-pdf";
+import { logoComoDataUrl } from "@/lib/logo-empresa";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildMappedProcessPayload,
   formatRevision,
@@ -123,6 +126,7 @@ function mapDocumentRow(row: DbGeneratedDocument): GeneratedDocumentRecord {
     revisionNumber: row.revision_number,
     approverName: row.approver_name || "",
     approverRole: row.approver_role || "",
+    approvedAt: row.approved_at ?? null,
     distributedTo: row.distribution_list?.length > 0
       ? row.distribution_list
       : Array.from(new Set(distributionHistory.map((item) => item.recipient).filter(Boolean))),
@@ -138,18 +142,18 @@ function mapDocumentRow(row: DbGeneratedDocument): GeneratedDocumentRecord {
   };
 }
 
-function markdownToHtml(markdown: string) {
-  return markdown
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/^### (.*)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.*)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-    .replace(/^> (.*)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/^- (.*)$/gm, "<li>$1</li>")
-    .replace(/\n{2,}/g, "</p><p>")
-    .replace(/\n/g, "<br />");
+// Dados do cabeçalho do documento controlado. Data e aprovador só depois de aprovado.
+function dadosDoCabecalho(doc: GeneratedDocumentRecord, logo: string | null): DadosDoCabecalho {
+  const aprovado = doc.status === "Aprovado" || doc.status === "Publicado";
+  return {
+    titulo: doc.title,
+    codigo: doc.code,
+    revisao: doc.revision,
+    aprovadoEm: aprovado ? doc.approvedAt ?? null : null,
+    elaboradoPor: doc.documentOwner,
+    aprovadoPor: aprovado ? doc.approverName : "",
+    logo,
+  };
 }
 
 function parseRevision(label: string) {
@@ -218,6 +222,7 @@ export default function Documentos() {
     procedureCategory: "Procedimento Operacional",
   });
   const [viewingDoc, setViewingDoc] = useState<GeneratedDocumentRecord | null>(null);
+  const [logoDaVisualizacao, setLogoDaVisualizacao] = useState<string | null>(null);
   const [editingDoc, setEditingDoc] = useState<GeneratedDocumentRecord | null>(null);
   const [reviewingDoc, setReviewingDoc] = useState<GeneratedDocumentRecord | null>(null);
   const [reviewReason, setReviewReason] = useState("");
@@ -294,6 +299,7 @@ export default function Documentos() {
 
   useEffect(() => {
     const loadPage = async () => {
+      let nomeDoUsuario = "";
       const nextContext: CompanyContext = {
         companyId: window.localStorage.getItem("process:activeEmpresaId"),
         companyName: window.localStorage.getItem("process:activeEmpresaNome") || "Empresa local",
@@ -306,6 +312,8 @@ export default function Documentos() {
         if (userData.user?.id) {
           nextContext.userId = userData.user.id;
           nextContext.isAuthenticated = true;
+          const nomeDoPerfil = (userData.user.user_metadata as { full_name?: unknown } | undefined)?.full_name;
+          nomeDoUsuario = (typeof nomeDoPerfil === "string" && nomeDoPerfil.trim()) || userData.user.email || "";
           const resolvedCompanyId = await resolveAccessibleCompanyId(userData.user.id, nextContext.companyId);
           if (resolvedCompanyId) {
             nextContext.companyId = resolvedCompanyId;
@@ -322,9 +330,10 @@ export default function Documentos() {
       setCompanyContext(nextContext);
       setState(nextState);
       setSelectedTemplateId(defaultTemplate?.id || "");
-      setReviewedBy(nextContext.userId);
-      setApprovalName(nextContext.userId);
-      setDistributedBy(nextContext.userId);
+      // Nome de quem está logado (perfil ou e-mail), não o código interno do usuário.
+      setReviewedBy(nomeDoUsuario);
+      setApprovalName(nomeDoUsuario);
+      setDistributedBy(nomeDoUsuario);
 
       try {
         await Promise.all([
@@ -496,6 +505,20 @@ export default function Documentos() {
       setPreviewTitle((current) => current || `Procedimento - ${selectedProcess.nome}`);
     }
   }, [selectedProcess, sourceMode]);
+
+  // Logo do cliente para a pré-visualização do documento aberto.
+  const empresaDoDocumentoAberto = viewingDoc?.companyId ?? null;
+  useEffect(() => {
+    let ativo = true;
+    setLogoDaVisualizacao(null);
+    if (!empresaDoDocumentoAberto) return;
+    void logoComoDataUrl(empresaDoDocumentoAberto).then((logo) => {
+      if (ativo) setLogoDaVisualizacao(logo);
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [empresaDoDocumentoAberto]);
 
   const newerApprovedRevision = useMemo(() => {
     if (!viewingDoc || viewingDoc.sourceMode !== "linked_process" || !viewingDoc.processId) return null;
@@ -1056,8 +1079,8 @@ export default function Documentos() {
   const handleExportWord = (doc: GeneratedDocumentRecord) => {
     const html = `
       <html>
-        <head><meta charset="utf-8"><title>${doc.title}</title></head>
-        <body>${markdownToHtml(doc.contentMarkdown)}</body>
+        <head><meta charset="utf-8"><title>${doc.code} – ${tituloDoDocumento(doc.title)}</title></head>
+        <body>${markdownParaHtml(doc.contentMarkdown)}</body>
       </html>
     `;
     const blob = new Blob([html], { type: "application/msword" });
@@ -1069,25 +1092,24 @@ export default function Documentos() {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPdf = (doc: GeneratedDocumentRecord) => {
+  // PDF pelo navegador ("Salvar como PDF" na janela de impressão), no layout do documento controlado.
+  const handleExportPdf = async (doc: GeneratedDocumentRecord) => {
+    // A janela abre antes de buscar o logo: navegadores bloqueiam janelas abertas depois de uma espera.
     const popup = window.open("", "_blank", "width=960,height=720");
-    if (!popup) return;
-    popup.document.write(`
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>${doc.title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 32px; color: #17313b; }
-            h1, h2, h3 { color: #0f766e; }
-            blockquote { border-left: 4px solid #0f766e; margin: 16px 0; padding-left: 16px; color: #4b5563; }
-            li { margin-bottom: 6px; }
-          </style>
-        </head>
-        <body>${markdownToHtml(doc.contentMarkdown)}</body>
-      </html>
-    `);
+    if (!popup) {
+      toast({ title: "Janela bloqueada", description: "Permita janelas pop-up para este site e tente de novo.", variant: "destructive" });
+      return;
+    }
+    popup.document.write("<p style=\"font-family:Arial;padding:24px\">Preparando o documento...</p>");
+    const logo = await logoComoDataUrl(doc.companyId);
+    popup.document.open();
+    popup.document.write(documentoHtml(doc.contentMarkdown, dadosDoCabecalho(doc, logo)));
     popup.document.close();
+    const imagens = Array.from(popup.document.images);
+    await Promise.all(imagens.map((imagem) => (imagem.complete ? Promise.resolve() : new Promise((resolve) => {
+      imagem.onload = resolve;
+      imagem.onerror = resolve;
+    }))));
     popup.focus();
     popup.print();
   };
@@ -1270,7 +1292,7 @@ export default function Documentos() {
                           <Button size="sm" variant="outline" onClick={() => setDistributionDoc(doc)}>
                             <Send className="mr-2 h-4 w-4" /> Distribuir
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleExportPdf(doc)}>
+                          <Button size="sm" variant="outline" onClick={() => void handleExportPdf(doc)}>
                             <Download className="mr-2 h-4 w-4" /> Exportar PDF
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleExportWord(doc)}>
@@ -1492,7 +1514,26 @@ export default function Documentos() {
               </div>
             </div>
           ) : null}
-          <Textarea readOnly className="min-h-[520px] font-mono text-xs" value={viewingDoc?.contentMarkdown || ""} />
+          {viewingDoc ? (
+            <Tabs defaultValue="documento">
+              <TabsList>
+                <TabsTrigger value="documento">Documento</TabsTrigger>
+                <TabsTrigger value="texto">Texto</TabsTrigger>
+              </TabsList>
+              <TabsContent value="documento">
+                {/* Como sai no PDF: cabeçalho, tabelas e rodapé. Sem scripts (sandbox vazio). */}
+                <iframe
+                  title="Pré-visualização do documento"
+                  sandbox=""
+                  className="h-[60vh] w-full rounded-md border bg-white"
+                  srcDoc={documentoHtml(viewingDoc.contentMarkdown, dadosDoCabecalho(viewingDoc, logoDaVisualizacao))}
+                />
+              </TabsContent>
+              <TabsContent value="texto">
+                <Textarea readOnly className="min-h-[60vh] font-mono text-xs" value={viewingDoc.contentMarkdown} />
+              </TabsContent>
+            </Tabs>
+          ) : null}
         </DialogContent>
       </Dialog>
 

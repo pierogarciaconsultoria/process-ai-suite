@@ -12,6 +12,7 @@ import { ChevronsUpDown, Check } from "lucide-react";
 import { Plus, Search, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { LogoDaEmpresa } from "@/components/empresas/LogoDaEmpresa";
 
 interface Empresa {
   id: string;
@@ -283,6 +284,7 @@ const Empresas = () => {
                 <TableHead>Segmento</TableHead>
                 <TableHead>Colaboradores</TableHead>
                 <TableHead>Data de Cadastro</TableHead>
+                <TableHead>Logo (cabeçalho dos documentos)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -297,6 +299,7 @@ const Empresas = () => {
                   <TableCell>{empresa.segmento}</TableCell>
                   <TableCell>{empresa.tamanho}</TableCell>
                   <TableCell>{new Date(empresa.data_cadastro).toLocaleDateString("pt-BR")}</TableCell>
+                  <TableCell><LogoDaEmpresa companyId={empresa.id} nome={empresa.nome} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
