@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ChevronsUpDown, Check } from "lucide-react";
 import { Plus, Search, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { listarEmpresasDoUsuario } from "@/lib/empresas-do-usuario";
 import { useToast } from "@/hooks/use-toast";
 import { LogoDaEmpresa } from "@/components/empresas/LogoDaEmpresa";
 
@@ -63,7 +64,7 @@ const Empresas = () => {
 
   useEffect(() => {
     const loadFromServer = async () => {
-      const { data, error } = await supabase.functions.invoke("org-list");
+      const { data, error } = await listarEmpresasDoUsuario();
       if (!error && Array.isArray(data)) {
         const seen = new Set<string>();
         const list = (data as Array<Record<string, unknown>>)
@@ -130,7 +131,7 @@ const Empresas = () => {
     }
 
     // Revalida a partir do servidor para garantir consistência
-    const { data: listData } = await supabase.functions.invoke("org-list");
+    const { data: listData } = await listarEmpresasDoUsuario();
     if (Array.isArray(listData)) {
       const list = (listData as Array<Record<string, unknown>>).map((e) => ({
         id: String(e.id),
