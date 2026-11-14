@@ -25,3 +25,28 @@ describe("Migration de contas", () => {
     expect(migration).toContain("create trigger empresas_define_conta before insert on public.empresas");
   });
 });
+
+const convites = readFileSync(resolve(process.cwd(), "supabase/migrations/202611140002_convites_de_conta.sql"), "utf8");
+
+describe("Migration de convites e membros", () => {
+  it("aceitar exige convite pendente, no prazo e do e-mail de quem está logado", () => {
+    expect(convites).toContain("if _convite.status <> 'pendente' then");
+    expect(convites).toContain("if _convite.expira_em < now() then");
+    expect(convites).toContain("if _convite.email <> _email then");
+  });
+
+  it("criar empresa exige conta ativa, participação e respeita o limite do plano", () => {
+    expect(convites).toContain("Para cadastrar empresas, você precisa fazer parte de uma conta do Peter.");
+    expect(convites).toContain("if _conta.situacao <> 'ativa' then");
+    expect(convites).toContain("if _total >= _conta.limite_empresas then");
+  });
+
+  it("a conta mantém um administrador e o perfil Consultor é protegido", () => {
+    expect(convites).toContain("A conta precisa de ao menos um administrador.");
+    expect(convites).toContain("Só o Consultor (ou o administrador da conta) dá, tira ou remove o perfil Consultor.");
+  });
+
+  it("manutenção sem usuário logado pode mudar o plano", () => {
+    expect(convites).toContain("if auth.uid() is not null and not public.is_super_admin() and (");
+  });
+});

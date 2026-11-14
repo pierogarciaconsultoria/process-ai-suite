@@ -6,9 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { DESCRICAO_PERFIL, ROTULO_PERFIL } from "@/lib/perfil";
+import { DESCRICAO_PERFIL, ROTULO_PERFIL, usePodeGerenciar } from "@/lib/perfil";
+import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 import { supabase } from "@/integrations/supabase/client";
 import { listarEmpresasDoUsuario } from "@/lib/empresas-do-usuario";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +89,33 @@ const Usuarios = () => {
     };
     loadMembers();
   }, [empresaId, toast]);
+
+  // Consultor e Gestor trocam perfil e removem; dar ou tirar "Consultor" é só do Consultor (regra no banco).
+  const podeGerenciar = usePodeGerenciar(empresaId || null);
+
+  const trocarPerfil = async (membro: Membro, perfil: Membro["perfil"]) => {
+    if (perfil === membro.perfil) return;
+    const { error } = await supabase.from("membros").update({ perfil }).eq("id", membro.id);
+    if (error) {
+      toast({ title: "Não foi possível trocar o perfil", description: mensagemDoErroDoProcesso(error, "Tente de novo."), variant: "destructive" });
+      return;
+    }
+    setMembros((atuais) => atuais.map((item) => (item.id === membro.id ? { ...item, perfil } : item)));
+    toast({ title: "Perfil atualizado", description: `${users[membro.user_id]?.email || "Membro"}: ${perfilLabels[perfil]}.` });
+  };
+
+  const removerMembro = async (membro: Membro) => {
+    const quem = users[membro.user_id]?.email || "este membro";
+    if (!window.confirm(`Remover ${quem} da empresa? O acesso aos dados da empresa termina na hora.`)) return;
+    const { data, error } = await supabase.from("membros").delete().eq("id", membro.id).select("id");
+    // Remoção bloqueada pela regra de acesso volta sem erro e sem linhas.
+    if (error || !data?.length) {
+      toast({ title: "Não foi possível remover", description: mensagemDoErroDoProcesso(error, "Você não tem permissão para remover este membro."), variant: "destructive" });
+      return;
+    }
+    setMembros((atuais) => atuais.filter((item) => item.id !== membro.id));
+    toast({ title: "Membro removido", description: quem });
+  };
 
   const filtered = useMemo(() => {
     return membros.filter((m) => {
@@ -208,6 +236,7 @@ const Usuarios = () => {
                 <TableHead>Nome</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Perfil</TableHead>
+                {podeGerenciar && <TableHead />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -217,7 +246,25 @@ const Usuarios = () => {
                   <TableRow key={m.id}>
                     <TableCell className="font-medium">{u?.nome || "—"}</TableCell>
                     <TableCell>{u?.email || "—"}</TableCell>
-                    <TableCell><Badge className={perfilColors[m.perfil]}>{perfilLabels[m.perfil]}</Badge></TableCell>
+                    <TableCell>
+                      {podeGerenciar ? (
+                        <Select value={m.perfil} onValueChange={(valor) => void trocarPerfil(m, valor as Membro["perfil"])}>
+                          <SelectTrigger className="w-40" aria-label={`Perfil de ${u?.email || "membro"}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(["admin", "gestor", "analista"] as const).map((perfil) => <SelectItem key={perfil} value={perfil}>{perfilLabels[perfil]}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge className={perfilColors[m.perfil]}>{perfilLabels[m.perfil]}</Badge>
+                      )}
+                    </TableCell>
+                    {podeGerenciar && (
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => void removerMembro(m)} aria-label={`Remover ${u?.email || "membro"}`}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
