@@ -687,6 +687,50 @@ export type Database = {
           { foreignKeyName: "conta_membros_conta_id_fkey"; columns: ["conta_id"]; isOneToOne: false; referencedRelation: "contas"; referencedColumns: ["id"] },
         ]
       }
+      convites_conta: {
+        Row: {
+          aceito_em: string | null
+          aceito_por: string | null
+          conta_id: string
+          created_at: string
+          created_by: string | null
+          email: string
+          expira_em: string
+          id: string
+          papel: string
+          status: string
+          token: string
+        }
+        Insert: {
+          aceito_em?: string | null
+          aceito_por?: string | null
+          conta_id: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expira_em?: string
+          id?: string
+          papel?: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          aceito_em?: string | null
+          aceito_por?: string | null
+          conta_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expira_em?: string
+          id?: string
+          papel?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          { foreignKeyName: "convites_conta_conta_id_fkey"; columns: ["conta_id"]; isOneToOne: false; referencedRelation: "contas"; referencedColumns: ["id"] },
+        ]
+      }
       contas: {
         Row: {
           created_at: string
@@ -1474,6 +1518,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aceitar_convite_conta: { Args: { _token: string }; Returns: string }
       acquire_ai_request:
         | {
             Args: {
@@ -1490,6 +1535,10 @@ export type Database = {
             }[]
           }
         | { Args: { p_company_id: string }; Returns: boolean }
+      convite_conta_info: {
+        Args: { _token: string }
+        Returns: { conta_nome: string; conta_tipo: string; email: string; expirado: boolean; papel: string; status: string }[]
+      }
       contas_da_plataforma: {
         Args: never
         Returns: {
@@ -1529,6 +1578,14 @@ export type Database = {
           segmento: string | null
           tamanho: string | null
         }[]
+      }
+      membros_da_conta: {
+        Args: { _conta_id: string }
+        Returns: { created_at: string; email: string; id: string; nome: string | null; papel: string; user_id: string }[]
+      }
+      minhas_contas: {
+        Args: never
+        Returns: { empresas: number; id: string; limite_empresas: number | null; nome: string; papel: string; plano: string; situacao: string; tipo: string }[]
       }
       get_user_empresa_ids: { Args: { _user_id: string }; Returns: string[] }
       is_super_admin: { Args: never; Returns: boolean }

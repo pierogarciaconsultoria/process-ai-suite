@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Pencil, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Pencil, Plus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,7 @@ function limite(texto: string): number | null {
 
 const ConfigContas = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [contas, setContas] = useState<Conta[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [rascunho, setRascunho] = useState<Rascunho | null>(null);
@@ -106,7 +108,7 @@ const ConfigContas = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Todas as contas</CardTitle>
-          <CardDescription>O administrador de cada conta é definido pelo convite (próxima etapa). Limite em branco = sem limite.</CardDescription>
+          <CardDescription>Em "Pessoas e convites" você convida o administrador de cada conta. Limite em branco = sem limite.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -136,7 +138,10 @@ const ConfigContas = () => {
                       <TableCell><Badge variant={conta.situacao === "ativa" ? "secondary" : "destructive"}>{SITUACAO[conta.situacao] ?? conta.situacao}</Badge></TableCell>
                       <TableCell className="text-center">{conta.empresas}{conta.limite_empresas !== null ? ` / ${conta.limite_empresas}` : ""}</TableCell>
                       <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">{conta.administradores || "—"}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="space-x-2 whitespace-nowrap text-right">
+                        <Button size="sm" variant="outline" aria-label={`Pessoas e convites de ${conta.nome}`} onClick={() => navigate(`/configuracoes/conta?id=${conta.id}`)}>
+                          <Users className="h-4 w-4" />
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

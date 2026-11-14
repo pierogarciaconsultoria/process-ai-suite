@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -48,7 +49,7 @@ describe("Contas da plataforma", () => {
   });
 
   it("lista as contas com tipo, situação, empresas e administradores", async () => {
-    render(<ConfigContas />);
+    render(<MemoryRouter><ConfigContas /></MemoryRouter>);
     expect(await screen.findByText("Consultoria Exemplo")).toBeInTheDocument();
     expect(screen.getByText("Empresa direta")).toBeInTheDocument();
     expect(screen.getByText("Suspensa")).toBeInTheDocument();
@@ -57,7 +58,7 @@ describe("Contas da plataforma", () => {
   });
 
   it("cria uma conta e edita o plano de outra", async () => {
-    render(<ConfigContas />);
+    render(<MemoryRouter><ConfigContas /></MemoryRouter>);
     await screen.findByText("Consultoria Exemplo");
 
     fireEvent.click(screen.getByRole("button", { name: /Nova conta/ }));

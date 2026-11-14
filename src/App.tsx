@@ -27,6 +27,8 @@ const ConfigChamados = React.lazy(() => import("./pages/ConfigChamados"));
 const ChamadoDetalhe = React.lazy(() => import("./pages/ChamadoDetalhe"));
 const ConfigRoteiroEntrevista = React.lazy(() => import("./pages/ConfigRoteiroEntrevista"));
 const ConfigSkinIA = React.lazy(() => import("./pages/ConfigSkinIA"));
+const ConviteConta = React.lazy(() => import("./pages/ConviteConta"));
+const MinhaConta = React.lazy(() => import("./pages/MinhaConta"));
 const ConfigContas = React.lazy(() => import("./pages/ConfigContas"));
 const ConfigDocumentacaoProcesso = React.lazy(() => import("./pages/ConfigDocumentacaoProcesso"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
@@ -86,6 +88,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/convite/:token" element={<ConviteAceite />} />
+              <Route path="/convite-conta/:token" element={<ConviteConta />} />
               <Route path="/" element={<Landing />} />
               <Route element={<AppLayout />}>
                 <Route path="/inicio" element={<PeterChat />} />
@@ -112,6 +115,7 @@ const App = () => (
                 <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/configuracoes/minhas-empresas" element={<ConsultorRoute><MinhasEmpresas /></ConsultorRoute>} />
               <Route path="/configuracoes/contas" element={<SuperAdminRoute><ConfigContas /></SuperAdminRoute>} />
+              <Route path="/configuracoes/conta" element={<MinhaConta />} />
               <Route path="/configuracoes/empresas" element={<Empresas />} />
               <Route path="/configuracoes/usuarios" element={<Usuarios />} />
               <Route path="/configuracoes/perfil" element={<ConfigPerfil />} />
