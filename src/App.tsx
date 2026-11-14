@@ -27,6 +27,7 @@ const ConfigChamados = React.lazy(() => import("./pages/ConfigChamados"));
 const ChamadoDetalhe = React.lazy(() => import("./pages/ChamadoDetalhe"));
 const ConfigRoteiroEntrevista = React.lazy(() => import("./pages/ConfigRoteiroEntrevista"));
 const ConfigSkinIA = React.lazy(() => import("./pages/ConfigSkinIA"));
+const ConfigContas = React.lazy(() => import("./pages/ConfigContas"));
 const ConfigDocumentacaoProcesso = React.lazy(() => import("./pages/ConfigDocumentacaoProcesso"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const EntrevistaProcesso = React.lazy(() => import("./pages/EntrevistaProcesso"));
@@ -110,6 +111,7 @@ const App = () => (
               <Route path="/relatorios" element={<Relatorios />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/configuracoes/minhas-empresas" element={<ConsultorRoute><MinhasEmpresas /></ConsultorRoute>} />
+              <Route path="/configuracoes/contas" element={<SuperAdminRoute><ConfigContas /></SuperAdminRoute>} />
               <Route path="/configuracoes/empresas" element={<Empresas />} />
               <Route path="/configuracoes/usuarios" element={<Usuarios />} />
               <Route path="/configuracoes/perfil" element={<ConfigPerfil />} />

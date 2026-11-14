@@ -679,9 +679,57 @@ export type Database = {
           },
         ]
       }
+      conta_membros: {
+        Row: { conta_id: string; created_at: string; id: string; papel: string; user_id: string }
+        Insert: { conta_id: string; created_at?: string; id?: string; papel?: string; user_id: string }
+        Update: { conta_id?: string; created_at?: string; id?: string; papel?: string; user_id?: string }
+        Relationships: [
+          { foreignKeyName: "conta_membros_conta_id_fkey"; columns: ["conta_id"]; isOneToOne: false; referencedRelation: "contas"; referencedColumns: ["id"] },
+        ]
+      }
+      contas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          limite_empresas: number | null
+          limite_usuarios: number | null
+          nome: string
+          plano: string
+          situacao: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limite_empresas?: number | null
+          limite_usuarios?: number | null
+          nome: string
+          plano?: string
+          situacao?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limite_empresas?: number | null
+          limite_usuarios?: number | null
+          nome?: string
+          plano?: string
+          situacao?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
           area_atuacao: string | null
+          conta_id: string | null
           contexto: string | null
           created_at: string
           id: string
@@ -692,6 +740,7 @@ export type Database = {
         }
         Insert: {
           area_atuacao?: string | null
+          conta_id?: string | null
           contexto?: string | null
           created_at?: string
           id?: string
@@ -702,6 +751,7 @@ export type Database = {
         }
         Update: {
           area_atuacao?: string | null
+          conta_id?: string | null
           contexto?: string | null
           created_at?: string
           id?: string
@@ -1197,6 +1247,12 @@ export type Database = {
           },
         ]
       }
+      plataforma_admins: {
+        Row: { created_at: string; user_id: string }
+        Insert: { created_at?: string; user_id: string }
+        Update: { created_at?: string; user_id?: string }
+        Relationships: []
+      }
       peter_conversas: {
         Row: {
           company_id: string
@@ -1434,6 +1490,21 @@ export type Database = {
             }[]
           }
         | { Args: { p_company_id: string }; Returns: boolean }
+      contas_da_plataforma: {
+        Args: never
+        Returns: {
+          administradores: string | null
+          created_at: string
+          empresas: number
+          id: string
+          limite_empresas: number | null
+          limite_usuarios: number | null
+          nome: string
+          plano: string
+          situacao: string
+          tipo: string
+        }[]
+      }
       chave_nome_processo: { Args: { _nome: string }; Returns: string }
       complete_ai_request: {
         Args: {
@@ -1443,6 +1514,21 @@ export type Database = {
           _function_name: string
         }
         Returns: undefined
+      }
+      empresas_do_usuario: {
+        Args: never
+        Returns: {
+          area_atuacao: string | null
+          conta_id: string | null
+          conta_nome: string | null
+          contexto: string | null
+          created_at: string
+          id: string
+          nome: string
+          perfil: string
+          segmento: string | null
+          tamanho: string | null
+        }[]
       }
       get_user_empresa_ids: { Args: { _user_id: string }; Returns: string[] }
       is_super_admin: { Args: never; Returns: boolean }

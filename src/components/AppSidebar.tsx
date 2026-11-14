@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { lerEmpresaAtiva, trocarEmpresaAtiva, useEmpresaAtiva } from "@/lib/empresa-ativa";
 import { supabase } from "@/integrations/supabase/client";
+import { listarEmpresasDoUsuario } from "@/lib/empresas-do-usuario";
 import type { Session } from "@supabase/supabase-js";
 
 const mainItems = [
@@ -89,7 +90,7 @@ export function AppSidebar() {
         return;
       }
       setLoadingEmpresas(true);
-      const { data, error } = await supabase.functions.invoke("org-list");
+      const { data, error } = await listarEmpresasDoUsuario();
       if (!isMounted) return;
       if (error || !Array.isArray(data)) {
         setEmpresas([]);

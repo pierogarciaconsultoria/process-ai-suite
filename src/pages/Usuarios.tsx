@@ -10,6 +10,7 @@ import { Plus, Search } from "lucide-react";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { DESCRICAO_PERFIL, ROTULO_PERFIL } from "@/lib/perfil";
 import { supabase } from "@/integrations/supabase/client";
+import { listarEmpresasDoUsuario } from "@/lib/empresas-do-usuario";
 import { useToast } from "@/hooks/use-toast";
 
 type Empresa = { id: string; nome: string };
@@ -58,7 +59,7 @@ const Usuarios = () => {
 
   useEffect(() => {
     const loadEmpresas = async () => {
-      const { data, error } = await supabase.functions.invoke("org-list");
+      const { data, error } = await listarEmpresasDoUsuario();
       if (!error && Array.isArray(data)) {
         const list = (data as Array<Record<string, unknown>>).map((e) => ({
           id: String(e.id),

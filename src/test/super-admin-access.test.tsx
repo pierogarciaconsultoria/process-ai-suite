@@ -6,7 +6,16 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { isSuperAdmin } from "@/lib/permissions";
 import Configuracoes from "@/pages/Configuracoes";
 
+const banco = vi.hoisted(() => ({ adminPelaTabela: false }));
+
 vi.mock("@/hooks/useAuthUser", () => ({ useAuthUser: vi.fn() }));
+// is_super_admin no banco: e-mail original ou tabela plataforma_admins.
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    rpc: async () => ({ data: banco.adminPelaTabela, error: null }),
+    auth: { getUser: async () => ({ data: { user: null } }) },
+  },
+}));
 
 const mockedUseAuthUser = vi.mocked(useAuthUser);
 
@@ -22,7 +31,10 @@ function renderGuard() {
 }
 
 describe("acesso de super admin", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    banco.adminPelaTabela = false;
+  });
 
   it("normaliza o e-mail antes de validar", () => {
     expect(isSuperAdmin({ email: " CONTATO@PIEROGARCIA.COM.BR " })).toBe(true);
@@ -36,10 +48,17 @@ describe("acesso de super admin", () => {
     expect(screen.getByText("Configuração restrita")).toBeInTheDocument();
   });
 
-  it("redireciona os demais usuários", () => {
-    mockedUseAuthUser.mockReturnValue({ user: { email: "usuario@empresa.com" } as never, loading: false });
+  it("permite a rota para administrador da plataforma cadastrado na tabela", async () => {
+    banco.adminPelaTabela = true;
+    mockedUseAuthUser.mockReturnValue({ user: { id: "u-2", email: "socio@pierogarcia.com.br" } as never, loading: false });
     renderGuard();
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(await screen.findByText("Configuração restrita")).toBeInTheDocument();
+  });
+
+  it("redireciona os demais usuários", async () => {
+    mockedUseAuthUser.mockReturnValue({ user: { id: "u-3", email: "usuario@empresa.com" } as never, loading: false });
+    renderGuard();
+    expect(await screen.findByText("Dashboard")).toBeInTheDocument();
     expect(screen.queryByText("Configuração restrita")).not.toBeInTheDocument();
   });
 

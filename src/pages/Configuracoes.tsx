@@ -1,14 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Briefcase, Building2, Users, User, KeyRound, MessageSquare, Sparkles, FileText } from "lucide-react";
+import { Briefcase, Building2, Landmark, Users, User, KeyRound, MessageSquare, Sparkles, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuthUser } from "@/hooks/useAuthUser";
-import { isSuperAdmin } from "@/lib/permissions";
+import { useAdminDaPlataforma } from "@/hooks/useAdminDaPlataforma";
 import { useEhConsultor } from "@/lib/perfil";
 
 const Configuracoes = () => {
   const navigate = useNavigate();
-  const { user } = useAuthUser();
-  const showRestrictedSettings = isSuperAdmin(user);
+  const { admin: showRestrictedSettings } = useAdminDaPlataforma();
   const consultor = useEhConsultor();
   return (
     <div className="space-y-6 animate-fade-in max-w-6xl">
@@ -88,6 +86,17 @@ const Configuracoes = () => {
         </Card>
         {showRestrictedSettings && (
           <>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/contas")}>
+          <CardHeader className="flex-row items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <Landmark className="h-5 w-5 text-secondary-foreground" />
+            </div>
+            <CardTitle>Contas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Consultorias e empresas que assinam o Peter: plano, situação e limites</p>
+          </CardContent>
+        </Card>
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/roteiro-entrevista")}>
           <CardHeader className="flex-row items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
