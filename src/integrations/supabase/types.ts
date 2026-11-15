@@ -679,6 +679,12 @@ export type Database = {
           },
         ]
       }
+      registros_exclusao: {
+        Row: { alvo_id: string; alvo_nome: string | null; conta_id: string | null; excluido_em: string; excluido_por: string | null; id: string; motivo: string; tipo: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       aceites_termos: {
         Row: { aceito_em: string; id: string; user_id: string; versao: string }
         Insert: { versao: string }
@@ -741,6 +747,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          encerrada_em: string | null
           id: string
           limite_empresas: number | null
           limite_usuarios: number | null
@@ -753,6 +760,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          encerrada_em?: string | null
           id?: string
           limite_empresas?: number | null
           limite_usuarios?: number | null
@@ -765,6 +773,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          encerrada_em?: string | null
           id?: string
           limite_empresas?: number | null
           limite_usuarios?: number | null
@@ -1588,6 +1597,22 @@ export type Database = {
       membros_da_conta: {
         Args: { _conta_id: string }
         Returns: { created_at: string; email: string; id: string; nome: string | null; papel: string; user_id: string }[]
+      }
+      aplicar_prazos_de_guarda: {
+        Args: never
+        Returns: { item: string; quantidade: number }[]
+      }
+      excluir_empresa: {
+        Args: { _empresa_id: string; _confirmacao: string }
+        Returns: undefined
+      }
+      exportar_dados_empresa: {
+        Args: { _empresa_id: string }
+        Returns: Json
+      }
+      user_pode_excluir_empresa: {
+        Args: { _empresa_id: string }
+        Returns: boolean
       }
       minhas_contas: {
         Args: never

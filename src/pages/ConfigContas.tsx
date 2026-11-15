@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
+import { PrazosDeGuarda } from "@/components/PrazosDeGuarda";
 
 // Contas da plataforma (migration 202611140001): quem assina o Peter. Só para o administrador da plataforma.
 
@@ -168,6 +169,8 @@ const ConfigContas = () => {
         </CardContent>
       </Card>
 
+      <PrazosDeGuarda />
+
       <Dialog open={Boolean(rascunho)} onOpenChange={(aberto) => !aberto && setRascunho(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -200,6 +203,11 @@ const ConfigContas = () => {
                     <SelectItem value="cancelada">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
+                {rascunho.situacao === "cancelada" && (
+                  <p className="text-xs text-destructive" role="note">
+                    Cancelada: as empresas da conta e todos os dados delas são excluídos 30 dias depois. Reativar antes disso interrompe a contagem.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="conta-plano">Plano</Label>

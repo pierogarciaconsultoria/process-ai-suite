@@ -72,7 +72,10 @@ export const POLITICA_DE_PRIVACIDADE: DocumentoLegal = {
       titulo: "6. Por quanto tempo guardamos",
       paragrafos: [
         "Os dados de cadastro e o conteúdo das empresas ficam guardados enquanto o contrato com a empresa cliente estiver ativo.",
-        "Ao fim do contrato, a empresa cliente pode pedir a exportação dos seus dados; depois, eles são excluídos em até [a definir] dias, salvo obrigação legal de guarda.",
+        "Texto extraído de anexos enviados no chat do Peter: 90 dias. Depois disso, fica só o nome do arquivo.",
+        "Conversas com o Peter: excluídas depois de 12 meses sem mensagem nova.",
+        "Ao fim do contrato (conta cancelada), os dados das empresas da conta são excluídos 30 dias depois do cancelamento, salvo obrigação legal de guarda. Nesse prazo, a empresa cliente pode exportar os seus dados em Configurações → Empresas.",
+        "A empresa cliente também pode exportar ou excluir os dados de uma empresa a qualquer momento, pela mesma tela.",
         "Registros de acesso: 6 meses. Cópias de segurança do provedor seguem o ciclo de retenção dele [a definir].",
       ],
     },
@@ -159,7 +162,7 @@ export const TERMOS_DE_USO: DocumentoLegal = {
       titulo: "8. Suspensão, cancelamento e dados",
       paragrafos: [
         "O acesso pode ser suspenso em caso de uso indevido, risco à segurança ou falta de pagamento, conforme o contrato.",
-        "Cancelamento e reembolso seguem a proposta ou o contrato [condições a definir]. Ao término, a empresa cliente pode exportar seus dados no prazo previsto na Política de privacidade; depois, eles são excluídos.",
+        "Cancelamento e reembolso seguem a proposta ou o contrato [condições a definir]. Ao término, a empresa cliente tem 30 dias para exportar seus dados; depois, eles são excluídos.",
       ],
     },
     {

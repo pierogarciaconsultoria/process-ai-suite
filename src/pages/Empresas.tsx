@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { listarEmpresasDoUsuario } from "@/lib/empresas-do-usuario";
 import { useToast } from "@/hooks/use-toast";
 import { LogoDaEmpresa } from "@/components/empresas/LogoDaEmpresa";
+import { DadosDaEmpresa } from "@/components/empresas/DadosDaEmpresa";
+import { lerEmpresaAtiva, trocarEmpresaAtiva } from "@/lib/empresa-ativa";
 
 interface Empresa {
   id: string;
@@ -87,6 +89,24 @@ const Empresas = () => {
     };
     void loadFromServer();
   }, []);
+
+  // Depois de excluir: tira da lista e, se era a empresa ativa, passa para outra.
+  const aoExcluir = (id: string) => {
+    const restantes = empresas.filter((e) => e.id !== id);
+    setEmpresas(restantes);
+    if (lerEmpresaAtiva() === id) {
+      const proxima = restantes[0];
+      if (proxima) trocarEmpresaAtiva(proxima.id, proxima.nome);
+      else {
+        try {
+          window.localStorage.removeItem("process:activeEmpresaId");
+          window.localStorage.removeItem("process:activeEmpresaNome");
+        } catch {
+          // Sem armazenamento local: nada a limpar.
+        }
+      }
+    }
+  };
 
   const filtered = empresas.filter((e) =>
     e.nome.toLowerCase().includes(search.toLowerCase())
@@ -286,6 +306,7 @@ const Empresas = () => {
                 <TableHead>Colaboradores</TableHead>
                 <TableHead>Data de Cadastro</TableHead>
                 <TableHead>Logo (cabeçalho dos documentos)</TableHead>
+                <TableHead>Dados</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -301,6 +322,7 @@ const Empresas = () => {
                   <TableCell>{empresa.tamanho}</TableCell>
                   <TableCell>{new Date(empresa.data_cadastro).toLocaleDateString("pt-BR")}</TableCell>
                   <TableCell><LogoDaEmpresa companyId={empresa.id} nome={empresa.nome} /></TableCell>
+                  <TableCell><DadosDaEmpresa empresaId={empresa.id} nome={empresa.nome} onExcluida={aoExcluir} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
