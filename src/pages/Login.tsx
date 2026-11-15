@@ -9,6 +9,7 @@ import { Network, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { safeInternalRedirect } from "@/lib/auth-navigation";
+import { mensagemDoErroDeSenha } from "@/lib/mensagem-de-senha";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LinksLegais } from "@/components/LinksLegais";
 import { VERSAO_DOCUMENTOS_LEGAIS } from "@/data/documentos-legais";
@@ -128,8 +129,7 @@ const Login = () => {
       setPassword("");
       setAceiteTermos(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast({ title: "Erro no cadastro", description: message, variant: "destructive" });
+      toast({ title: "Erro no cadastro", description: mensagemDoErroDeSenha(error), variant: "destructive" });
     } finally {
       setLoading(false);
     }
