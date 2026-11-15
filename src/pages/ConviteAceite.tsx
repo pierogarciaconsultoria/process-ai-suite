@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Network } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { LinksLegais } from "@/components/LinksLegais";
 import { useToast } from "@/hooks/use-toast";
 
 type InvitePayload = {
@@ -245,6 +246,7 @@ const ConviteAceite = () => {
                 )}
               </>
             ) : null}
+            <LinksLegais className="justify-center pt-2 text-muted-foreground" />
           </CardContent>
         </Card>
       </div>

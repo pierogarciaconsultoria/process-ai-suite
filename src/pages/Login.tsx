@@ -9,6 +9,9 @@ import { Network, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { safeInternalRedirect } from "@/lib/auth-navigation";
+import { Checkbox } from "@/components/ui/checkbox";
+import { LinksLegais } from "@/components/LinksLegais";
+import { VERSAO_DOCUMENTOS_LEGAIS } from "@/data/documentos-legais";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ChevronsUpDown, Check } from "lucide-react";
@@ -25,6 +28,7 @@ const Login = () => {
   const [areaAtuacao, setAreaAtuacao] = useState("");
   const [contexto, setContexto] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [aceiteTermos, setAceiteTermos] = useState(false);
   const segmentosBR = [
     "Agricultura, Pecuária, Produção Florestal, Pesca e Aquicultura",
     "Indústrias Extrativas",
@@ -83,13 +87,26 @@ const Login = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!aceiteTermos) {
+      toast({ title: "Aceite pendente", description: "Para criar o acesso, aceite a Política de privacidade e os Termos de uso.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { nome, empresa, segmento, area_atuacao: areaAtuacao, contexto },
+          data: {
+            nome,
+            empresa,
+            segmento,
+            area_atuacao: areaAtuacao,
+            contexto,
+            // Registrado em aceites_termos no primeiro acesso (AceiteDosTermos).
+            aceite_termos_versao: VERSAO_DOCUMENTOS_LEGAIS,
+            aceite_termos_em: new Date().toISOString(),
+          },
           emailRedirectTo: `${window.location.origin}/login?${new URLSearchParams({
             email,
             redirect: redirectAfterLogin,
@@ -109,6 +126,7 @@ const Login = () => {
       setContexto("");
       setEmail("");
       setPassword("");
+      setAceiteTermos(false);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       toast({ title: "Erro no cadastro", description: message, variant: "destructive" });
@@ -279,7 +297,24 @@ const Login = () => {
                 </>
               )}
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              {isSignupMode && !isResetMode && (
+                <div className="space-y-3 rounded-md border bg-muted/30 p-3 text-sm">
+                  <p className="text-foreground/80">
+                    Usamos seu nome e e-mail para criar o acesso e identificar você nas empresas em que for incluído. Os dados da empresa servem
+                    para contextualizar o Peter.
+                  </p>
+                  <div className="flex items-start gap-3">
+                    <Checkbox id="aceite-termos" checked={aceiteTermos} onCheckedChange={(valor) => setAceiteTermos(valor === true)} className="mt-0.5" />
+                    <Label htmlFor="aceite-termos" className="font-normal leading-relaxed">
+                      Li e aceito a{" "}
+                      <a href="/privacidade" target="_blank" rel="noopener" className="text-primary underline">Política de privacidade</a> e os{" "}
+                      <a href="/termos" target="_blank" rel="noopener" className="text-primary underline">Termos de uso</a>.
+                    </Label>
+                  </div>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loading || (isSignupMode && !isResetMode && !aceiteTermos)}>
                 {loading ? "Aguarde..." : isResetMode ? "Enviar Link" : isSignupMode ? "Criar Conta" : "Entrar"}
               </Button>
 
@@ -292,6 +327,7 @@ const Login = () => {
                 </button>
               </div>
             </form>
+            <LinksLegais className="mt-6 justify-center text-muted-foreground" />
           </CardContent>
         </Card>
       </div>
