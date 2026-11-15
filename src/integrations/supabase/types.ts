@@ -679,6 +679,12 @@ export type Database = {
           },
         ]
       }
+      aceites_termos: {
+        Row: { aceito_em: string; id: string; user_id: string; versao: string }
+        Insert: { versao: string }
+        Update: never
+        Relationships: []
+      }
       conta_membros: {
         Row: { conta_id: string; created_at: string; id: string; papel: string; user_id: string }
         Insert: { conta_id: string; created_at?: string; id?: string; papel?: string; user_id: string }

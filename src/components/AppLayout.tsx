@@ -1,5 +1,6 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AceiteDosTermos } from "@/components/AceiteDosTermos";
 import { supabase } from "@/integrations/supabase/client";
 import { loginRedirectFor } from "@/lib/auth-navigation";
 import { useEmpresaAtiva } from "@/lib/empresa-ativa";
@@ -59,7 +60,9 @@ export function AppLayout() {
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:block print:overflow-visible">
           <main className={`min-h-0 flex-1 p-3 sm:p-6 print:overflow-visible print:p-0 ${isInterviewRoute ? "overflow-hidden" : "overflow-auto"}`}>
-            <Outlet key={empresaAtiva ?? "sem-empresa"} />
+            <AceiteDosTermos>
+              <Outlet key={empresaAtiva ?? "sem-empresa"} />
+            </AceiteDosTermos>
           </main>
         </div>
       </div>

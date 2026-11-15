@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,7 @@ const auth = vi.hoisted(() => ({
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth } }));
 vi.mock("@/components/AppSidebar", () => ({ AppSidebar: () => <aside>Sidebar</aside> }));
+vi.mock("@/components/AceiteDosTermos", () => ({ AceiteDosTermos: ({ children }: { children: ReactNode }) => <>{children}</> }));
 
 import { AppLayout } from "@/components/AppLayout";
 

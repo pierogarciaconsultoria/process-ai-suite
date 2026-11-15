@@ -12,6 +12,7 @@ const Login = React.lazy(() => import("./pages/Login"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
 const ConviteAceite = React.lazy(() => import("./pages/ConviteAceite.tsx"));
 const Landing = React.lazy(() => import("./pages/Landing"));
+const DocumentoLegal = React.lazy(() => import("./pages/DocumentoLegal"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Empresas = React.lazy(() => import("./pages/Empresas"));
 const Processos = React.lazy(() => import("./pages/Processos"));
@@ -90,6 +91,8 @@ const App = () => (
               <Route path="/convite/:token" element={<ConviteAceite />} />
               <Route path="/convite-conta/:token" element={<ConviteConta />} />
               <Route path="/" element={<Landing />} />
+              <Route path="/privacidade" element={<DocumentoLegal tipo="privacidade" />} />
+              <Route path="/termos" element={<DocumentoLegal tipo="termos" />} />
               <Route element={<AppLayout />}>
                 <Route path="/inicio" element={<PeterChat />} />
                 <Route path="/minhas-empresas" element={<Navigate to="/configuracoes/minhas-empresas" replace />} />

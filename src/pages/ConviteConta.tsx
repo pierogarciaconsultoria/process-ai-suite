@@ -4,6 +4,7 @@ import { Loader2, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { LinksLegais } from "@/components/LinksLegais";
 import { trocarEmpresaAtiva } from "@/lib/empresa-ativa";
 import { mensagemDoErroDoProcesso } from "@/lib/processo-duplicado";
 import { PAPEL_CONTA, TIPO_CONTA } from "@/lib/contas";
@@ -103,6 +104,7 @@ const ConviteConta = () => {
             </Button>
           )}
           {erro && <p className="text-center text-destructive" role="alert">{erro}</p>}
+          <LinksLegais className="justify-center pt-2 text-muted-foreground" />
         </CardContent>
       </Card>
     </div>
