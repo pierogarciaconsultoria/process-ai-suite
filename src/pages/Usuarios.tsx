@@ -198,12 +198,15 @@ const Usuarios = () => {
                 <Select value={invPerfil} onValueChange={(v) => setInvPerfil(v as Membro["perfil"])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">{ROTULO_PERFIL.admin}</SelectItem>
                     <SelectItem value="gestor">Gestor</SelectItem>
                     <SelectItem value="analista">{ROTULO_PERFIL.analista}</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">{DESCRICAO_PERFIL[invPerfil]}</p>
+                {/* Convite por e-mail não dá o perfil Consultor (regra no banco, migration 202611150001). */}
+                <p className="text-xs text-muted-foreground">
+                  Para dar o perfil {ROTULO_PERFIL.admin}, convide como Gestor ou {ROTULO_PERFIL.analista} e troque o perfil na lista depois que a pessoa entrar.
+                </p>
               </div>
               <Button className="w-full" onClick={handleInvite} disabled={loadingInvite}>{loadingInvite ? "Enviando..." : "Enviar convite"}</Button>
             </div>

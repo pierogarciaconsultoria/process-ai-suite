@@ -47,7 +47,7 @@ export function DocumentoDeApoio({ valor, onChange }: { valor: DocumentoDeApoioV
     <div className="space-y-1.5">
       <Label>Documento de apoio (opcional)</Label>
       <p className="text-xs text-muted-foreground">
-        Anexe o procedimento ou a instrução que a empresa já usa para este processo. O Peter usa o texto para detalhar como executar cada atividade.
+        Anexe o procedimento ou a instrução que a empresa já usa para este processo. O Peter usa o texto para detalhar como executar cada atividade. O texto é processado pela OpenAI (EUA).
       </p>
       <input
         ref={arquivoRef}

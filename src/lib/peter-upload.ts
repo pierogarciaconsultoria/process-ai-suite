@@ -39,7 +39,8 @@ export async function extrairTextoPdf(file: File): Promise<string> {
   try {
     const pdfjs = await import("pdfjs-dist");
     pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+    // isEvalSupported: false fecha a execução de código por fontes de PDF malicioso (GHSA-wgrm-67xf-hhpq).
+    const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise;
     const pages: string[] = [];
     for (let index = 1; index <= pdf.numPages; index += 1) {
       const page = await pdf.getPage(index);

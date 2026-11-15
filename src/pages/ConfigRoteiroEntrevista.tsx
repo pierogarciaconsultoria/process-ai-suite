@@ -22,7 +22,8 @@ const ConfigRoteiroEntrevista = () => {
     const pdfjs = await import("pdfjs-dist");
     pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker as string;
     const buf = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument({ data: buf });
+    // isEvalSupported: false fecha a execução de código por fontes de PDF malicioso (GHSA-wgrm-67xf-hhpq).
+    const loadingTask = pdfjs.getDocument({ data: buf, isEvalSupported: false });
     const pdf = await loadingTask.promise;
     let full = "";
     for (let i = 1; i <= pdf.numPages; i++) {

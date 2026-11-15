@@ -445,7 +445,7 @@ const PeterChat = () => {
               <Send className="h-4 w-4 sm:ml-2" />
             </Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">O Peter consulta os dados da sua empresa e não altera nada. Aceita anexos em Word, PDF e imagem. Confira informações importantes nas telas indicadas.</p>
+          <p className="mt-2 text-xs text-muted-foreground">O Peter consulta os dados da sua empresa e não altera nada. Aceita anexos em Word, PDF e imagem. Mensagens e anexos são processados pela OpenAI (EUA) para gerar as respostas; não envie dados pessoais desnecessários. Confira informações importantes nas telas indicadas.</p>
         </div>
       </section>
 
