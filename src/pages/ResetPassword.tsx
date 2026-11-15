@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Network } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { mensagemDoErroDeSenha } from "@/lib/mensagem-de-senha";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -35,8 +36,7 @@ const ResetPassword = () => {
       toast({ title: "Senha alterada", description: "Sua senha foi atualizada com sucesso." });
       navigate("/inicio");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      toast({ title: "Erro", description: message, variant: "destructive" });
+      toast({ title: "Erro", description: mensagemDoErroDeSenha(error), variant: "destructive" });
     } finally {
       setLoading(false);
     }
