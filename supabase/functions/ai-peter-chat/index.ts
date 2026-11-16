@@ -22,12 +22,7 @@ import {
   type ContextoEmpresa,
   type DetalheProcesso,
 } from "../_shared/peter-chat.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { cabecalhosCors } from "../_shared/cors.ts";
 
 type Linha = Record<string, unknown>;
 
@@ -131,6 +126,7 @@ async function montarContexto(client: SupabaseClient, companyId: string, busca: 
 }
 
 serve(async (req: Request) => {
+  const corsHeaders = cabecalhosCors(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
