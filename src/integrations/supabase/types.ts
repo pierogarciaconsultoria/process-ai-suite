@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      aceites_termos: {
+        Row: {
+          aceito_em: string
+          id: string
+          user_id: string
+          versao: string
+        }
+        Insert: {
+          aceito_em?: string
+          id?: string
+          user_id?: string
+          versao: string
+        }
+        Update: {
+          aceito_em?: string
+          id?: string
+          user_id?: string
+          versao?: string
+        }
+        Relationships: []
+      }
       acoes: {
         Row: {
           chave_origem: string | null
@@ -261,10 +282,85 @@ export type Database = {
           },
         ]
       }
+      conta_membros: {
+        Row: {
+          conta_id: string
+          created_at: string
+          id: string
+          papel: string
+          user_id: string
+        }
+        Insert: {
+          conta_id: string
+          created_at?: string
+          id?: string
+          papel?: string
+          user_id: string
+        }
+        Update: {
+          conta_id?: string
+          created_at?: string
+          id?: string
+          papel?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conta_membros_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          encerrada_em: string | null
+          id: string
+          limite_empresas: number | null
+          limite_usuarios: number | null
+          nome: string
+          plano: string
+          situacao: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          encerrada_em?: string | null
+          id?: string
+          limite_empresas?: number | null
+          limite_usuarios?: number | null
+          nome: string
+          plano?: string
+          situacao?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          encerrada_em?: string | null
+          id?: string
+          limite_empresas?: number | null
+          limite_usuarios?: number | null
+          nome?: string
+          plano?: string
+          situacao?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       convites: {
         Row: {
           accepted_at: string | null
           accepted_by: string | null
+          convidado_por: string | null
           created_at: string
           email: string
           empresa_id: string
@@ -280,6 +376,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           accepted_by?: string | null
+          convidado_por?: string | null
           created_at?: string
           email: string
           empresa_id: string
@@ -295,6 +392,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           accepted_by?: string | null
+          convidado_por?: string | null
           created_at?: string
           email?: string
           empresa_id?: string
@@ -313,6 +411,56 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      convites_conta: {
+        Row: {
+          aceito_em: string | null
+          aceito_por: string | null
+          conta_id: string
+          created_at: string
+          created_by: string | null
+          email: string
+          expira_em: string
+          id: string
+          papel: string
+          status: string
+          token: string
+        }
+        Insert: {
+          aceito_em?: string | null
+          aceito_por?: string | null
+          conta_id: string
+          created_at?: string
+          created_by?: string | null
+          email: string
+          expira_em?: string
+          id?: string
+          papel?: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          aceito_em?: string | null
+          aceito_por?: string | null
+          conta_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          expira_em?: string
+          id?: string
+          papel?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "convites_conta_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
             referencedColumns: ["id"]
           },
         ]
@@ -679,112 +827,6 @@ export type Database = {
           },
         ]
       }
-      registros_exclusao: {
-        Row: { alvo_id: string; alvo_nome: string | null; conta_id: string | null; excluido_em: string; excluido_por: string | null; id: string; motivo: string; tipo: string }
-        Insert: never
-        Update: never
-        Relationships: []
-      }
-      aceites_termos: {
-        Row: { aceito_em: string; id: string; user_id: string; versao: string }
-        Insert: { versao: string }
-        Update: never
-        Relationships: []
-      }
-      conta_membros: {
-        Row: { conta_id: string; created_at: string; id: string; papel: string; user_id: string }
-        Insert: { conta_id: string; created_at?: string; id?: string; papel?: string; user_id: string }
-        Update: { conta_id?: string; created_at?: string; id?: string; papel?: string; user_id?: string }
-        Relationships: [
-          { foreignKeyName: "conta_membros_conta_id_fkey"; columns: ["conta_id"]; isOneToOne: false; referencedRelation: "contas"; referencedColumns: ["id"] },
-        ]
-      }
-      convites_conta: {
-        Row: {
-          aceito_em: string | null
-          aceito_por: string | null
-          conta_id: string
-          created_at: string
-          created_by: string | null
-          email: string
-          expira_em: string
-          id: string
-          papel: string
-          status: string
-          token: string
-        }
-        Insert: {
-          aceito_em?: string | null
-          aceito_por?: string | null
-          conta_id: string
-          created_at?: string
-          created_by?: string | null
-          email: string
-          expira_em?: string
-          id?: string
-          papel?: string
-          status?: string
-          token?: string
-        }
-        Update: {
-          aceito_em?: string | null
-          aceito_por?: string | null
-          conta_id?: string
-          created_at?: string
-          created_by?: string | null
-          email?: string
-          expira_em?: string
-          id?: string
-          papel?: string
-          status?: string
-          token?: string
-        }
-        Relationships: [
-          { foreignKeyName: "convites_conta_conta_id_fkey"; columns: ["conta_id"]; isOneToOne: false; referencedRelation: "contas"; referencedColumns: ["id"] },
-        ]
-      }
-      contas: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          encerrada_em: string | null
-          id: string
-          limite_empresas: number | null
-          limite_usuarios: number | null
-          nome: string
-          plano: string
-          situacao: string
-          tipo: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          encerrada_em?: string | null
-          id?: string
-          limite_empresas?: number | null
-          limite_usuarios?: number | null
-          nome: string
-          plano?: string
-          situacao?: string
-          tipo?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          encerrada_em?: string | null
-          id?: string
-          limite_empresas?: number | null
-          limite_usuarios?: number | null
-          nome?: string
-          plano?: string
-          situacao?: string
-          tipo?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       empresas: {
         Row: {
           area_atuacao: string | null
@@ -819,7 +861,15 @@ export type Database = {
           segmento?: string | null
           tamanho?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "empresas_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       generated_document_attachments: {
         Row: {
@@ -1306,12 +1356,6 @@ export type Database = {
           },
         ]
       }
-      plataforma_admins: {
-        Row: { created_at: string; user_id: string }
-        Insert: { created_at?: string; user_id: string }
-        Update: { created_at?: string; user_id?: string }
-        Relationships: []
-      }
       peter_conversas: {
         Row: {
           company_id: string
@@ -1384,6 +1428,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plataforma_admins: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       processos: {
         Row: {
@@ -1528,6 +1587,39 @@ export type Database = {
           },
         ]
       }
+      registros_exclusao: {
+        Row: {
+          alvo_id: string
+          alvo_nome: string | null
+          conta_id: string | null
+          excluido_em: string
+          excluido_por: string | null
+          id: string
+          motivo: string
+          tipo: string
+        }
+        Insert: {
+          alvo_id: string
+          alvo_nome?: string | null
+          conta_id?: string | null
+          excluido_em?: string
+          excluido_por?: string | null
+          id?: string
+          motivo: string
+          tipo: string
+        }
+        Update: {
+          alvo_id?: string
+          alvo_nome?: string | null
+          conta_id?: string | null
+          excluido_em?: string
+          excluido_por?: string | null
+          id?: string
+          motivo?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1550,23 +1642,11 @@ export type Database = {
             }[]
           }
         | { Args: { p_company_id: string }; Returns: boolean }
-      convite_conta_info: {
-        Args: { _token: string }
-        Returns: { conta_nome: string; conta_tipo: string; email: string; expirado: boolean; papel: string; status: string }[]
-      }
-      contas_da_plataforma: {
+      aplicar_prazos_de_guarda: {
         Args: never
         Returns: {
-          administradores: string | null
-          created_at: string
-          empresas: number
-          id: string
-          limite_empresas: number | null
-          limite_usuarios: number | null
-          nome: string
-          plano: string
-          situacao: string
-          tipo: string
+          item: string
+          quantidade: number
         }[]
       }
       chave_nome_processo: { Args: { _nome: string }; Returns: string }
@@ -1579,50 +1659,81 @@ export type Database = {
         }
         Returns: undefined
       }
+      contas_da_plataforma: {
+        Args: never
+        Returns: {
+          administradores: string
+          created_at: string
+          empresas: number
+          id: string
+          limite_empresas: number
+          limite_usuarios: number
+          nome: string
+          plano: string
+          situacao: string
+          tipo: string
+        }[]
+      }
+      convite_conta_info: {
+        Args: { _token: string }
+        Returns: {
+          conta_nome: string
+          conta_tipo: string
+          email: string
+          expirado: boolean
+          papel: string
+          status: string
+        }[]
+      }
       empresas_do_usuario: {
         Args: never
         Returns: {
-          area_atuacao: string | null
-          conta_id: string | null
-          conta_nome: string | null
-          contexto: string | null
+          area_atuacao: string
+          conta_id: string
+          conta_nome: string
+          contexto: string
           created_at: string
           id: string
           nome: string
           perfil: string
-          segmento: string | null
-          tamanho: string | null
+          segmento: string
+          tamanho: string
         }[]
       }
-      membros_da_conta: {
-        Args: { _conta_id: string }
-        Returns: { created_at: string; email: string; id: string; nome: string | null; papel: string; user_id: string }[]
-      }
-      aplicar_prazos_de_guarda: {
-        Args: never
-        Returns: { item: string; quantidade: number }[]
-      }
       excluir_empresa: {
-        Args: { _empresa_id: string; _confirmacao: string }
+        Args: { _confirmacao: string; _empresa_id: string }
         Returns: undefined
       }
-      exportar_dados_empresa: {
-        Args: { _empresa_id: string }
-        Returns: Json
-      }
-      user_pode_excluir_empresa: {
-        Args: { _empresa_id: string }
-        Returns: boolean
-      }
-      minhas_contas: {
-        Args: never
-        Returns: { empresas: number; id: string; limite_empresas: number | null; nome: string; papel: string; plano: string; situacao: string; tipo: string }[]
-      }
+      exportar_dados_empresa: { Args: { _empresa_id: string }; Returns: Json }
       get_user_empresa_ids: { Args: { _user_id: string }; Returns: string[] }
       is_super_admin: { Args: never; Returns: boolean }
       is_super_admin_or_manage: {
         Args: { p_company_id: string }
         Returns: boolean
+      }
+      membros_da_conta: {
+        Args: { _conta_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          nome: string
+          papel: string
+          user_id: string
+        }[]
+      }
+      minhas_contas: {
+        Args: never
+        Returns: {
+          empresas: number
+          id: string
+          limite_empresas: number
+          nome: string
+          papel: string
+          plano: string
+          situacao: string
+          tipo: string
+        }[]
       }
       perfil_convite_permitido: { Args: never; Returns: boolean }
       user_can_manage_company: {
@@ -1633,7 +1744,21 @@ export type Database = {
         Args: { _empresa_id: string }
         Returns: boolean
       }
+      user_contas_admin: { Args: never; Returns: string[] }
+      user_eh_admin_da_conta: { Args: { _conta_id: string }; Returns: boolean }
       user_empresa_ids: { Args: never; Returns: string[] }
+      user_gerencia_como_consultor: {
+        Args: { _empresa_id: string }
+        Returns: boolean
+      }
+      user_pode_excluir_empresa: {
+        Args: { _empresa_id: string }
+        Returns: boolean
+      }
+      usuario_gerencia_como_consultor: {
+        Args: { _empresa_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
