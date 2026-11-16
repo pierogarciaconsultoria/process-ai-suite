@@ -2,14 +2,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mensagemDoErro } from "../_shared/authorization-core.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { cabecalhosCors } from "../_shared/cors.ts";
 
 serve(async (req: Request) => {
+  const corsHeaders = cabecalhosCors(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -71,22 +67,15 @@ serve(async (req: Request) => {
       });
     }
 
-    const { data: membership } = await supabase
-      .from("membros")
-      .select("perfil")
-      .eq("empresa_id", invite.empresa_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const { data: empresa } = await supabase
-      .from("empresas")
-      .select("owner_id")
-      .eq("id", invite.empresa_id)
-      .maybeSingle();
-
-    const canManage = Boolean(
-      empresa?.owner_id === user.id ||
-      (membership && ["admin", "gestor"].includes(membership.perfil)),
-    );
+    // Dono, Consultor, Gestor ou administrador da conta (mesma regra do banco).
+    const { data: gerencia, error: permissaoError } = await supabase.rpc("user_can_manage_company", { _empresa_id: invite.empresa_id });
+    if (permissaoError) {
+      return new Response(JSON.stringify({ error: permissaoError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const canManage = gerencia === true;
 
     if (!canManage) {
       return new Response(JSON.stringify({ error: "Permissão negada para revogar convites" }), {

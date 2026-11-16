@@ -2,14 +2,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mensagemDoErro } from "../_shared/authorization-core.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { cabecalhosCors } from "../_shared/cors.ts";
 
 serve(async (req) => {
+  const corsHeaders = cabecalhosCors(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -56,7 +52,9 @@ serve(async (req) => {
       .select("owner_id")
       .eq("id", empresaId)
       .single();
-    if (!membership && empresa?.owner_id !== user.id) {
+    // Também entra quem gerencia sem ser membro: o administrador da conta da empresa.
+    const { data: gerencia } = await supabase.rpc("user_can_manage_company", { _empresa_id: empresaId });
+    if (!membership && empresa?.owner_id !== user.id && gerencia !== true) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

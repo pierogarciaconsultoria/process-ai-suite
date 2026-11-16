@@ -30,12 +30,7 @@ import {
   type SubsecaoAtividade,
 } from "../_shared/procedimento-padrao.ts";
 import { carregarPadrao } from "../_shared/padrao-banco.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { cabecalhosCors } from "../_shared/cors.ts";
 
 const IDENTIDADE_PETER_DOC = `Você é o Peter, assistente de documentação de processos da plataforma Peter, desenvolvido com base na metodologia Piero Garcia Consultoria.
 Fundamentos: BPM/BPMN (ABPMP), ISO 9001/SGQ, Lean, Cadeia de Valor de Porter, Gestão por Objetivos (Drucker) e metodologia própria Piero Garcia.
@@ -199,6 +194,7 @@ async function gerarProcedimento(entrada: {
 }
 
 serve(async (req) => {
+  const corsHeaders = cabecalhosCors(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

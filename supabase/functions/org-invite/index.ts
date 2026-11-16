@@ -2,15 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mensagemDoErro } from "../_shared/authorization-core.ts";
 import nodemailer from "npm:nodemailer@6.9.16";
+import { cabecalhosCors, enderecoDoApp } from "../_shared/cors.ts";
 
 // Nomes dos perfis na tela e no e-mail (os valores gravados continuam admin/gestor/analista).
 const ROTULO_PERFIL: Record<string, string> = { admin: "Consultor", gestor: "Gestor", analista: "Equipe" };
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
 
 function token(): string {
   const array = new Uint8Array(16);
@@ -162,6 +157,7 @@ async function sendInviteEmail(args: {
 }
 
 serve(async (req) => {
+  const corsHeaders = cabecalhosCors(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -196,27 +192,30 @@ serve(async (req) => {
     const email = String(body?.email || "").trim().toLowerCase();
     const perfilRaw = String(body?.perfil || "analista");
     const perfil = ["admin", "gestor", "analista"].includes(perfilRaw) ? perfilRaw : "analista";
-    const requestedBaseUrl = typeof body?.appBaseUrl === "string" ? body.appBaseUrl.trim() : "";
-    const appBaseUrl = requestedBaseUrl || Deno.env.get("INVITE_APP_BASE_URL") || req.headers.get("origin") || SUPABASE_URL;
+    // O link do e-mail leva o token do convite: o endereço nunca vem do corpo da requisição.
+    const appBaseUrl = enderecoDoApp(req);
     const expirationHours = Number(Deno.env.get("INVITE_EXPIRATION_HOURS") ?? "168");
     if (!empresaId || !email) {
       return new Response(JSON.stringify({ error: "empresaId e email são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: membership } = await supabase
-      .from("membros")
-      .select("perfil")
-      .eq("empresa_id", empresaId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const { data: empresa } = await supabase
-      .from("empresas")
-      .select("owner_id")
-      .eq("id", empresaId)
-      .single();
-    const canInvite = membership && ["admin", "gestor"].includes(membership.perfil) || empresa?.owner_id === user.id;
-    if (!canInvite) {
+    // Quem convida: dono, Consultor, Gestor ou administrador da conta (mesma regra do banco).
+    const { data: canInvite, error: permissaoError } = await supabase.rpc("user_can_manage_company", { _empresa_id: empresaId });
+    if (permissaoError) {
+      return new Response(JSON.stringify({ error: permissaoError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (canInvite !== true) {
       return new Response(JSON.stringify({ error: "Permissão negada para convidar" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    // O perfil Consultor só é dado por quem já gerencia como Consultor (o Gestor não).
+    if (perfil === "admin") {
+      const { data: podeDarConsultor, error: consultorError } = await supabase.rpc("user_gerencia_como_consultor", { _empresa_id: empresaId });
+      if (consultorError) {
+        return new Response(JSON.stringify({ error: consultorError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (podeDarConsultor !== true) {
+        return new Response(JSON.stringify({ error: "Só o Consultor ou o administrador da conta convida com o perfil Consultor." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const { data: company } = await supabase
@@ -270,6 +269,7 @@ serve(async (req) => {
           status: "pending",
           token: inviteToken,
           expires_at: expiresAt,
+          convidado_por: user.id,
         })
         .select("id, empresa_id, email, perfil, status, token, created_at, expires_at")
         .single();
@@ -278,15 +278,21 @@ serve(async (req) => {
       }
       inviteId = invite.id;
     } else {
-      await admin
+      // Convite pendente reaproveitado: vale o perfil pedido agora (o e-mail anuncia esse perfil).
+      const { error: reuseError } = await admin
         .from("convites")
         .update({
+          perfil,
+          convidado_por: user.id,
           expires_at: expiresAt,
           revoked_at: null,
           revoked_by: null,
           revoked_reason: null,
         })
         .eq("id", inviteId);
+      if (reuseError) {
+        return new Response(JSON.stringify({ error: reuseError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     try {
