@@ -129,12 +129,17 @@ const Empresas = () => {
     });
     setLoadingCreate(false);
 
-    // supabase.functions.invoke devolve `error` mas não o body do erro;
-    // o servidor agora retorna {error, message, ...} em status 4xx/5xx.
-    const serverError = (data as { error?: string; message?: string } | null)?.error;
+    // Em status 4xx/5xx, supabase.functions.invoke devolve data=null; o body {error, message}
+    // do servidor fica na Response em error.context.
+    let body = data as { error?: string; message?: string } | null;
+    if (error && !body) {
+      const ctx = (error as { context?: Response }).context;
+      body = await ctx?.json?.().catch(() => null) ?? null;
+    }
+    const serverError = body?.error;
     if (error || serverError) {
       const description = serverError
-        ? `${serverError}${(data as { message?: string })?.message ? ` — ${(data as { message?: string }).message}` : ""}`
+        ? `${serverError}${body?.message ? ` — ${body.message}` : ""}`
         : error?.message || "Erro desconhecido ao cadastrar empresa.";
       toast({ title: "Erro ao cadastrar", description, variant: "destructive" });
       return;

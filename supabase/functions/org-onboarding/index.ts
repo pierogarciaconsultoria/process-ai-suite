@@ -32,14 +32,18 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.error("[org-onboarding] missing SUPABASE_URL or SUPABASE_ANON_KEY");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[org-onboarding] missing SUPABASE_URL, SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY");
       return json({ error: "Configuração ausente no servidor" }, 500);
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
+    // Só para o vínculo em membros: a política de INSERT de membros não aceita o dono
+    // de uma empresa recém-criada (ele ainda não a enxerga) e recursa em membros.
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
     if (userErr) {
@@ -94,13 +98,14 @@ serve(async (req) => {
 
     // 2) Insere se não existir
     if (!empresaId) {
-      const { data: empresaCreated, error: createErr } = await supabase
+      // Sem .select(): a política de SELECT de empresas exige vínculo em membros, que só
+      // existe no passo 3; o RETURNING falharia com "new row violates row-level security".
+      const novoId = crypto.randomUUID();
+      const { error: createErr } = await supabase
         .from("empresas")
-        .insert({ nome, segmento, tamanho, area_atuacao, contexto, owner_id: user.id })
-        .select("id")
-        .single();
+        .insert({ id: novoId, nome, segmento, tamanho, area_atuacao, contexto, owner_id: user.id });
 
-      if (createErr || !empresaCreated) {
+      if (createErr) {
         console.error("[org-onboarding] insert empresa error:", createErr, "user:", user.id);
         return json(
           {
@@ -113,11 +118,12 @@ serve(async (req) => {
           400,
         );
       }
-      empresaId = empresaCreated.id;
+      empresaId = novoId;
     }
 
-    // 3) Garante membership (idempotente)
-    const { data: membership, error: memSelErr } = await supabase
+    // 3) Garante membership (idempotente). empresaId é do próprio usuário: veio do insert
+    // com owner_id = user.id ou da busca filtrada por owner_id.
+    const { data: membership, error: memSelErr } = await admin
       .from("membros")
       .select("id")
       .eq("user_id", user.id)
@@ -127,14 +133,16 @@ serve(async (req) => {
 
     if (memSelErr) {
       console.error("[org-onboarding] select membros error:", memSelErr);
+      return json({ error: "Erro ao consultar vínculo", message: memSelErr.message }, 500);
     }
 
-    if (!memSelErr && !membership) {
-      const { error: memberErr } = await supabase
+    if (!membership) {
+      const { error: memberErr } = await admin
         .from("membros")
         .insert({ user_id: user.id, empresa_id: empresaId, perfil, invited_by: user.id });
       if (memberErr) {
         console.error("[org-onboarding] insert membros error:", memberErr);
+        return json({ error: "Empresa criada, mas o vínculo falhou", message: memberErr.message }, 500);
       }
     }
 
