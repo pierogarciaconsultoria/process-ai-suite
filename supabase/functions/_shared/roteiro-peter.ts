@@ -173,7 +173,9 @@ export function resumoEtapa(roteiro: Roteiro, estado: EstadoRoteiro, numero: num
     .map((pergunta) => {
       const resposta = estado.respostas[pergunta.id];
       if (!resposta || resposta.status === "lacuna" || resposta.textos.length === 0) return `❓ **${pergunta.rotulo}:** não informado`;
-      return `✅ **${pergunta.rotulo}:** ${resposta.textos.join("; ")}`;
+      if (resposta.textos.length === 1) return `✅ **${pergunta.rotulo}:** ${resposta.textos[0]}`;
+      // Várias respostas (ex.: atividades) viram lista numerada, uma por linha.
+      return `✅ **${pergunta.rotulo}:**\n${resposta.textos.map((texto, i) => `${i + 1}. ${texto}`).join("\n")}`;
     })
     .join("\n");
 }

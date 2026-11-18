@@ -58,7 +58,8 @@ describe("Peter v5 — documentos canônicos", () => {
   });
 
   it("exige modelagem visual e valida a estrutura mínima do XML", () => {
-    for (const token of ["Pool principal", "Lane", "bpmn:UserTask", "bpmn:ServiceTask", "bpmn:ParallelGateway", "Verbo de ação", "validarXMLBPMN", "startEvent", "endEvent", "sequenceFlow", "BPMNDiagram", "BPMNShape", "IDs duplicados"]) {
+    // Pool, raias e layout são montados em código (bpmn-montagem.test.ts); a IA só descreve a estrutura.
+    for (const token of ["Uma raia por papel", "decisao", "rotulo", "Verbo de ação", "montarBpmnXml", "estruturaLinear", "validarXMLBPMN", "startEvent", "endEvent", "sequenceFlow", "BPMNDiagram", "BPMNShape", "IDs duplicados"]) {
       expect(bpmnEdge).toContain(token);
     }
   });

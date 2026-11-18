@@ -2,6 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 import { acquireAiQuota, fetchWithAiQuota } from "../_shared/quota.ts";
 import { runConfiguredAssistant, stripCodeFence } from "../_shared/openai-assistant.ts";
+import {
+  type EstruturaBpmn,
+  estruturaLinear,
+  montarBpmnXml,
+  normalizarEstrutura,
+  totalDeTarefas,
+} from "../_shared/bpmn-montagem.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,13 +47,24 @@ export function validarXMLBPMN(xml: string): { valido: boolean; problemas: strin
   return { valido: problemas.length === 0, problemas };
 }
 
-const REGRAS_BPMN_ADICIONAIS = `REGRAS ADICIONAIS OBRIGATÓRIAS:
-- Use um Pool principal e uma Lane para cada área/departamento responsável; se houver uma única área, use uma Lane.
-- Pessoa sem sistema: bpmn:Task. Pessoa via sistema: bpmn:UserTask. Automação: bpmn:ServiceTask.
-- Decisão de caminho: bpmn:ExclusiveGateway. Atividades simultâneas: bpmn:ParallelGateway.
-- Tasks sempre em [Verbo de ação] + [Objeto], nunca substantivo isolado.
-- Exatamente 1 StartEvent por Pool e pelo menos 1 EndEvent por Pool.
-- Inclua todos os BPMNShape e BPMNEdge; layout horizontal; lanes com altura mínima 120px; tasks 100x80; gateways 50x50.`;
+// A IA devolve só a estrutura; o XML e o layout são montados em bpmn-montagem.ts.
+const FORMATO_ESTRUTURA = `Responda APENAS com um JSON, sem markdown, neste formato:
+{
+  "raias": ["Papel A", "Papel B"],
+  "nos": [
+    { "id": "inicio", "tipo": "inicio", "nome": "Evento que dispara o processo", "raia": "Papel A" },
+    { "id": "t1", "tipo": "tarefa", "nome": "Verbo + objeto", "raia": "Papel A", "sistema": "Sistema ou documento usado" },
+    { "id": "d1", "tipo": "decisao", "nome": "Pergunta da decisão?", "raia": "Papel B" },
+    { "id": "fim", "tipo": "fim", "nome": "Resultado final", "raia": "Papel B" }
+  ],
+  "fluxos": [ { "de": "inicio", "para": "t1" }, { "de": "d1", "para": "t2", "rotulo": "Sim" } ]
+}
+REGRAS:
+- Uma raia por papel (cargo) responsável. Quando a atividade lista vários responsáveis, use o papel principal e repita as raias já criadas; não crie raia com vários nomes juntos.
+- "tipo" é um de: inicio, fim, tarefa, decisao. Um "inicio" para cada gatilho diferente e pelo menos um "fim".
+- Toda decisão tem pelo menos dois fluxos de saída, cada um com "rotulo" (ex.: Sim / Não, ou o critério).
+- Tarefas em [Verbo de ação] + [Objeto]. "sistema" só quando a atividade usa um sistema, ferramenta ou documento.
+- Todos os nós ligados por fluxos, do início ao fim.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -107,25 +125,30 @@ serve(async (req) => {
 
     const modeInstruction = mode === "to-be"
       ? `Este é o mapa TO-BE (futuro/otimizado). Incorpore as seguintes oportunidades de melhoria:\n- Oportunidades priorizadas: ${oportunidadesMelhoria || "N/A"}\nAdicione atividades otimizadas, remova gargalos e inclua automações quando fizer sentido.`
-      : `Este é o mapa AS-IS (situação atual). Represente fielmente o processo como descrito.`;
+      : `Este é o mapa AS-IS (situação atual). Represente fielmente o processo como descrito: TODAS as atividades listadas viram uma tarefa cada, sem juntar nem omitir nenhuma.`;
 
-    const systemPrompt = `Você é um especialista em modelagem BPMN 2.0. Gere XML BPMN 2.0 válido e completo.
+    const systemPrompt = `Você é um especialista em modelagem BPMN 2.0. Descreva a estrutura do processo para o diagrama.
 
-REGRAS OBRIGATÓRIAS:
-1. Use namespaces corretos: bpmn, bpmndi, dc, di e defina targetNamespace="http://processhub.app.br/bpmn"
-2. Inclua StartEvent, EndEvent, e Tasks para cada atividade
-3. Se houver decisões, use ExclusiveGateway com fluxos divergentes e convergentes
-4. Conecte tudo com SequenceFlow
-5. OBRIGATÓRIO: Inclua o BPMNDiagram com BPMNShape e BPMNEdge com coordenadas (waypoints) para layout horizontal legível
-6. Posicione elementos da esquerda para direita, com espaçamento de ~150px entre elementos
-7. StartEvent em x=180, primeiro task em x=330, e assim por diante
-8. Tasks com width=100, height=80. Events com width=36, height=36. Gateways com width=50, height=50.
-9. Y base = 160 para o fluxo principal
-10. NÃO inclua \`\`\`xml ou qualquer markdown. Retorne APENAS o XML puro.
+${modeInstruction}
 
-    ${modeInstruction}
+${FORMATO_ESTRUTURA}`;
 
-    ${REGRAS_BPMN_ADICIONAIS}`;
+    const fimPadrao = String(saidas?.find((s: any) => String(s?.saida || "").trim())?.saida || "Fim");
+    const xmlDaResposta = (conteudo: string): string => {
+      let estrutura: EstruturaBpmn | null = null;
+      try {
+        estrutura = normalizarEstrutura(JSON.parse(stripCodeFence(conteudo)));
+      } catch {
+        estrutura = null;
+      }
+      // No AS IS nenhuma atividade da entrevista pode sumir; se sumiu, desenha o fluxo direto delas.
+      const faltaAtividade = mode !== "to-be" && hasEtapas && estrutura !== null && totalDeTarefas(estrutura) < etapas.length;
+      if (!estrutura || faltaAtividade) {
+        console.warn("[ai-generate-bpmn] estrutura da IA inválida ou incompleta; usando fluxo linear das atividades");
+        estrutura = estruturaLinear(etapas, String(gatilho || ""), fimPadrao);
+      }
+      return montarBpmnXml(estrutura, String(nomeProcesso || ""));
+    };
 
     const userPrompt = `Processo: ${nomeProcesso || "Sem nome"}
 Gatilho: ${gatilho || "N/A"}
@@ -139,12 +162,12 @@ ${hasResumo ? resumo : "N/A"}
 Atividades:
 ${etapasText}
 
-Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
+Devolva o JSON da estrutura.`;
 
     if (use_peter_assistant === true) {
       const lease = await acquireAiQuota(client, "ai-generate-bpmn", companyId);
       try {
-        const content = stripCodeFence(await runConfiguredAssistant(OPENAI_API_KEY, systemPrompt, userPrompt));
+        const content = xmlDaResposta(await runConfiguredAssistant(OPENAI_API_KEY, systemPrompt, userPrompt));
         const validation = validarXMLBPMN(content);
         if (!validation.valido) throw new Error(`O Peter não retornou um XML BPMN válido: ${validation.problemas.join("; ")}`);
         return new Response(JSON.stringify({ xml: content }), {
@@ -164,6 +187,7 @@ Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
       },
       body: JSON.stringify({
         model: "gpt-4o",
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -193,10 +217,7 @@ Gere o XML BPMN 2.0 completo com diagrama visual (BPMNDiagram).`;
     }
 
     const json = await response.json();
-    let content = json.choices?.[0]?.message?.content || "";
-
-    // Clean up any markdown fences the model may have added
-    content = content.replace(/```xml\s*/gi, "").replace(/```\s*/g, "").trim();
+    const content = xmlDaResposta(json.choices?.[0]?.message?.content || "");
 
     // Validate it looks like BPMN XML
     const xmlValidation = validarXMLBPMN(content);
