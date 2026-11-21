@@ -89,9 +89,13 @@ serve(async (req: Request) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurado");
 
-    const persona = await carregarPersonaPeter(client, companyId);
     const current = lerCurrent(body?.current);
     const historico = sanitizarHistorico(body?.history);
+    const persona = await carregarPersonaPeter(
+      client,
+      companyId,
+      [JSON.stringify(current), JSON.stringify(estado.respostas), resposta, ...partes.map((parte) => parte.type === "input_text" ? parte.text : "")].join(" "),
+    );
 
     const quotaLease = await acquireAiQuota(client, "ai-interview-roteiro", companyId);
     let consumo = JSON.stringify(historico).length + resposta.length;

@@ -235,7 +235,7 @@ serve(async (req) => {
     const systemPrompt = [
       instrucoes ? promptDoTipo.replace(SYSTEM_PROMPT_ATUAL, `${instrucoes}\n\n${SYSTEM_PROMPT_ATUAL}`) : promptDoTipo,
       dadosDoProcesso ? GUIA_DE_FONTES : "",
-      await carregarBlocoDeNormas(client, companyId),
+      await carregarBlocoDeNormas(client, companyId, JSON.stringify({ tipoDocumento, mappedProcessData, manualDescription, dadosDoProcesso })),
     ].filter(Boolean).join("\n\n");
 
     const tituloPadrao = String(manualDescription?.title || (dadosDoProcesso?.identificacao.nome ? `${template.name ?? "Documento"} - ${dadosDoProcesso.identificacao.nome}` : template.name) || "Documento gerado");

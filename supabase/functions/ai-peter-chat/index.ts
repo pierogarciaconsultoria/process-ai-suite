@@ -161,13 +161,13 @@ serve(async (req: Request) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurado");
 
-    const persona = await carregarPersonaPeter(client, companyId);
     // O anexo também indica o assunto: o nome e o começo do texto entram na busca do processo relacionado.
     const busca = [
       ...historico.filter((item) => item.role === "user").slice(-2).map((item) => item.content),
       mensagem,
       ...anexos.map((anexo) => `${anexo.nome} ${anexo.texto?.slice(0, MAX_TEXTO_ANEXO_NA_BUSCA) ?? ""}`),
     ].join(" ");
+    const persona = await carregarPersonaPeter(client, companyId, busca);
     const contexto = await montarContexto(client, companyId, busca);
     const primeiraResposta = !historico.some((item) => item.role === "assistant");
 

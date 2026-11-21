@@ -39,7 +39,8 @@ function identidadeDaSkin(raw: string): string {
   return raw;
 }
 
-export async function carregarPersonaPeter(client: SupabaseClient, companyId: string): Promise<PersonaPeter> {
+/** `contexto`: texto do processo ou da conversa, usado para escolher os trechos das normas longas. */
+export async function carregarPersonaPeter(client: SupabaseClient, companyId: string, contexto = ""): Promise<PersonaPeter> {
   const { data, error } = await client
     .from("ai_configurations")
     .select("config_type, content")
@@ -50,7 +51,7 @@ export async function carregarPersonaPeter(client: SupabaseClient, companyId: st
   const configs = (data ?? []) as Array<{ config_type: string; content: string }>;
   const conteudo = (tipo: string) => configs.find((item) => item.config_type === tipo)?.content?.trim() || "";
   const identidade = conteudo("skin_identity");
-  const normas = await carregarBlocoDeNormas(client, companyId);
+  const normas = await carregarBlocoDeNormas(client, companyId, contexto);
   const orientacoes = conteudo("route_script") || ORIENTACOES_PADRAO;
 
   return {

@@ -275,7 +275,7 @@ Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos
       }
     }
 
-    const normasDaEmpresa = await carregarBlocoDeNormas(client, companyId);
+    const normasDaEmpresa = await carregarBlocoDeNormas(client, companyId, JSON.stringify(processoData ?? {}));
     const systemPrompt = `${identityPrompt}
 ${customScript ? `\n### DIRETRIZES DA EMPRESA:\n${customScript}\n` : ""}
 ${normasDaEmpresa ? `\n### ${normasDaEmpresa}\n` : ""}

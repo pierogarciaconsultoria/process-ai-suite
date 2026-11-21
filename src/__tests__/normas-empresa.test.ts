@@ -28,4 +28,24 @@ describe("bloco de normas no prompt", () => {
     expect(bloco).not.toContain("b".repeat(21));
     expect(bloco).toContain("foi cortado");
   });
+
+  it("norma longa: escolhe os itens ligados ao processo e pula a capa", () => {
+    const capa = "Prefácio publicado pelo secretariado central em Genebra. ".repeat(40);
+    const norma = [
+      capa,
+      "8.4.1 Generalidades A organização deve avaliar e reavaliar fornecedores externos de compras.",
+      "7.1.5 Recursos de monitoramento e medição calibrados e rastreáveis.",
+      "8.5.1 Controle de produção com critérios de aceitação documentados.",
+    ].join(" ");
+    const bloco = blocoDeNormas([{ nome: "ISO 9001", requisitos: norma }], 300, "Processo de compras: avaliar fornecedores antes do pedido");
+    expect(bloco).toContain("8.4.1 Generalidades");
+    expect(bloco).not.toContain("Prefácio");
+    expect(bloco).not.toContain("7.1.5");
+    expect(bloco).toContain("trechos mais ligados");
+  });
+
+  it("norma longa sem contexto útil: corta no limite como antes", () => {
+    const bloco = blocoDeNormas([{ nome: "A", requisitos: "a".repeat(200) }], 100, "");
+    expect(bloco).toContain("foi cortado");
+  });
 });
