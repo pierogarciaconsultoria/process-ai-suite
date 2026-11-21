@@ -1321,6 +1321,53 @@ export type Database = {
           },
         ]
       }
+      normas_empresa: {
+        Row: {
+          arquivo_nome: string | null
+          ativa: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          nome: string
+          origem: string
+          requisitos: string
+          updated_at: string
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          ativa?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome: string
+          origem?: string
+          requisitos: string
+          updated_at?: string
+        }
+        Update: {
+          arquivo_nome?: string | null
+          ativa?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome?: string
+          origem?: string
+          requisitos?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "normas_empresa_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       padroes_documento: {
         Row: {
           company_id: string | null

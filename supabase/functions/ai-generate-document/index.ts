@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, HttpError, requireString } from "../_shared/auth.ts";
 import { acquireAiQuota } from "../_shared/quota.ts";
+import { carregarBlocoDeNormas } from "../_shared/normas-empresa.ts";
 import { callResponsesAPI } from "../_shared/openai-assistant.ts";
 import { instrucoesDoModelo, modeloSemInstrucoes } from "../_shared/instrucoes-documento.ts";
 import {
@@ -234,6 +235,7 @@ serve(async (req) => {
     const systemPrompt = [
       instrucoes ? promptDoTipo.replace(SYSTEM_PROMPT_ATUAL, `${instrucoes}\n\n${SYSTEM_PROMPT_ATUAL}`) : promptDoTipo,
       dadosDoProcesso ? GUIA_DE_FONTES : "",
+      await carregarBlocoDeNormas(client, companyId),
     ].filter(Boolean).join("\n\n");
 
     const tituloPadrao = String(manualDescription?.title || (dadosDoProcesso?.identificacao.nome ? `${template.name ?? "Documento"} - ${dadosDoProcesso.identificacao.nome}` : template.name) || "Documento gerado");

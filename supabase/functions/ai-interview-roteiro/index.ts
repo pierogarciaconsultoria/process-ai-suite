@@ -5,7 +5,7 @@ import { callResponsesAPI } from "../_shared/openai-assistant.ts";
 import { checkModeration } from "../_shared/moderation.ts";
 import { carregarPersonaPeter } from "../_shared/peter-persona.ts";
 import { ROTEIRO_PADRAO } from "../_shared/roteiro-entrevista.ts";
-import { iniciarRoteiro, proximoPasso } from "../_shared/roteiro-engine.ts";
+import { etapasDaRevisao, iniciarRoteiro, proximoPasso } from "../_shared/roteiro-engine.ts";
 import {
   aplicarAvaliacao,
   aplicarConfirmacao,
@@ -134,7 +134,7 @@ serve(async (req: Request) => {
         const raw = await callResponsesAPI({
           systemPrompt: promptConfirmacao(persona, roteiro, estado, current),
           messages: mensagens,
-          responseSchema: schemaConfirmacao(passo.etapa),
+          responseSchema: schemaConfirmacao(etapasDaRevisao(roteiro, estado)),
           openaiApiKey: OPENAI_API_KEY,
         });
         return jsonResponse(aplicarConfirmacao(roteiro, estado, raw, resposta));

@@ -109,9 +109,7 @@ describe("Roteiro da entrevista — motor", () => {
       }
     }
     expect(passos).toEqual([
-      "1:confirmar",
-      "2:confirmar",
-      "3:confirmar",
+      // Etapas 1 a 3 seguem direto; a revisão única fica na 4, antes do diagnóstico.
       "4:confirmar",
       "5:diagnostico_as_is",
       "5:confirmar",

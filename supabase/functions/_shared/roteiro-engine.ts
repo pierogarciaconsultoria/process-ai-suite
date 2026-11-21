@@ -105,34 +105,51 @@ export function repeticaoPendente(pergunta: PerguntaRoteiro, resposta: RespostaR
   return Boolean(pergunta.repetir) && resposta.status === "respondida" && !resposta.repeticaoEncerrada;
 }
 
+// Só pedem confirmação as etapas com análise da IA e a última antes de uma análise (ou do fim).
+// As demais seguem direto e são revisadas juntas nessa confirmação.
+export function pontoDeRevisao(roteiro: Roteiro, etapa: EtapaRoteiro): boolean {
+  const seguinte = roteiro.etapas[roteiro.etapas.indexOf(etapa) + 1];
+  return Boolean(etapa.acaoIA) || !seguinte || Boolean(seguinte.acaoIA);
+}
+
 export function proximoPasso(roteiro: Roteiro, estado: EstadoRoteiro): PassoRoteiro {
-  const etapa = buscarEtapa(roteiro, estado.etapaAtual);
-  if (!etapa) return { tipo: "concluido" };
+  const inicio = roteiro.etapas.findIndex((etapa) => etapa.numero === estado.etapaAtual);
+  if (inicio < 0) return { tipo: "concluido" };
 
-  for (const pergunta of etapa.perguntas) {
-    if (!perguntaAplicavel(pergunta, estado) || pergunta.somenteRegistro) continue;
-    const resposta = estado.respostas[pergunta.id];
-    const aprofundamentos = estado.aprofundamentos[pergunta.id] ?? 0;
-    if (!resposta) {
-      return { tipo: "pergunta", etapa, pergunta, texto: pergunta.texto, iteracao: 0, aprofundamentos };
+  for (const etapa of roteiro.etapas.slice(inicio)) {
+    for (const pergunta of etapa.perguntas) {
+      if (!perguntaAplicavel(pergunta, estado) || pergunta.somenteRegistro) continue;
+      const resposta = estado.respostas[pergunta.id];
+      const aprofundamentos = estado.aprofundamentos[pergunta.id] ?? 0;
+      if (!resposta) {
+        return { tipo: "pergunta", etapa, pergunta, texto: pergunta.texto, iteracao: 0, aprofundamentos };
+      }
+      if (repeticaoPendente(pergunta, resposta)) {
+        return {
+          tipo: "pergunta",
+          etapa,
+          pergunta,
+          texto: pergunta.repetir!.textoProxima,
+          iteracao: resposta.textos.length,
+          aprofundamentos,
+        };
+      }
     }
-    if (repeticaoPendente(pergunta, resposta)) {
-      return {
-        tipo: "pergunta",
-        etapa,
-        pergunta,
-        texto: pergunta.repetir!.textoProxima,
-        iteracao: resposta.textos.length,
-        aprofundamentos,
-      };
+
+    if (etapa.acaoIA && !estado.acoesConcluidas.includes(etapa.acaoIA)) {
+      return { tipo: "acao_ia", etapa, acao: etapa.acaoIA };
     }
-  }
 
-  if (etapa.acaoIA && !estado.acoesConcluidas.includes(etapa.acaoIA)) {
-    return { tipo: "acao_ia", etapa, acao: etapa.acaoIA };
+    if (pontoDeRevisao(roteiro, etapa)) return { tipo: "confirmar_etapa", etapa, texto: etapa.textoConfirmacao };
   }
+  return { tipo: "concluido" };
+}
 
-  return { tipo: "confirmar_etapa", etapa, texto: etapa.textoConfirmacao };
+// Etapas ainda não confirmadas até a do passo atual: o que a próxima confirmação revisa.
+export function etapasDaRevisao(roteiro: Roteiro, estado: EstadoRoteiro): EtapaRoteiro[] {
+  const passo = proximoPasso(roteiro, estado);
+  if (passo.tipo === "concluido") return [];
+  return roteiro.etapas.filter((etapa) => etapa.numero >= estado.etapaAtual && etapa.numero <= passo.etapa.numero);
 }
 
 export function registrarResposta(roteiro: Roteiro, estado: EstadoRoteiro, entrada: EntradaResposta): EstadoRoteiro {
@@ -185,8 +202,8 @@ export function corrigirResposta(
   estado: EstadoRoteiro,
   correcao: { perguntaId: string; texto: string; valor?: string },
 ): EstadoRoteiro {
-  const etapa = buscarEtapa(roteiro, estado.etapaAtual);
-  const pergunta = etapa?.perguntas.find((item) => item.id === correcao.perguntaId);
+  // Qualquer pergunta das etapas em revisão pode ser corrigida, não só a da etapa atual.
+  const pergunta = etapasDaRevisao(roteiro, estado).flatMap((etapa) => etapa.perguntas).find((item) => item.id === correcao.perguntaId);
   const texto = correcao.texto.trim();
   if (!pergunta || !texto) return estado;
   const anterior = estado.respostas[pergunta.id];
@@ -267,10 +284,12 @@ export function confirmarEtapa(roteiro: Roteiro, estado: EstadoRoteiro): EstadoR
   if (passo.tipo !== "confirmar_etapa") {
     throw new Error(`A etapa ${estado.etapaAtual} ainda não está pronta para confirmação.`);
   }
+  // A confirmação vale para todas as etapas revisadas juntas.
+  const revisadas = etapasDaRevisao(roteiro, estado).map((etapa) => etapa.numero);
   return {
     ...estado,
-    etapaAtual: estado.etapaAtual + 1,
-    etapasConfirmadas: [...estado.etapasConfirmadas, passo.etapa.numero],
+    etapaAtual: passo.etapa.numero + 1,
+    etapasConfirmadas: [...new Set([...estado.etapasConfirmadas, ...revisadas])],
   };
 }
 
@@ -283,7 +302,8 @@ export function etapasConfirmadasAte(estado: EstadoRoteiro, numero: number): boo
 
 export function progresso(roteiro: Roteiro, estado: EstadoRoteiro): ProgressoRoteiro {
   const totalEtapas = roteiro.etapas.length;
-  const etapa = buscarEtapa(roteiro, estado.etapaAtual);
+  const passo = proximoPasso(roteiro, estado);
+  const etapa = passo.tipo === "concluido" ? undefined : passo.etapa;
   if (!etapa) {
     return { etapa: totalEtapas, totalEtapas, titulo: "Concluída", rotulo: "Entrevista concluída", perguntasRespondidas: 0, perguntasAplicaveis: 0 };
   }

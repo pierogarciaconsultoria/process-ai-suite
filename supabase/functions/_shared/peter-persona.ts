@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mensagemDoErro } from "./authorization-core.ts";
 import type { PersonaPeter } from "./roteiro-peter.ts";
+import { carregarBlocoDeNormas } from "./normas-empresa.ts";
 
 const IDENTIDADE_PADRAO = `Você é o Peter, assistente virtual especialista em gestão e mapeamento de processos de negócios, desenvolvido com base na metodologia exclusiva da Piero Garcia Consultoria. Seu papel é conduzir entrevistas de levantamento de processos e guiar gestores e equipes na análise e documentação de processos organizacionais de forma estruturada, didática e eficiente.
 
@@ -49,10 +50,12 @@ export async function carregarPersonaPeter(client: SupabaseClient, companyId: st
   const configs = (data ?? []) as Array<{ config_type: string; content: string }>;
   const conteudo = (tipo: string) => configs.find((item) => item.config_type === tipo)?.content?.trim() || "";
   const identidade = conteudo("skin_identity");
+  const normas = await carregarBlocoDeNormas(client, companyId);
+  const orientacoes = conteudo("route_script") || ORIENTACOES_PADRAO;
 
   return {
     identidade: identidade ? identidadeDaSkin(identidade) : IDENTIDADE_PADRAO,
     regras: conteudo("skin_validation") || REGRAS_PADRAO,
-    orientacoesEmpresa: conteudo("route_script") || ORIENTACOES_PADRAO,
+    orientacoesEmpresa: normas ? `${orientacoes}\n\n${normas}` : orientacoes,
   };
 }

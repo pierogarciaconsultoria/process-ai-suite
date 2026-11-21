@@ -72,6 +72,23 @@ function ateConfirmacao(numero: number): EstadoRoteiro {
   throw new Error("etapa não alcançada");
 }
 
+// Etapa N começando, com as anteriores respondidas e confirmadas (como o estado salvo chega).
+function iniciandoEtapa(numero: number): EstadoRoteiro {
+  let estado = iniciarRoteiro(roteiro);
+  for (let i = 0; i < 200; i++) {
+    const passo = proximoPasso(roteiro, estado);
+    if (passo.tipo !== "pergunta" || passo.etapa.numero >= numero) break;
+    estado = registrarResposta(roteiro, estado, {
+      perguntaId: passo.pergunta.id,
+      texto: `r ${passo.pergunta.id}`,
+      suficiente: true,
+      valor: passo.pergunta.tipo === "sim_nao" ? "sim" : undefined,
+      encerraRepeticao: true,
+    });
+  }
+  return { ...estado, etapaAtual: numero, etapasConfirmadas: Array.from({ length: numero - 1 }, (_, i) => i + 1) };
+}
+
 // Regras do modo strict da OpenAI: todo objeto fecha additionalProperties e exige todas as chaves.
 function verificarStrict(schema: unknown, caminho = "$"): void {
   if (!schema || typeof schema !== "object") return;
@@ -89,14 +106,15 @@ function verificarStrict(schema: unknown, caminho = "$"): void {
 describe("Peter no roteiro — schemas", () => {
   it("gera schemas compatíveis com o modo strict para todas as perguntas e etapas", () => {
     for (const etapa of roteiro.etapas) {
-      verificarStrict(schemaConfirmacao(etapa));
+      verificarStrict(schemaConfirmacao([etapa]));
       for (const pergunta of etapa.perguntas) {
         verificarStrict(schemaAvaliacao(pergunta));
         verificarStrict(schemaAvaliacao(pergunta, perguntasEmAberto(roteiro, iniciarRoteiro(roteiro), pergunta.id)));
       }
     }
+    verificarStrict(schemaConfirmacao(roteiro.etapas.slice(0, 4)));
     verificarStrict(schemaExtracao(roteiro));
-    verificarStrict(schemaExtracao(roteiro, confirmarEtapa(roteiro, ateConfirmacao(1))));
+    verificarStrict(schemaExtracao(roteiro, iniciandoEtapa(2)));
     verificarStrict(SCHEMA_DIAGNOSTICO);
     verificarStrict(SCHEMA_PLANO);
   });
@@ -168,7 +186,7 @@ describe("Peter no roteiro — turnos", () => {
     expect(turno.campos).toEqual({ entrevistados: "Ana (analista financeira)" });
   });
 
-  it("apresenta o resumo com lacunas ao chegar na confirmação da etapa", () => {
+  it("só pede confirmação antes do diagnóstico, com o resumo das etapas 1 a 4 e as lacunas", () => {
     let estado = iniciarRoteiro(roteiro);
     while (proximoPasso(roteiro, estado).tipo === "pergunta") {
       const passo = proximoPasso(roteiro, estado);
@@ -177,22 +195,27 @@ describe("Peter no roteiro — turnos", () => {
     }
     const turno = iniciarTurno(roteiro, estado);
     expect(turno.passo.tipo).toBe("confirmar_etapa");
+    expect(turno.passo.etapa?.numero).toBe(4);
+    expect(estado.etapaAtual).toBe(1);
+    expect(turno.mensagem).toContain("**Sobre o processo**");
+    expect(turno.mensagem).toContain("**Passo a passo**");
     expect(turno.mensagem).toContain("✅ **Nome do processo:** ok");
     expect(turno.mensagem).toContain("❓ **Área:** não informado");
     // Pergunta que só é registrada a partir de outras respostas não aparece como lacuna.
     expect(turno.mensagem).not.toContain("Responsável pelo processo");
-    expect(turno.mensagem).toContain("Está certo ou quer ajustar algo");
+    expect(turno.mensagem).toContain("Esse é o resumo do processo até aqui");
   });
 
-  it("confirma a etapa e anuncia a seguinte", () => {
-    const turno = aplicarConfirmacao(roteiro, ateConfirmacao(1), { confirmou: true, pedeAjuste: false, comentario: "Ótimo!", correcoes: [], campos: {} }, "Está correto");
-    expect(turno.estado.etapaAtual).toBe(2);
-    expect(turno.mensagem).toContain("Etapa 2 de 6");
-    expect(turno.passo.pergunta?.id).toBe("e2.gatilho");
+  it("a revisão única confirma as etapas 1 a 4 e anuncia a seguinte", () => {
+    const turno = aplicarConfirmacao(roteiro, ateConfirmacao(4), { confirmou: true, pedeAjuste: false, comentario: "Ótimo!", correcoes: [], campos: {} }, "Está correto");
+    expect(turno.estado.etapaAtual).toBe(5);
+    expect(turno.estado.etapasConfirmadas).toEqual([1, 2, 3, 4]);
+    expect(turno.mensagem).toContain("Etapa 5 de 6");
+    expect(turno.passo.pergunta?.id).toBe("e5.dores");
   });
 
-  it("aplica a correção e reapresenta o resumo atualizado em vez de avançar", () => {
-    const turno = aplicarConfirmacao(roteiro, ateConfirmacao(1), {
+  it("aplica a correção de uma etapa anterior e reapresenta o resumo atualizado em vez de avançar", () => {
+    const turno = aplicarConfirmacao(roteiro, ateConfirmacao(4), {
       confirmou: true,
       pedeAjuste: true,
       comentario: "Ajustei a área.",
@@ -209,7 +232,7 @@ describe("Peter no roteiro — turnos", () => {
     let estado = iniciarRoteiro(roteiro);
     for (let i = 0; i < 200; i++) {
       const passo = proximoPasso(roteiro, estado);
-      if (passo.tipo === "confirmar_etapa" && passo.etapa.numero === 3) break;
+      if (passo.tipo === "confirmar_etapa" && passo.etapa.numero === 4) break;
       if (passo.tipo === "pergunta") {
         estado = registrarResposta(roteiro, estado, {
           perguntaId: passo.pergunta.id,
@@ -233,7 +256,7 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("extrai respostas de texto livre sem reabrir etapas confirmadas", () => {
-    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const estado = iniciandoEtapa(2);
     const turno = aplicarExtracao(roteiro, estado, {
       respostas: [
         { perguntaId: "e1.nome", texto: "outro nome", valor: null },
@@ -253,7 +276,7 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("com diagrama BPMN, aproveita respostas parciais e o que não aparece no diagrama", () => {
-    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const estado = iniciandoEtapa(2);
     const prompt = promptExtracao(persona, roteiro, estado, {});
     expect(prompt).toContain('"Resumo do diagrama"');
     expect(prompt).toContain('"nao" com o texto "Não aparece no diagrama"');
@@ -276,7 +299,7 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("não diz que anotou algo quando o material não respondeu nenhuma pergunta", () => {
-    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const estado = iniciandoEtapa(2);
     const turno = aplicarExtracao(roteiro, estado, {
       respostas: [], comentario: "Não encontrei informações do processo.", alerta: null, oportunidade: null, campos: {},
     }, "anexo");
@@ -316,15 +339,14 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("ao chegar nas atividades adiantadas, mostra o que já foi anotado e pede a próxima", () => {
-    const antes = ateConfirmacao(2);
-    const comAtividades: EstadoRoteiro = {
+    const antes = iniciandoEtapa(3);
+    const estado: EstadoRoteiro = {
       ...antes,
       respostas: {
         ...antes.respostas,
         "e3.atividades": { perguntaId: "e3.atividades", textos: ["Receber requisição — Compras"], status: "respondida", origem: "entrevista", repeticaoEncerrada: false },
       },
     };
-    const estado = confirmarEtapa(roteiro, comAtividades);
     const passo = descreverPasso(roteiro, estado);
     expect(passo.pergunta?.id).toBe("e3.atividades");
     const texto = textoDoPasso(roteiro, estado, passo, 2);
@@ -333,7 +355,7 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("um texto colado substitui as atividades ainda em levantamento pela lista completa", () => {
-    const base = confirmarEtapa(roteiro, ateConfirmacao(2));
+    const base = iniciandoEtapa(3);
     const estado = aplicarAvaliacao(roteiro, base, avaliacao({ texto: "Receber requisição — Compras", encerraRepeticao: false })).estado;
     expect(perguntasEmAberto(roteiro, estado).map((pergunta) => pergunta.id)).toContain("e3.atividades");
     expect(promptExtracao(persona, roteiro, estado, {})).toContain("Já registrado: Receber requisição — Compras");
@@ -355,7 +377,7 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("envia ao Peter os valores atuais dos campos na extração e as perguntas adiantáveis na avaliação", () => {
-    const estado = confirmarEtapa(roteiro, ateConfirmacao(1));
+    const estado = iniciandoEtapa(2);
     const extracao = promptExtracao(persona, roteiro, estado, { gatilho: "Pedido do cliente", nomeProcesso: "Compras" });
     expect(extracao).toContain('"gatilho":"Pedido do cliente"');
     expect(extracao).not.toContain('"nomeProcesso"');
@@ -368,14 +390,14 @@ describe("Peter no roteiro — turnos", () => {
   });
 
   it("pede ao Peter que registre, a partir da resposta, as perguntas que a entrevista não faz", () => {
-    const prompt = promptAvaliacao(persona, roteiro, confirmarEtapa(roteiro, ateConfirmacao(1)), {});
+    const prompt = promptAvaliacao(persona, roteiro, iniciandoEtapa(2), {});
     expect(prompt).toContain('Pergunta feita: "O que dá início a esse processo?"');
     expect(prompt).toMatch(/- e2\.fornecedores \(Quem envia\):.*Esta pergunta não será feita: registre-a sempre que a resposta trouxer a informação/);
     expect(prompt).toMatch(/- e3\.aprovacoes \(Aprovações\):.*inclusive "nao" quando ficar claro que não existe/);
   });
 
   it("pede o passo a passo inteiro na primeira resposta sobre as atividades", () => {
-    const estado = confirmarEtapa(roteiro, ateConfirmacao(2));
+    const estado = iniciandoEtapa(3);
     const prompt = promptAvaliacao(persona, roteiro, estado, {});
     expect(prompt).toContain("Esta pergunta pede o passo a passo inteiro");
     expect(prompt).toContain('"encerraRepeticao" = true se a descrição vai até o fim do processo');

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateRequest, authorizeCompany, authorizeProcess, errorResponse, requireString } from "../_shared/auth.ts";
 import { acquireAiQuota, fetchWithAiQuota } from "../_shared/quota.ts";
 import { runConfiguredAssistant, stripCodeFence } from "../_shared/openai-assistant.ts";
+import { carregarBlocoDeNormas } from "../_shared/normas-empresa.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -274,8 +275,10 @@ Conduza a conversa com empatia, objetividade e segurança, incentivando exemplos
       }
     }
 
+    const normasDaEmpresa = await carregarBlocoDeNormas(client, companyId);
     const systemPrompt = `${identityPrompt}
 ${customScript ? `\n### DIRETRIZES DA EMPRESA:\n${customScript}\n` : ""}
+${normasDaEmpresa ? `\n### ${normasDaEmpresa}\n` : ""}
 ${validationRules ? `\n### REGRAS DE VALIDAÇÃO:\n${validationRules}\n` : ""}
 
 Você atua como o motor inteligente de um sistema de diagnóstico e transformação de processos. Receba os dados preenchidos pelo usuário e gere um diagnóstico completo organizado em 6 FASES:

@@ -18,6 +18,7 @@ import {
   concluirAcao,
   confirmarEtapa,
   corrigirResposta,
+  etapasDaRevisao,
   perguntaAplicavel,
   reabrirAnalise,
   progresso,
@@ -180,6 +181,21 @@ export function resumoEtapa(roteiro: Roteiro, estado: EstadoRoteiro, numero: num
     .join("\n");
 }
 
+// Resumo de todas as etapas revisadas juntas; com mais de uma, cada bloco leva o título da etapa.
+export function resumoDaRevisao(roteiro: Roteiro, estado: EstadoRoteiro): string {
+  const etapas = etapasDaRevisao(roteiro, estado);
+  if (etapas.length <= 1) return etapas.length ? resumoEtapa(roteiro, estado, etapas[0].numero) : "";
+  return etapas.map((etapa) => `**${etapa.titulo}**\n${resumoEtapa(roteiro, estado, etapa.numero)}`).join("\n\n");
+}
+
+const TEXTO_REVISAO_GERAL = "Esse é o resumo do processo até aqui. Está certo? Se algo estiver errado ou faltando, me diga o que ajustar.";
+
+// Número da etapa do passo atual, para saber quando a conversa entrou numa etapa nova.
+export function etapaDoPasso(roteiro: Roteiro, estado: EstadoRoteiro): number {
+  const passo = proximoPasso(roteiro, estado);
+  return passo.tipo === "concluido" ? 0 : passo.etapa.numero;
+}
+
 const TEXTO_ACAO: Record<AcaoIA, string> = {
   diagnostico_as_is: "Com o que você me contou, vou montar o diagnóstico do processo. Isso leva alguns segundos.",
   plano_melhoria: "Vou montar o plano de melhoria com base nas suas prioridades. Isso leva alguns segundos.",
@@ -200,7 +216,9 @@ export function textoDoPasso(roteiro: Roteiro, estado: EstadoRoteiro, passo: Pas
     case "confirmar_etapa": {
       const etapa = roteiro.etapas.find((item) => item.numero === passo.etapa!.numero)!;
       // Nas etapas com análise, o que se confirma é a análise, exibida à parte.
-      return etapa.acaoIA ? etapa.textoConfirmacao : `${resumoEtapa(roteiro, estado, etapa.numero)}\n\n${etapa.textoConfirmacao}`;
+      if (etapa.acaoIA) return etapa.textoConfirmacao;
+      const geral = etapasDaRevisao(roteiro, estado).length > 1;
+      return `${resumoDaRevisao(roteiro, estado)}\n\n${geral ? TEXTO_REVISAO_GERAL : etapa.textoConfirmacao}`;
     }
     case "concluido":
       return "Entrevista concluída! Obrigado pelo seu tempo. Já tenho tudo para gerar o relatório e o mapa do processo.";
@@ -282,6 +300,10 @@ export function camposDaEtapa(etapa: EtapaRoteiro): CampoFormulario[] {
   return camposUnicos(etapa.perguntas.flatMap((pergunta) => pergunta.campos));
 }
 
+export function camposDasEtapas(etapas: EtapaRoteiro[]): CampoFormulario[] {
+  return camposUnicos(etapas.flatMap(camposDaEtapa));
+}
+
 function camposDoRoteiro(roteiro: Roteiro): CampoFormulario[] {
   return camposUnicos(todasPerguntas(roteiro).flatMap((pergunta) => pergunta.campos));
 }
@@ -345,7 +367,8 @@ export function schemaAvaliacao(pergunta: PerguntaRoteiro, adiantaveis: Pergunta
   return { type: "object", additionalProperties: false, properties, required: Object.keys(properties) };
 }
 
-export function schemaConfirmacao(etapa: EtapaRoteiro) {
+export function schemaConfirmacao(etapas: EtapaRoteiro[]) {
+  const perguntas = etapas.flatMap((etapa) => etapa.perguntas);
   const properties = {
     confirmou: { type: "boolean" },
     pedeAjuste: { type: "boolean" },
@@ -356,14 +379,14 @@ export function schemaConfirmacao(etapa: EtapaRoteiro) {
         type: "object",
         additionalProperties: false,
         properties: {
-          perguntaId: { type: "string", enum: etapa.perguntas.map((pergunta) => pergunta.id) },
+          perguntaId: { type: "string", enum: perguntas.map((pergunta) => pergunta.id) },
           texto: { type: "string" },
           valor: textoOuNulo,
         },
         required: ["perguntaId", "texto", "valor"],
       },
     },
-    campos: schemaCampos(camposDaEtapa(etapa)),
+    campos: schemaCampos(camposDasEtapas(etapas)),
   };
   return { type: "object", additionalProperties: false, properties, required: Object.keys(properties) };
 }
@@ -513,9 +536,10 @@ export function promptConfirmacao(
   const passo = proximoPasso(roteiro, estado);
   if (passo.tipo !== "confirmar_etapa") throw new HttpError(409, "A entrevista não está aguardando confirmação.");
   const { etapa } = passo;
+  const revisadas = etapasDaRevisao(roteiro, estado);
   const apresentado = etapa.acaoIA
     ? `Análise apresentada (gerada por você a partir das respostas):\n${JSON.stringify(estado.analises[etapa.acaoIA] ?? null)}`
-    : `Resumo apresentado:\n${resumoEtapa(roteiro, estado, etapa.numero)}`;
+    : `Resumo apresentado:\n${resumoDaRevisao(roteiro, estado)}`;
 
   return `${cabecalho(persona)}
 
@@ -524,8 +548,8 @@ O entrevistado acabou de ver o fechamento da ${progresso(roteiro, estado).rotulo
 
 ${apresentado}
 
-Perguntas desta etapa (para as correções):
-${etapa.perguntas.map((pergunta) => `- ${pergunta.id} (${pergunta.rotulo})`).join("\n")}
+Perguntas em revisão (para as correções):
+${revisadas.flatMap((item) => item.perguntas).map((pergunta) => `- ${pergunta.id} (${pergunta.rotulo})`).join("\n")}
 
 ## COMO RESPONDER (JSON)
 - "confirmou": true somente se o entrevistado aprovou sem pedir mudanças.
@@ -534,7 +558,7 @@ ${etapa.perguntas.map((pergunta) => `- ${pergunta.id} (${pergunta.rotulo})`).joi
 - "correcoes": para cada item que o entrevistado corrigiu ou completou, o id da pergunta e o novo "texto" completo daquela resposta (para e3.atividades, a lista inteira, uma atividade por linha). "valor": "sim"/"nao" se a correção muda uma resposta de sim/não; senão null. Lista vazia se não houve correção.
 - "campos": se houve correção, o valor COMPLETO e atualizado dos campos afetados; null nos demais.
 
-Valores atuais dos campos: ${valoresDosCampos(camposDaEtapa(etapa), atuais)}`;
+Valores atuais dos campos: ${valoresDosCampos(camposDasEtapas(revisadas), atuais)}`;
 }
 
 export function promptExtracao(
@@ -644,7 +668,7 @@ export function aplicarAvaliacao(roteiro: Roteiro, estado: EstadoRoteiro, raw: u
   const mesmaPergunta = passo.tipo === "pergunta" && passo.pergunta?.id === pergunta.id && r.suficiente !== true;
   const mensagem = mesmaPergunta
     ? juntar(textoLimpo(r.comentario), textoLimpo(r.aprofundamento) || passoAtual.texto)
-    : juntar(textoLimpo(r.comentario), textoDoPasso(roteiro, novoEstado, passo, estado.etapaAtual));
+    : juntar(textoLimpo(r.comentario), textoDoPasso(roteiro, novoEstado, passo, etapaDoPasso(roteiro, estado)));
 
   return {
     estado: novoEstado,
@@ -660,7 +684,7 @@ export function aplicarConfirmacao(roteiro: Roteiro, estado: EstadoRoteiro, raw:
   const passoAtual = proximoPasso(roteiro, estado);
   if (passoAtual.tipo !== "confirmar_etapa") throw new HttpError(409, "A entrevista não está aguardando confirmação.");
   const r = isRecord(raw) ? raw : {};
-  const campos = filtrarCampos(r.campos, camposDaEtapa(passoAtual.etapa));
+  const campos = filtrarCampos(r.campos, camposDasEtapas(etapasDaRevisao(roteiro, estado)));
   const correcoes = (Array.isArray(r.correcoes) ? r.correcoes : []).filter(isRecord);
   const pedeAjuste = r.pedeAjuste === true || correcoes.length > 0;
 
@@ -684,7 +708,7 @@ export function aplicarConfirmacao(roteiro: Roteiro, estado: EstadoRoteiro, raw:
   return {
     estado: novoEstado,
     passo,
-    mensagem: juntar(textoLimpo(r.comentario), textoDoPasso(roteiro, novoEstado, passo, estado.etapaAtual)),
+    mensagem: juntar(textoLimpo(r.comentario), textoDoPasso(roteiro, novoEstado, passo, etapaDoPasso(roteiro, estado))),
     campos,
     alerta: null,
     oportunidade: null,
@@ -706,7 +730,7 @@ export function aplicarExtracao(
   // Diz o que não será perguntado, para o entrevistado saber o que o material já cobriu.
   const anotadas = todasPerguntas(roteiro).filter((pergunta) => novoEstado.respostas[pergunta.id] !== estado.respostas[pergunta.id]);
   const anotado = anotadas.length > 0
-    ? `Do que você enviou, já anotei: ${anotadas.map((pergunta) => pergunta.rotulo).join(", ")}. Não vou perguntar de novo; você confere tudo no resumo de cada etapa.`
+    ? `Do que você enviou, já anotei: ${anotadas.map((pergunta) => pergunta.rotulo).join(", ")}. Não vou perguntar de novo; vou perguntar só o que faltou e, no fim, você confere tudo num resumo só.`
     : "";
 
   return {
