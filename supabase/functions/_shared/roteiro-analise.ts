@@ -24,7 +24,18 @@ export interface AchadoDiagnostico {
   descricao: string;
   impacto: string;
   causaProvavel: string;
+  // Cadeia dos "5 porquês" até a causa raiz; vazia em diagnósticos antigos.
+  porques: string[];
   fundamento: string;
+}
+
+export interface RiscoDiagnostico {
+  risco: string;
+  evidencia: string;
+  consequencia: string;
+  // Escala 1 a 5; null em diagnósticos gerados antes da avaliação de riscos.
+  probabilidade: number | null;
+  impacto: number | null;
 }
 
 export interface DiagnosticoRoteiro {
@@ -32,7 +43,7 @@ export interface DiagnosticoRoteiro {
   pontosFortes: string[];
   achados: AchadoDiagnostico[];
   desperdiciosLean: Array<{ tipo: (typeof DESPERDICIOS_LEAN)[number]; evidencia: string }>;
-  riscosIso: Array<{ risco: string; evidencia: string }>;
+  riscosIso: RiscoDiagnostico[];
   maturidade: { nivel: (typeof NIVEIS_MATURIDADE)[number]; justificativa: string };
   lacunas: string[];
 }
@@ -82,6 +93,7 @@ function objeto(properties: Record<string, unknown>) {
 
 const texto = { type: "string" };
 const listaDeTextos = { type: "array", items: texto };
+const nivel15 = { type: "integer", enum: [1, 2, 3, 4, 5] };
 
 export const SCHEMA_DIAGNOSTICO = objeto({
   resumo: texto,
@@ -93,6 +105,7 @@ export const SCHEMA_DIAGNOSTICO = objeto({
       descricao: texto,
       impacto: texto,
       causaProvavel: texto,
+      porques: listaDeTextos,
       fundamento: texto,
     }),
   },
@@ -100,7 +113,10 @@ export const SCHEMA_DIAGNOSTICO = objeto({
     type: "array",
     items: objeto({ tipo: { type: "string", enum: [...DESPERDICIOS_LEAN] }, evidencia: texto }),
   },
-  riscosIso: { type: "array", items: objeto({ risco: texto, evidencia: texto }) },
+  riscosIso: {
+    type: "array",
+    items: objeto({ risco: texto, evidencia: texto, consequencia: texto, probabilidade: nivel15, impacto: nivel15 }),
+  },
   maturidade: objeto({ nivel: { type: "string", enum: [...NIVEIS_MATURIDADE] }, justificativa: texto }),
   lacunas: listaDeTextos,
 });
@@ -158,6 +174,10 @@ function textos(value: unknown): string[] {
   return (Array.isArray(value) ? value : []).map(str).filter(Boolean);
 }
 
+function notaDe1a5(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
+}
+
 function umDe<T extends string>(valor: unknown, opcoes: readonly T[]): T | null {
   return opcoes.includes(valor as T) ? valor as T : null;
 }
@@ -173,14 +193,29 @@ export function normalizarDiagnostico(raw: unknown): DiagnosticoRoteiro | null {
     achados: lista(raw.achados, (item) => {
       const prioridade = umDe(item.prioridade, ["critico", "relevante", "oportunidade"] as const);
       return prioridade && str(item.descricao)
-        ? { prioridade, descricao: str(item.descricao), impacto: str(item.impacto), causaProvavel: str(item.causaProvavel), fundamento: str(item.fundamento) }
+        ? {
+          prioridade,
+          descricao: str(item.descricao),
+          impacto: str(item.impacto),
+          causaProvavel: str(item.causaProvavel),
+          porques: textos(item.porques),
+          fundamento: str(item.fundamento),
+        }
         : null;
     }),
     desperdiciosLean: lista(raw.desperdiciosLean, (item) => {
       const tipo = umDe(item.tipo, DESPERDICIOS_LEAN);
       return tipo && str(item.evidencia) ? { tipo, evidencia: str(item.evidencia) } : null;
     }),
-    riscosIso: lista(raw.riscosIso, (item) => (str(item.risco) ? { risco: str(item.risco), evidencia: str(item.evidencia) } : null)),
+    riscosIso: lista(raw.riscosIso, (item) => (str(item.risco)
+      ? {
+        risco: str(item.risco),
+        evidencia: str(item.evidencia),
+        consequencia: str(item.consequencia),
+        probabilidade: notaDe1a5(item.probabilidade),
+        impacto: notaDe1a5(item.impacto),
+      }
+      : null)),
     maturidade: { nivel, justificativa: str(maturidade.justificativa) },
     lacunas: textos(raw.lacunas),
   };
@@ -230,6 +265,32 @@ export function camposDoPlano(plano: PlanoMelhoriaRoteiro) {
   return {
     oportunidadesMelhoria: plano.melhorias.map((melhoria) => `• ${melhoria.titulo} (${melhoria.prioridade}): ${melhoria.solucao}`).join("\n"),
     planoAcao: plano.planoAcao,
+    ...(plano.indicadores.length > 0
+      ? {
+        indicadores: plano.indicadores.map((indicador) => ({
+          nome: indicador.nome,
+          objetivo: indicador.motivo,
+          formulaCalculo: indicador.formula,
+          meta: indicador.meta,
+          periodicidade: indicador.periodicidade,
+          responsavel: indicador.responsavel,
+        })),
+      }
+      : {}),
+  };
+}
+
+// Riscos avaliados no diagnóstico viram a matriz de riscos do formulário (que define a criticidade).
+export function camposDoDiagnostico(diagnostico: DiagnosticoRoteiro) {
+  const avaliados = diagnostico.riscosIso.filter((item) => item.probabilidade && item.impacto);
+  if (avaliados.length === 0) return {};
+  return {
+    riscos: avaliados.map((item) => ({
+      risco: item.risco,
+      consequencia: item.consequencia || item.evidencia,
+      probabilidade: item.probabilidade,
+      impacto: item.impacto,
+    })),
   };
 }
 
@@ -281,7 +342,7 @@ Desperdícios Lean (registre só os que têm evidência nas respostas):
 - Movimento: troca excessiva de sistemas, ferramentas ou canais
 - Defeitos: saídas fora do padrão esperado pelo cliente do processo
 
-Riscos ISO 9001: atividades sem responsável ou evidência de execução; ausência de critério de aceitação da saída; documentos sem controle de versão; ausência de contingência para processo crítico; indicadores sem meta ou sem responsável pela medição.
+Riscos (ISO 9001, 6.1): considere também o que o entrevistado disse sobre falhas, erros e atrasos. Atividades sem responsável ou evidência de execução; ausência de critério de aceitação da saída; documentos sem controle de versão; ausência de contingência para processo crítico; indicadores sem meta ou sem responsável pela medição.
 
 Oportunidades: atividades automatizáveis com ferramentas já disponíveis; etapas elimináveis sem impacto na saída; aprovações delegáveis ou substituíveis por critérios objetivos; integrações que reduziriam retrabalho.
 
@@ -290,8 +351,13 @@ Maturidade: Inicial (informal, dependente de pessoas-chave); Estruturado (docume
 ## COMO RESPONDER (JSON)
 - "resumo": 2 a 4 frases sobre o estado atual do processo.
 - "pontosFortes": o que está bem estruturado e deve ser mantido.
-- "achados": cada problema ou oportunidade, com "prioridade" (critico, relevante ou oportunidade), "descricao", "impacto", "causaProvavel" e "fundamento" (o critério Lean, ISO 9001 ou BPM que sustenta o achado). Ordene do mais crítico ao menos crítico.
-- "desperdiciosLean" e "riscosIso": cada item com a evidência tirada das respostas.
+- "achados": cada problema ou oportunidade, com "prioridade" (critico, relevante ou oportunidade), "descricao", "impacto", "porques", "causaProvavel" e "fundamento" (o critério Lean, ISO 9001 ou BPM que sustenta o achado). Ordene do mais crítico ao menos crítico.
+  - "porques": para problemas (critico e relevante), a cadeia dos 5 porquês, de 3 a 5 passos, cada um respondendo o anterior ("Por que X? Porque Y."). Use as respostas; quando um passo for suposição, termine-o com "(hipótese)". Para oportunidades, pode ficar vazio.
+  - "causaProvavel": a causa raiz, o último passo dos porquês. Nunca repita a solução como causa (ex.: "falta de dupla conferência" não é causa raiz).
+- "desperdiciosLean": cada item com a evidência tirada das respostas.
+- "riscosIso": de 2 a 5 riscos do processo, cada um com "risco", "evidencia", "consequencia" (o que acontece com o cliente, o prazo ou o custo) e notas de 1 a 5:
+  - "probabilidade": 1 rara, 2 improvável, 3 possível (acontece às vezes), 4 provável (acontece com frequência), 5 quase certa (acontece sempre). Erro relatado como frequente é no mínimo 4.
+  - "impacto": 1 desprezível, 2 baixo (corrigido internamente), 3 moderado (atrasa ou gera retrabalho), 4 alto (chega ao cliente ou gera custo), 5 crítico (perda de cliente, multa ou parada).
 - "maturidade": o nível e a justificativa com base nas respostas.
 - "lacunas": informações [NÃO INFORMADO] que limitam o diagnóstico.
 Nunca apresente como fato algo que não foi informado. Se uma conclusão depende de suposição, deixe isso explícito no texto do achado.${blocoObservacoes(estado, 5, estado.analises.diagnostico_as_is)}`;
@@ -311,10 +377,10 @@ ${JSON.stringify(estado.analises.diagnostico_as_is ?? null)}
 - "resumoToBe": como o processo deve funcionar depois das melhorias, em poucas frases.
 - "melhorias": priorize as oportunidades que o entrevistado indicou como prioritárias; cada melhoria resolve achados do diagnóstico. "prioridade": Alta, Média ou Baixa.
 - "planoAcao": uma ou mais ações 5W2H por melhoria.
-  - "quem": o responsável pelas mudanças informado na entrevista, ou um cargo ou área que o entrevistado citou como responsável por aquela parte do processo. Se nada disso foi informado, escreva "[a definir]". Nunca crie um cargo que não apareceu na entrevista (por exemplo, "Gestor de TI").
-  - "quando": derivado apenas do prazo de implantação informado. Sem prazo informado, escreva "[a definir]".
+  - "quem": um cargo, não uma equipe. Use o responsável pelas mudanças informado na entrevista ou o cargo que executa aquela parte do processo no passo a passo (ex.: "Auxiliar de Almoxarifado", não "Equipe de Almoxarifado"). Se nenhum cargo couber, escreva "[a definir]". Nunca crie um cargo que não apareceu na entrevista (por exemplo, "Gestor de TI").
+  - "quando": derivado do prazo de implantação informado. Sem prazo informado, sugira pelo nível de prioridade da melhoria: Alta → "Sugestão: em até 30 dias", Média → "Sugestão: em até 60 dias", Baixa → "Sugestão: em até 90 dias".
   - "custo": o valor informado; sem valor informado, uma estimativa qualitativa precedida de "Estimativa:" (Baixo, Médio ou Alto).
-- "indicadores": de 2 a 4 indicadores para acompanhar se o processo otimizado funciona (ISO 9001, 9.1). Se o entrevistado citou indicadores, comece por eles, com os dados que ele deu. Complete com indicadores tirados das informações coletadas: a saída principal entregue no prazo, o prazo ou SLA, os erros e o retrabalho, as reclamações, o volume, e o que as melhorias pretendem mudar.
+- "indicadores": sempre de 2 a 4 indicadores para acompanhar se o processo otimizado funciona (ISO 9001, 9.1). Se o entrevistado citou indicadores, comece por eles, com os dados que ele deu. Complete com indicadores tirados das informações coletadas: a saída principal entregue no prazo, o prazo ou SLA, os erros e o retrabalho, as reclamações, o volume, e o que as melhorias pretendem mudar.
   - "nome": curto e mensurável (ex.: "Pedidos entregues no prazo").
   - "formula": como calcular com os dados que o processo já gera (ex.: "pedidos entregues no prazo ÷ pedidos entregues × 100").
   - "sentido": "maior" quando quanto maior, melhor; "menor" quando quanto menor, melhor.

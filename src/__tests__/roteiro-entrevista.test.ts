@@ -155,7 +155,7 @@ describe("Roteiro da entrevista — motor", () => {
     expect(somenteRegistro).toEqual(expect.arrayContaining(["e1.dono", "e2.fornecedores", "e2.cliente", "e3.aprovacoes", "e4.volume", "e6.gestor_mudanca"]));
     for (const id of somenteRegistro) expect(perguntas).not.toContain(id);
     // Sem aprovação registrada, as condicionais também não aparecem.
-    expect(perguntas).toHaveLength(20);
+    expect(perguntas).toHaveLength(21);
   });
 
   it("não pergunta o nome quando o processo já tem nome", () => {
@@ -182,7 +182,7 @@ describe("Roteiro da entrevista — motor", () => {
     estado = responderAtual(estado, { texto: "", encerraRepeticao: true });
 
     passo = proximoPasso(roteiro, estado);
-    expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.sistemas");
+    expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.caminhos");
     expect(estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Aprovar pedido — Gerente"]);
   });
 
@@ -194,7 +194,7 @@ describe("Roteiro da entrevista — motor", () => {
     estado = responderAtual(estado, { texto: "Receber pedido — Comercial\n Separar material — Almoxarifado \nEmitir NF — Faturamento", encerraRepeticao: true });
     expect(estado.respostas["e3.atividades"].textos).toEqual(["Receber pedido — Comercial", "Separar material — Almoxarifado", "Emitir NF — Faturamento"]);
     const passo = proximoPasso(roteiro, estado);
-    expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.sistemas");
+    expect(passo.tipo === "pergunta" && passo.pergunta.id).toBe("e3.caminhos");
   });
 
   it(`registra lacuna depois de ${MAX_APROFUNDAMENTOS} respostas insuficientes e segue em frente`, () => {

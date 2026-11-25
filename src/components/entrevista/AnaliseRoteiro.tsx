@@ -53,6 +53,11 @@ export function DiagnosticoView({ diagnostico }: { diagnostico: DiagnosticoRotei
                   <div key={`${chave}-${indice}`} className={`rounded-md border p-3 text-sm print:break-inside-avoid ${classe}`}>
                     <div className="font-medium">{titulo} — {achado.descricao}</div>
                     {achado.impacto && <div className="mt-1">Impacto: {achado.impacto}</div>}
+                    {achado.porques?.length > 0 && (
+                      <ol className="list-decimal pl-5">
+                        {achado.porques.map((porque, indice) => <li key={indice}>{porque}</li>)}
+                      </ol>
+                    )}
                     {achado.causaProvavel && <div>Causa provável: {achado.causaProvavel}</div>}
                     {achado.fundamento && <div className="mt-1 text-xs opacity-80">Fundamento: {achado.fundamento}</div>}
                   </div>
@@ -70,7 +75,10 @@ export function DiagnosticoView({ diagnostico }: { diagnostico: DiagnosticoRotei
 
       {diagnostico.riscosIso.length > 0 && (
         <Secao titulo="Riscos (ISO 9001)">
-          <Lista itens={diagnostico.riscosIso.map((item) => (item.evidencia ? `${item.risco} — ${item.evidencia}` : item.risco))} />
+          <Lista itens={diagnostico.riscosIso.map((item) => [
+            item.evidencia ? `${item.risco} — ${item.evidencia}` : item.risco,
+            item.probabilidade && item.impacto ? ` (probabilidade ${item.probabilidade}, impacto ${item.impacto})` : "",
+          ].join(""))} />
         </Secao>
       )}
 

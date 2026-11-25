@@ -10,6 +10,7 @@ import {
   registrarResposta,
   type EstadoRoteiro,
 } from "../../supabase/functions/_shared/roteiro-engine";
+import { etapaDoPasso } from "../../supabase/functions/_shared/roteiro-peter";
 
 const roteiro = ROTEIRO_PADRAO;
 
@@ -41,7 +42,8 @@ const respostasFixas: Record<string, string> = {
 // Percorre o roteiro até `ateEtapa` (inclusive), deixando a pergunta e1.area como lacuna.
 function estadoAte(ateEtapa: number): EstadoRoteiro {
   let estado = iniciarRoteiro(roteiro);
-  for (let i = 0; i < 300 && estado.etapaAtual <= ateEtapa; i++) {
+  // As etapas 1 a 4 só são confirmadas juntas, então o limite é a etapa do próximo passo.
+  for (let i = 0; i < 300 && etapaDoPasso(roteiro, estado) <= ateEtapa; i++) {
     const passo = proximoPasso(roteiro, estado);
     if (passo.tipo === "pergunta") {
       const lacuna = passo.pergunta.id === "e1.area";

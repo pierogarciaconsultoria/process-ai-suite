@@ -372,7 +372,7 @@ describe("Peter no roteiro — turnos", () => {
       repeticaoEncerrada: true,
       origem: "texto_livre",
     });
-    expect(turno.passo.pergunta?.id).toBe("e3.sistemas");
+    expect(turno.passo.pergunta?.id).toBe("e3.caminhos");
     expect(turno.campos).toEqual({ decisoes: "Valor acima de R$ 5 mil" });
   });
 
@@ -405,14 +405,14 @@ describe("Peter no roteiro — turnos", () => {
 
   it("no plano 5W2H, não inventa quem conduz nem o prazo", () => {
     const instrucoes = INSTRUCOES_POR_ACAO.plano_melhoria(roteiro, iniciarRoteiro(roteiro));
-    expect(instrucoes).toContain('Se nada disso foi informado, escreva "[a definir]"');
-    expect(instrucoes).toContain('"quando": derivado apenas do prazo de implantação informado. Sem prazo informado, escreva "[a definir]"');
+    expect(instrucoes).toContain('Se nenhum cargo couber, escreva "[a definir]"');
+    expect(instrucoes).toContain('Sem prazo informado, sugira pelo nível de prioridade da melhoria: Alta → "Sugestão: em até 30 dias"');
     expect(instrucoes).toContain("Nunca crie um cargo que não apareceu na entrevista");
   });
 
   it("sugere indicadores no plano sem inventar meta", () => {
     const instrucoes = INSTRUCOES_POR_ACAO.plano_melhoria(roteiro, iniciarRoteiro(roteiro));
-    expect(instrucoes).toContain('"indicadores": de 2 a 4 indicadores para acompanhar se o processo otimizado funciona');
+    expect(instrucoes).toContain('"indicadores": sempre de 2 a 4 indicadores para acompanhar se o processo otimizado funciona');
     expect(instrucoes).toContain('Sem número informado, escreva "[a definir]". Nunca invente uma meta.');
     expect(instrucoes).toContain("Se o entrevistado citou indicadores, comece por eles");
   });

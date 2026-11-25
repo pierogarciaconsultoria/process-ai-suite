@@ -7,6 +7,7 @@ import type { AcaoIA, CampoFormulario, EtapaRoteiro, PerguntaRoteiro, Roteiro } 
 import {
   INSTRUCOES_POR_ACAO,
   SCHEMA_POR_ACAO,
+  camposDoDiagnostico,
   camposDoPlano,
   normalizarAnalises,
   normalizarDiagnostico,
@@ -272,6 +273,12 @@ const SCHEMA_POR_CAMPO: Record<CampoFormulario, unknown> = {
   },
   problemasTexto: textoOuNulo,
   riscosTexto: textoOuNulo,
+  riscos: listaOuNula({
+    risco: textoObrigatorio,
+    consequencia: textoObrigatorio,
+    probabilidade: { type: "integer", enum: [1, 2, 3, 4, 5] },
+    impacto: { type: "integer", enum: [1, 2, 3, 4, 5] },
+  }),
   indicadores: listaOuNula({
     nome: textoObrigatorio,
     objetivo: textoObrigatorio,
@@ -594,7 +601,7 @@ Valores atuais dos campos: ${valoresDosCampos(camposEmAberto(roteiro, estado), a
 
 // ─── Aplicação dos resultados do Peter ──────────────────────────────────────
 
-const CAMPOS_LISTA = new Set<CampoFormulario>(["entradas", "saidas", "indicadores", "planoAcao"]);
+const CAMPOS_LISTA = new Set<CampoFormulario>(["entradas", "saidas", "riscos", "indicadores", "planoAcao"]);
 
 function textoLimpo(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -778,7 +785,7 @@ export function aplicarAnalise(roteiro: Roteiro, estado: EstadoRoteiro, raw: unk
     estado: novoEstado,
     passo,
     mensagem: textoDoPasso(roteiro, novoEstado, passo, novoEstado.etapaAtual),
-    campos: plano ? camposDoPlano(plano) : {},
+    campos: plano ? camposDoPlano(plano) : diagnostico ? camposDoDiagnostico(diagnostico) : {},
     alerta: null,
     oportunidade: null,
     analise: acao,

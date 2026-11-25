@@ -27,6 +27,7 @@ export type CampoFormulario =
   | "problemas"
   | "problemasTexto"
   | "riscosTexto"
+  | "riscos"
   | "indicadores"
   | "oportunidadesMelhoria"
   | "planoAcao";
@@ -245,6 +246,15 @@ export const ROTEIRO_PADRAO: Roteiro = {
             textoProxima: "O que acontece depois disso, e quem faz? Se o processo termina aí, é só me dizer.",
             maxIteracoes: 60,
           },
+        },
+        {
+          id: "e3.caminhos",
+          rotulo: "Caminhos por tipo de demanda",
+          texto: "Esse passo a passo é o mesmo para tudo, ou muda conforme o tipo de demanda? Por exemplo: transferência entre unidades e pedido de cliente seguem caminhos diferentes?",
+          tipo: "sim_nao",
+          campos: ["decisoes"],
+          criterio: "Sim ou não; se sim, quais tipos de demanda existem, onde os caminhos se separam e quais atividades são de cada um.",
+          obrigatoria: true,
         },
         {
           id: "e3.sistemas",

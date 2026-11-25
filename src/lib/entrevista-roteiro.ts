@@ -4,7 +4,9 @@ import type {
   EntradaForm,
   EtapaForm,
   IndicadorForm,
+  NivelRisco,
   PlanoAcao5W2H,
+  RiscoForm,
   ProcessoFormData,
   SaidaForm,
 } from "@/data/processo-form-types";
@@ -38,6 +40,10 @@ function registros(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
+function nivelRisco(value: unknown): NivelRisco {
+  return typeof value === "number" && [1, 2, 3, 4, 5].includes(value) ? (value as NivelRisco) : 1;
+}
+
 // Aplica os campos devolvidos pelo Peter ao formulário. O Peter devolve o valor
 // completo de cada campo, então listas são substituídas e não concatenadas.
 export function mesclarCampos(form: ProcessoFormData, campos: CamposExtraidos): ProcessoFormData {
@@ -66,6 +72,14 @@ export function mesclarCampos(form: ProcessoFormData, campos: CamposExtraidos): 
           meta: str(item.meta),
           periodicidade: str(item.periodicidade),
           responsavel: str(item.responsavel),
+        }));
+        break;
+      case "riscos":
+        proximo.riscos = registros(valor).map((item): RiscoForm => ({
+          risco: str(item.risco),
+          consequencia: str(item.consequencia),
+          probabilidade: nivelRisco(item.probabilidade),
+          impacto: nivelRisco(item.impacto),
         }));
         break;
       case "planoAcao":
