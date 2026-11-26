@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Briefcase, Building2, Landmark, Users, User, KeyRound, MessageSquare, Sparkles, FileText, ShieldCheck } from "lucide-react";
+import { Briefcase, Building2, Landmark, Users, User, KeyRound, MessageSquare, Sparkles, FileText, ShieldCheck, Network } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminDaPlataforma } from "@/hooks/useAdminDaPlataforma";
 import { useMinhasContas } from "@/hooks/useMinhasContas";
@@ -53,6 +53,17 @@ const Configuracoes = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">Gerencie empresas e dados organizacionais</p>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/estrutura")}>
+          <CardHeader className="flex-row items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <Network className="h-5 w-5 text-secondary-foreground" />
+            </div>
+            <CardTitle>Setores, cargos e pessoas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Estrutura da empresa usada nos procedimentos, aprovações e distribuição</p>
           </CardContent>
         </Card>
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes/normas")}>

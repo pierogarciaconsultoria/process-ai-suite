@@ -26,6 +26,7 @@ const ConfigPerfil = React.lazy(() => import("./pages/ConfigPerfil"));
 const ConfigAlterarSenha = React.lazy(() => import("./pages/ConfigAlterarSenha"));
 const ConfigChamados = React.lazy(() => import("./pages/ConfigChamados"));
 const ConfigNormas = React.lazy(() => import("./pages/ConfigNormas"));
+const ConfigEstrutura = React.lazy(() => import("./pages/ConfigEstrutura"));
 const ChamadoDetalhe = React.lazy(() => import("./pages/ChamadoDetalhe"));
 const ConfigRoteiroEntrevista = React.lazy(() => import("./pages/ConfigRoteiroEntrevista"));
 const ConfigSkinIA = React.lazy(() => import("./pages/ConfigSkinIA"));
@@ -129,6 +130,7 @@ const App = () => (
               <Route path="/configuracoes/documentacao-processo" element={<SuperAdminRoute><ConfigDocumentacaoProcesso /></SuperAdminRoute>} />
               <Route path="/configuracoes/chamados" element={<ConfigChamados />} />
               <Route path="/configuracoes/normas" element={<ConfigNormas />} />
+              <Route path="/configuracoes/estrutura" element={<ConfigEstrutura />} />
               <Route path="/configuracoes/chamados/:id" element={<ChamadoDetalhe />} />
               <Route path="/usuarios" element={<Navigate to="/configuracoes/usuarios" replace />} />
               </Route>

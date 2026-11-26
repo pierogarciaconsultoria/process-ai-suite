@@ -190,6 +190,45 @@ export type Database = {
         }
         Relationships: []
       }
+      cargos: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          nome: string
+          setor_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          setor_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          setor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cargos_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chamado_mensagens: {
         Row: {
           anexo_url: string | null
@@ -1403,6 +1442,54 @@ export type Database = {
           },
         ]
       }
+      pessoas: {
+        Row: {
+          ativa: boolean
+          cargo_id: string | null
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          user_id: string | null
+        }
+        Insert: {
+          ativa?: boolean
+          cargo_id?: string | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome: string
+          user_id?: string | null
+        }
+        Update: {
+          ativa?: boolean
+          cargo_id?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pessoas_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       peter_conversas: {
         Row: {
           company_id: string
@@ -1666,6 +1753,35 @@ export type Database = {
           tipo?: string
         }
         Relationships: []
+      }
+      setores: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
