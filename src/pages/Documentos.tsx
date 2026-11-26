@@ -1397,27 +1397,20 @@ export default function Documentos() {
                 )}
 
                 <div className="space-y-1.5">
-                  <Label>Tipo</Label>
-                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de documento">
-                    {(["Procedimento", "Instrução de Trabalho"] as TipoProcedimento[]).map((tipo) => (
-                      <button
-                        key={tipo}
-                        type="button"
-                        role="radio"
-                        aria-checked={tipoDocumento === tipo}
-                        onClick={() => setTipoDocumento(tipo)}
-                        className={`rounded-lg border px-3 py-2 text-left text-sm transition ${tipoDocumento === tipo ? "border-primary bg-primary/5 font-medium" : "hover:border-primary/40"}`}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          {tipo} ({MODELO_DO_PETER[tipo].sigla})
-                          {sourceMode === "linked_process" && tipoRecomendado === tipo && (
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-normal text-primary" title={recomendacao?.motivo}>recomendado</span>
-                          )}
-                        </span>
-                        <span className="block text-xs font-normal text-muted-foreground">{tipo === "Procedimento" ? "Fluxo entre áreas" : "Tarefa de um cargo"}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <Label htmlFor="tipo-documento">Tipo</Label>
+                  <Select value={tipoDocumento} onValueChange={(valor) => setTipoDocumento(valor as TipoProcedimento)}>
+                    <SelectTrigger id="tipo-documento"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(["Procedimento", "Instrução de Trabalho"] as TipoProcedimento[]).map((tipo) => (
+                        <SelectItem key={tipo} value={tipo}>
+                          {tipo} ({MODELO_DO_PETER[tipo].sigla}){sourceMode === "linked_process" && tipoRecomendado === tipo ? " · recomendado" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground" title={recomendacao?.motivo}>
+                    {tipoDocumento === "Procedimento" ? "Fluxo entre áreas" : "Tarefa de um cargo"}
+                  </p>
                 </div>
 
                 {sourceMode === "linked_process" && <DocumentoDeApoio valor={documentoApoio} onChange={setDocumentoApoio} />}

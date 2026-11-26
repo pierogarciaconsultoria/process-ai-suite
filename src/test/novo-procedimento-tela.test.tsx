@@ -74,7 +74,7 @@ describe("Novo procedimento em poucos cliques", () => {
     // Passo 1: o processo já vem escolhido e o tipo, recomendado.
     expect(await screen.findByText("Novo procedimento")).toBeInTheDocument();
     expect(screen.getByText(/Ana Exemplo · Mapa aprovado em/)).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Procedimento \(PR\)/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByLabelText("Tipo")).toHaveTextContent("Procedimento (PR) · recomendado");
     expect(screen.queryByText("Modelo do documento")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Gerar" }));
@@ -107,13 +107,17 @@ describe("Novo procedimento em poucos cliques", () => {
   });
 
   it("troca para Instrução de Trabalho e para procedimento sem processo", async () => {
+    // jsdom não implementa scrollIntoView, usado pelo Select do Radix ao abrir.
+    Element.prototype.scrollIntoView = () => {};
     render(
       <MemoryRouter initialEntries={["/documentos?processId=proc-1"]}>
         <Routes><Route path="/documentos" element={<Documentos />} /></Routes>
       </MemoryRouter>,
     );
-    fireEvent.click(await screen.findByRole("radio", { name: /Instrução de Trabalho \(IT\)/ }));
-    expect(screen.getByRole("radio", { name: /Instrução de Trabalho \(IT\)/ })).toHaveAttribute("aria-checked", "true");
+    fireEvent.keyDown(await screen.findByLabelText("Tipo"), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: /Instrução de Trabalho \(IT\)/ }));
+    await waitFor(() => expect(screen.getByLabelText("Tipo")).toHaveTextContent("Instrução de Trabalho (IT)"));
+    expect(screen.getByText("Tarefa de um cargo")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Criar sem processo mapeado" }));
     expect(screen.getByLabelText("Nome do procedimento")).toBeInTheDocument();
