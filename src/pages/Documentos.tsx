@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, Download, Eye, FilePlus2, FileText, GitBranch, Link as LinkIcon, RotateCcw, Send, ShieldCheck, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Eye, FilePlus2, FileText, GitBranch, Link as LinkIcon, MoreHorizontal, RotateCcw, Send, ShieldCheck, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1113,6 +1114,22 @@ export default function Documentos() {
     return <div className="p-6">Carregando módulo de documentos...</div>;
   }
 
+  const abrirRevisao = (doc: (typeof filteredDocuments)[number]) => {
+    setReviewingDoc(doc);
+    setReviewSourceMode(doc.sourceMode);
+    setReviewProcessId(
+      doc.processId && approvedProcesses.some((processo) => processo.id === doc.processId)
+        ? doc.processId
+        : approvedProcesses[0]?.id || "",
+    );
+    setReviewIndependentDraft({
+      title: doc.title,
+      area: doc.area,
+      owner: doc.documentOwner,
+      procedureCategory: doc.procedureCategory,
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1229,12 +1246,12 @@ export default function Documentos() {
                     <TableHead>Distribuição</TableHead>
                     <TableHead>Data de criação</TableHead>
                     <TableHead>Última atualização</TableHead>
-                    <TableHead className="min-w-[340px]">Ações</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDocuments.map((doc) => (
-                    <TableRow key={doc.id}>
+                    <TableRow key={doc.id} className="cursor-pointer" onClick={() => setViewingDoc(doc)}>
                       <TableCell className="font-medium">{doc.code}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -1246,7 +1263,7 @@ export default function Documentos() {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell>{doc.processName ? <Link className="text-primary hover:underline" to={doc.processLink || "#"}>{doc.processName}</Link> : "Independente"}</TableCell>
+                      <TableCell>{doc.processName ? <Link onClick={(event) => event.stopPropagation()} className="text-primary hover:underline" to={doc.processLink || "#"}>{doc.processName}</Link> : "Independente"}</TableCell>
                       <TableCell>{originLabel(doc)}</TableCell>
                       <TableCell>{doc.revision}</TableCell>
                       <TableCell><Badge variant={statusBadgeVariant(doc.status)}>{doc.status}</Badge></TableCell>
@@ -1254,43 +1271,33 @@ export default function Documentos() {
                       <TableCell>{doc.distributedTo.length > 0 ? doc.distributedTo.join(", ") : "-"}</TableCell>
                       <TableCell>{new Date(doc.createdAt).toLocaleDateString("pt-BR")}</TableCell>
                       <TableCell>{new Date(doc.updatedAt).toLocaleDateString("pt-BR")}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setViewingDoc(doc)}>
-                            <Eye className="mr-2 h-4 w-4" /> Visualizar
-                          </Button>
-                          <Button size="sm" variant="outline" disabled={!canEditDocument(doc)} onClick={() => setEditingDoc({ ...doc })}>
-                            <FileText className="mr-2 h-4 w-4" /> Editar
-                          </Button>
-                          <Button size="sm" variant="outline" disabled={doc.status === "Obsoleto"} onClick={() => {
-                            setReviewingDoc(doc);
-                            setReviewSourceMode(doc.sourceMode);
-                            setReviewProcessId(
-                              doc.processId && approvedProcesses.some((processo) => processo.id === doc.processId)
-                                ? doc.processId
-                                : approvedProcesses[0]?.id || "",
-                            );
-                            setReviewIndependentDraft({
-                              title: doc.title,
-                              area: doc.area,
-                              owner: doc.documentOwner,
-                              procedureCategory: doc.procedureCategory,
-                            });
-                          }}>
-                            <RotateCcw className="mr-2 h-4 w-4" /> Revisar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setApprovalDoc(doc)}>
-                            <ShieldCheck className="mr-2 h-4 w-4" /> Aprovar / Reprovar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setDistributionDoc(doc)}>
-                            <Send className="mr-2 h-4 w-4" /> Distribuir
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => void handleExportPdf(doc)}>
-                            <Download className="mr-2 h-4 w-4" /> Exportar PDF
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleExportWord(doc)}>
-                            <Download className="mr-2 h-4 w-4" /> Exportar Word
-                          </Button>
+                      <TableCell onClick={(event) => event.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          {doc.status === "Publicado" ? (
+                            <Button size="sm" variant="outline" onClick={() => setDistributionDoc(doc)}>Distribuir</Button>
+                          ) : doc.status !== "Obsoleto" ? (
+                            <Button size="sm" variant="outline" onClick={() => setApprovalDoc(doc)}>Aprovar</Button>
+                          ) : null}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Mais ações de ${doc.title}`}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onCloseAutoFocus={(event) => event.preventDefault()}>
+                              <DropdownMenuItem onSelect={() => setViewingDoc(doc)}><Eye className="mr-2 h-4 w-4" /> Visualizar</DropdownMenuItem>
+                              <DropdownMenuItem disabled={!canEditDocument(doc)} onSelect={() => setEditingDoc({ ...doc })}><FileText className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
+                              <DropdownMenuItem disabled={doc.status === "Obsoleto"} onSelect={() => abrirRevisao(doc)}><RotateCcw className="mr-2 h-4 w-4" /> Nova revisão</DropdownMenuItem>
+                              {doc.status === "Publicado" ? (
+                                <DropdownMenuItem onSelect={() => setApprovalDoc(doc)}><ShieldCheck className="mr-2 h-4 w-4" /> Aprovar / Reprovar</DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onSelect={() => setDistributionDoc(doc)}><Send className="mr-2 h-4 w-4" /> Distribuir</DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => void handleExportPdf(doc)}><Download className="mr-2 h-4 w-4" /> Exportar PDF</DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleExportWord(doc)}><Download className="mr-2 h-4 w-4" /> Exportar Word</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
