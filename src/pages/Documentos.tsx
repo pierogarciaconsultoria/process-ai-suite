@@ -319,7 +319,8 @@ export default function Documentos() {
           nextContext.userId = userData.user.id;
           nextContext.isAuthenticated = true;
           const nomeDoPerfil = (userData.user.user_metadata as { full_name?: unknown } | undefined)?.full_name;
-          nomeDoUsuario = (typeof nomeDoPerfil === "string" && nomeDoPerfil.trim()) || userData.user.email || "";
+          // Só o nome do perfil: e-mail não serve como nome do responsável no documento.
+          nomeDoUsuario = (typeof nomeDoPerfil === "string" && nomeDoPerfil.trim()) || "";
           const resolvedCompanyId = await resolveAccessibleCompanyId(userData.user.id, nextContext.companyId);
           if (resolvedCompanyId) {
             nextContext.companyId = resolvedCompanyId;
@@ -331,7 +332,7 @@ export default function Documentos() {
 
       setCompanyContext(nextContext);
       void logoComoDataUrl(nextContext.companyId).then(setLogoDoCliente);
-      // Nome de quem está logado (perfil ou e-mail), não o código interno do usuário.
+      // Nome de quem está logado (do perfil), não o código interno do usuário.
       setReviewedBy(nomeDoUsuario);
       setApprovalName(nomeDoUsuario);
       setDistributedBy(nomeDoUsuario);
@@ -1671,7 +1672,7 @@ export default function Documentos() {
             </div>
             <div className="space-y-2">
               <Label>Nome do responsável</Label>
-              <Input value={approvalName} onChange={(e) => setApprovalName(e.target.value)} />
+              <Input value={approvalName} onChange={(e) => setApprovalName(e.target.value)} placeholder="Nome completo" />
             </div>
             <div className="space-y-2">
               <Label>Cargo do responsável</Label>
