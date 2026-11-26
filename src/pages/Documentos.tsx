@@ -1310,7 +1310,7 @@ export default function Documentos() {
             <DialogDescription>
               {preview
                 ? "Confira os pontos marcados e salve como rascunho. Depois ele segue para revisão e aprovação."
-                : "O Peter escreve o procedimento a partir da entrevista e do mapa do processo, no padrão da empresa."}
+                : "O Peter escreve a partir da entrevista e do mapa do processo."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1408,12 +1408,16 @@ export default function Documentos() {
                         onClick={() => setTipoDocumento(tipo)}
                         className={`rounded-lg border px-3 py-2 text-left text-sm transition ${tipoDocumento === tipo ? "border-primary bg-primary/5 font-medium" : "hover:border-primary/40"}`}
                       >
-                        {tipo} ({MODELO_DO_PETER[tipo].sigla})
-                        {sourceMode === "linked_process" && tipoRecomendado === tipo && <span className="block text-xs font-normal text-muted-foreground">recomendado</span>}
+                        <span className="flex items-center justify-between gap-2">
+                          {tipo} ({MODELO_DO_PETER[tipo].sigla})
+                          {sourceMode === "linked_process" && tipoRecomendado === tipo && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-normal text-primary" title={recomendacao?.motivo}>recomendado</span>
+                          )}
+                        </span>
+                        <span className="block text-xs font-normal text-muted-foreground">{tipo === "Procedimento" ? "Fluxo entre áreas" : "Tarefa de um cargo"}</span>
                       </button>
                     ))}
                   </div>
-                  {sourceMode === "linked_process" && recomendacao && <p className="text-xs text-muted-foreground">{recomendacao.motivo}</p>}
                 </div>
 
                 {sourceMode === "linked_process" && <DocumentoDeApoio valor={documentoApoio} onChange={setDocumentoApoio} />}
