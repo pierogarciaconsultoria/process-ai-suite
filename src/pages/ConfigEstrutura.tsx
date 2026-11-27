@@ -31,6 +31,8 @@ interface Rascunho {
 
 const NENHUM = "__nenhum__";
 const TITULO: Record<Aba, string> = { setores: "setor", cargos: "cargo", pessoas: "pessoa" };
+const NOVO: Record<Aba, string> = { setores: "Novo setor", cargos: "Novo cargo", pessoas: "Nova pessoa" };
+const EDITAR: Record<Aba, string> = { setores: "Editar setor", cargos: "Editar cargo", pessoas: "Editar pessoa" };
 
 const ConfigEstrutura = () => {
   const navigate = useNavigate();
@@ -99,7 +101,7 @@ const ConfigEstrutura = () => {
     setSalvando(false);
     if (error) {
       const repetido = error.code === "23505";
-      toast({ title: repetido ? `Já existe um ${TITULO[rascunho.aba]} com esse nome` : "Não foi possível salvar", description: repetido ? undefined : error.message, variant: "destructive" });
+      toast({ title: repetido ? `Já existe ${rascunho.aba === "pessoas" ? "uma" : "um"} ${TITULO[rascunho.aba]} com esse nome` : "Não foi possível salvar", description: repetido ? undefined : error.message, variant: "destructive" });
       return;
     }
     setRascunho(null);
@@ -165,7 +167,7 @@ const ConfigEstrutura = () => {
               {importando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Importar dos processos
             </Button>
             <Button onClick={() => setRascunho({ aba, id: null, nome: "", vinculo: NENHUM, email: "" })} disabled={!companyId}>
-              <Plus className="mr-2 h-4 w-4" /> Novo {TITULO[aba]}
+              <Plus className="mr-2 h-4 w-4" /> {NOVO[aba]}
             </Button>
           </div>
         )}
@@ -242,7 +244,7 @@ const ConfigEstrutura = () => {
       <Dialog open={rascunho !== null} onOpenChange={(aberto) => !aberto && setRascunho(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{rascunho?.id ? "Editar" : "Novo"} {rascunho ? TITULO[rascunho.aba] : ""}</DialogTitle>
+            <DialogTitle>{rascunho ? (rascunho.id ? EDITAR : NOVO)[rascunho.aba] : ""}</DialogTitle>
           </DialogHeader>
           {rascunho && (
             <div className="space-y-4">

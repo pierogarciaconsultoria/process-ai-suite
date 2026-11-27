@@ -21,6 +21,7 @@ import { mensagemDoErro } from "../../supabase/functions/_shared/authorization-c
 import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { documentoHtml, markdownParaHtml, tituloDoDocumento, type DadosDoCabecalho } from "@/lib/documento-pdf";
 import { logoComoDataUrl } from "@/lib/logo-empresa";
+import { EscolherPessoa, usePessoasDaEmpresa } from "@/components/documentos/EscolherPessoa";
 import { DocumentoDeApoio, type DocumentoDeApoioValor } from "@/components/documentos/DocumentoDeApoio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -199,6 +200,7 @@ export default function Documentos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const guidedSelectionHandled = useRef(false);
   const [companyContext, setCompanyContext] = useState<CompanyContext>(DEFAULT_COMPANY_CONTEXT);
+  const pessoasDaEmpresa = usePessoasDaEmpresa(companyContext.companyId);
   const [documents, setDocuments] = useState<GeneratedDocumentRecord[]>([]);
   const [processRows, setProcessRows] = useState<ProcessoRow[]>([]);
   // PR ou IT: começa pela recomendação (número de cargos do processo) e pode ser trocado.
@@ -1635,8 +1637,8 @@ export default function Documentos() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Quem revisou</Label>
-              <Input value={reviewedBy} onChange={(e) => setReviewedBy(e.target.value)} />
+              <Label htmlFor="quem-revisou">Quem revisou</Label>
+              <EscolherPessoa id="quem-revisou" pessoas={pessoasDaEmpresa} nome={reviewedBy} onChange={(nome) => setReviewedBy(nome)} />
             </div>
             <div className="space-y-2">
               <Label>Motivo da revisão</Label>
@@ -1671,8 +1673,16 @@ export default function Documentos() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Nome do responsável</Label>
-              <Input value={approvalName} onChange={(e) => setApprovalName(e.target.value)} placeholder="Nome completo" />
+              <Label htmlFor="responsavel-aprovacao">Responsável</Label>
+              <EscolherPessoa
+                id="responsavel-aprovacao"
+                pessoas={pessoasDaEmpresa}
+                nome={approvalName}
+                onChange={(nome, cargo) => {
+                  setApprovalName(nome);
+                  if (cargo !== null) setApprovalRole(cargo);
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label>Cargo do responsável</Label>
@@ -1701,8 +1711,8 @@ export default function Documentos() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Distribuído por</Label>
-              <Input value={distributedBy} onChange={(e) => setDistributedBy(e.target.value)} />
+              <Label htmlFor="distribuido-por">Distribuído por</Label>
+              <EscolherPessoa id="distribuido-por" pessoas={pessoasDaEmpresa} nome={distributedBy} onChange={(nome) => setDistributedBy(nome)} />
             </div>
             <div className="space-y-2">
               <Label>Áreas ou pessoas</Label>
