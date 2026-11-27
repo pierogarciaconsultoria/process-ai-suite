@@ -1325,6 +1325,61 @@ export type Database = {
           },
         ]
       }
+      leituras_documento: {
+        Row: {
+          company_id: string
+          confirmado_em: string | null
+          document_id: string
+          enviado_em: string
+          id: string
+          pessoa_id: string
+          revisao: string
+          token: string
+        }
+        Insert: {
+          company_id: string
+          confirmado_em?: string | null
+          document_id: string
+          enviado_em?: string
+          id?: string
+          pessoa_id: string
+          revisao: string
+          token?: string
+        }
+        Update: {
+          company_id?: string
+          confirmado_em?: string | null
+          document_id?: string
+          enviado_em?: string
+          id?: string
+          pessoa_id?: string
+          revisao?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leituras_documento_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leituras_documento_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leituras_documento_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membros: {
         Row: {
           created_at: string
@@ -1822,6 +1877,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      confirmar_leitura: { Args: { _token: string }; Returns: string }
       contas_da_plataforma: {
         Args: never
         Returns: {
@@ -1846,6 +1902,20 @@ export type Database = {
           expirado: boolean
           papel: string
           status: string
+        }[]
+      }
+      documento_para_leitura: {
+        Args: { _token: string }
+        Returns: {
+          aprovado_em: string | null
+          aprovado_por: string | null
+          codigo: string | null
+          confirmado_em: string | null
+          conteudo: string
+          elaborado_por: string | null
+          pessoa_nome: string
+          revisao: string
+          titulo: string
         }[]
       }
       empresas_do_usuario: {

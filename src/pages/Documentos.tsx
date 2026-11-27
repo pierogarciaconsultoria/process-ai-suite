@@ -22,6 +22,7 @@ import { mensagemDaFuncao } from "@/lib/erro-da-funcao";
 import { documentoHtml, markdownParaHtml, tituloDoDocumento, type DadosDoCabecalho } from "@/lib/documento-pdf";
 import { logoComoDataUrl } from "@/lib/logo-empresa";
 import { EscolherPessoa, usePessoasDaEmpresa } from "@/components/documentos/EscolherPessoa";
+import { EscolherDestinatarios, SituacaoDasLeituras, useDistribuicao } from "@/components/documentos/LeiturasDoDocumento";
 import { DocumentoDeApoio, type DocumentoDeApoioValor } from "@/components/documentos/DocumentoDeApoio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -250,6 +251,8 @@ export default function Documentos() {
   const [approvalComment, setApprovalComment] = useState("");
   const [distributionDoc, setDistributionDoc] = useState<GeneratedDocumentRecord | null>(null);
   const [distributionRecipients, setDistributionRecipients] = useState("");
+  const distribuicao = useDistribuicao(companyContext.companyId, distributionDoc);
+  const semEstrutura = distribuicao.setores.length === 0 && distribuicao.cargos.length === 0;
   const [distributedBy, setDistributedBy] = useState("");
 
   const refreshDocuments = async (companyId: string | null) => {
@@ -953,6 +956,7 @@ export default function Documentos() {
   };
 
   const handleApproval = async () => {
+    const cargoDoAprovador = pessoasDaEmpresa.find((pessoa) => pessoa.nome === approvalName)?.cargo || approvalRole;
     if (!approvalDoc || !approvalName.trim() || !companyContext.companyId) {
       toast({
         title: "Responsável obrigatório",
@@ -976,7 +980,7 @@ export default function Documentos() {
             {
               decision: approvalDecision === "approve" ? "Aprovado" : "Reprovado",
               responsibleName: approvalName,
-              responsibleRole: approvalRole,
+              responsibleRole: cargoDoAprovador,
               decidedAt: now,
               comment: approvalComment,
             },
@@ -986,7 +990,7 @@ export default function Documentos() {
       const updatePayload: TablesUpdate<"generated_documents"> = {
         status,
         approver_name: approvalName,
-        approver_role: approvalRole,
+        approver_role: cargoDoAprovador,
         approval_history: nextApprovalHistory,
         approved_at: approvalDecision === "approve" ? now : null,
         approved_by: approvalDecision === "approve" ? companyContext.userId : null,
@@ -1020,19 +1024,21 @@ export default function Documentos() {
   };
 
   const handleDistribution = async () => {
-    if (!distributionDoc || !distributionRecipients.trim() || !companyContext.companyId) {
+    const recipients = [
+      ...distribuicao.rotulos,
+      ...distributionRecipients
+        .split(/\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ];
+    if (!distributionDoc || recipients.length === 0 || !companyContext.companyId) {
       toast({
         title: "Distribuição obrigatória",
-        description: "Informe ao menos uma área ou pessoa para registrar a distribuição.",
+        description: semEstrutura ? "Informe ao menos uma área ou pessoa para registrar a distribuição." : "Escolha ao menos um setor ou cargo.",
         variant: "destructive",
       });
       return;
     }
-
-    const recipients = distributionRecipients
-      .split(/\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean);
 
     try {
       const distributedAt = new Date().toISOString();
@@ -1061,10 +1067,17 @@ export default function Documentos() {
 
       if (error) throw error;
 
+      const erroLeituras = await distribuicao.criarLeituras();
+      if (erroLeituras) throw erroLeituras;
+
       await refreshDocuments(companyContext.companyId);
-      setDistributionDoc(null);
       setDistributionRecipients("");
-      toast({ title: "Distribuição registrada", description: "Os destinatários ficaram vinculados ao documento com data e responsável." });
+      distribuicao.setSetoresEscolhidos([]);
+      distribuicao.setCargosEscolhidos([]);
+      toast({
+        title: "Distribuição registrada",
+        description: semEstrutura ? "Os destinatários ficaram vinculados ao documento com data e responsável." : "Envie o link de leitura a cada pessoa pela lista abaixo.",
+      });
     } catch (error) {
       console.error("Falha na distribuição:", error);
       toast({
@@ -1684,10 +1697,13 @@ export default function Documentos() {
                 }}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Cargo do responsável</Label>
-              <Input value={approvalRole} onChange={(e) => setApprovalRole(e.target.value)} />
-            </div>
+            {/* Quem vem do cadastro já traz o cargo; só quem é digitado precisa informar. */}
+            {!pessoasDaEmpresa.some((pessoa) => pessoa.nome === approvalName) && (
+              <div className="space-y-2">
+                <Label htmlFor="cargo-aprovacao">Cargo do responsável</Label>
+                <Input id="cargo-aprovacao" value={approvalRole} onChange={(e) => setApprovalRole(e.target.value)} />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Observação</Label>
               <Textarea value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Opcional" />
@@ -1707,20 +1723,25 @@ export default function Documentos() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Distribuir documento</DialogTitle>
-            <DialogDescription>Registre áreas ou pessoas que receberam o procedimento e quem fez a distribuição.</DialogDescription>
+            <DialogDescription>Escolha quem recebe o procedimento. Cada pessoa ganha um link para ler e confirmar a leitura.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="distribuido-por">Distribuído por</Label>
               <EscolherPessoa id="distribuido-por" pessoas={pessoasDaEmpresa} nome={distributedBy} onChange={(nome) => setDistributedBy(nome)} />
             </div>
-            <div className="space-y-2">
-              <Label>Áreas ou pessoas</Label>
-              <Textarea value={distributionRecipients} onChange={(e) => setDistributionRecipients(e.target.value)} placeholder="Uma por linha ou separadas por vírgula." />
-            </div>
+            {semEstrutura ? (
+              <div className="space-y-2">
+                <Label>Áreas ou pessoas</Label>
+                <Textarea value={distributionRecipients} onChange={(e) => setDistributionRecipients(e.target.value)} placeholder="Uma por linha ou separadas por vírgula." />
+              </div>
+            ) : (
+              <EscolherDestinatarios distribuicao={distribuicao} />
+            )}
+            {distributionDoc && <SituacaoDasLeituras distribuicao={distribuicao} documento={distributionDoc} />}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDistributionDoc(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDistributionDoc(null)}>Fechar</Button>
             <Button onClick={handleDistribution}>
               <Send className="mr-2 h-4 w-4" /> Registrar distribuição
             </Button>

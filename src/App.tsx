@@ -31,6 +31,7 @@ const ChamadoDetalhe = React.lazy(() => import("./pages/ChamadoDetalhe"));
 const ConfigRoteiroEntrevista = React.lazy(() => import("./pages/ConfigRoteiroEntrevista"));
 const ConfigSkinIA = React.lazy(() => import("./pages/ConfigSkinIA"));
 const ConviteConta = React.lazy(() => import("./pages/ConviteConta"));
+const LeituraDocumento = React.lazy(() => import("./pages/LeituraDocumento"));
 const MinhaConta = React.lazy(() => import("./pages/MinhaConta"));
 const ConfigContas = React.lazy(() => import("./pages/ConfigContas"));
 const ConfigDocumentacaoProcesso = React.lazy(() => import("./pages/ConfigDocumentacaoProcesso"));
@@ -92,6 +93,7 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/convite/:token" element={<ConviteAceite />} />
               <Route path="/convite-conta/:token" element={<ConviteConta />} />
+              <Route path="/leitura/:token" element={<LeituraDocumento />} />
               <Route path="/" element={<Landing />} />
               <Route path="/privacidade" element={<DocumentoLegal tipo="privacidade" />} />
               <Route path="/termos" element={<DocumentoLegal tipo="termos" />} />
